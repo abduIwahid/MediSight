@@ -12,6 +12,27 @@ export default async function AdminUsersPage() {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: viewer } = user
+    ? await supabase.from('profiles').select('role').eq('id', user.id).single()
+    : { data: null }
+
+  // The admin layout also admits data_scientist (for read-only model and
+  // audit views), but user management WRITES are super/hospital-admin
+  // only at the database level. Showing the controls to anyone else
+  // renders fake controls: their writes match zero RLS rows and silently
+  // do nothing. Say so instead.
+  if (!viewer || !['super_admin', 'hospital_admin'].includes(viewer.role)) {
+    return (
+      <div className="rounded-xl border bg-card p-8 text-center">
+        <h2 className="text-lg font-semibold">You don&apos;t have permission to manage users</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          User management is limited to super admins and hospital admins. Your role can use the other admin views, such as model registry, MLOps, and audit logs.
+        </p>
+      </div>
+    )
+  }
+
   const { data: profiles } = await supabase
     .from('profiles')
     .select('*, hospitals(name)')
@@ -22,5 +43,5 @@ export default async function AdminUsersPage() {
     .select('id, name')
     .order('name')
 
-  return <UserManagementView profiles={profiles || []} hospitals={hospitals || []} />
+  return <UserManagementView profiles={profiles || []} hospitals={hospitals || []} viewerRole={viewer.role} />
 }

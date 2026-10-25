@@ -22,6 +22,7 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
       *,
       vitals(*),
       lab_results(*),
+      diagnoses(*),
       predictions(*)
     `)
     .eq('id', params.id)

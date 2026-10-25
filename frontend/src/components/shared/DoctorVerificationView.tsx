@@ -27,6 +27,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
   const [rows, setRows] = useState(doctors)
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -34,9 +35,32 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
 
   const handleDecision = async (userId: string, status: "approved" | "rejected") => {
     setUpdatingId(userId)
-    const { error } = await supabase.from("doctors").update({ status }).eq("user_id", userId)
-    if (!error) {
+    setActionError(null)
+    const { data: { user } } = await supabase.auth.getUser()
+    // .select() verifies the write actually landed: RLS can match zero
+    // rows without returning an error, and the old code styled that as
+    // success.
+    const { data, error } = await supabase
+      .from("doctors")
+      .update({ status })
+      .eq("user_id", userId)
+      .select("user_id")
+    if (error || !data || data.length === 0) {
+      setActionError("The decision could not be saved. You may not have permission to review doctor applications.")
+    } else {
       setRows((prev) => prev.map((r) => (r.user_id === userId ? { ...r, status } : r)))
+      // Best-effort audit stamp (doctors.reviewed_by / reviewed_at,
+      // migration 20261025200000): kept separate from the decision
+      // write so the decision itself never depends on the stamp
+      // columns existing yet.
+      const { error: stampError } = await supabase
+        .from("doctors")
+        .update({
+          reviewed_by: user?.id ?? null,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+      if (stampError) console.warn("Reviewer stamp not saved:", stampError.message)
     }
     setUpdatingId(null)
   }
@@ -46,6 +70,11 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {actionError}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Stethoscope className="h-5 w-5 text-primary" />

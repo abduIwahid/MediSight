@@ -17,14 +17,18 @@ export default function NewPatientPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
+  const [createdPatientId, setCreatedPatientId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     age: "",
     gender: "",
-    bmi: "25",
-    bpSystolic: "120",
+    // No pre-filled vitals: a default BMI/BP left in place by a rushed
+    // clinician would be stored as if it had been measured.
+    bmi: "",
+    bpSystolic: "",
     highChol: false,
     smoker: false,
     historyHeartDisease: false,
@@ -41,6 +45,7 @@ export default function NewPatientPage() {
     if (loading) return
     setLoading(true)
     setError(null)
+    setWarning(null)
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -64,65 +69,16 @@ export default function NewPatientPage() {
       }
       if (!resolvedHospitalId) throw new Error("No hospital found. Please create a hospital first.")
 
-      // 1. Insert Patient
-      const mrn = `MRN-${Math.floor(Math.random() * 900000) + 100000}`
-      const { data: patient, error: patientError } = await supabase
-        .from("patients")
-        .insert({
-          mrn,
-          demographics: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            age: parseInt(formData.age),
-            gender: formData.gender,
-            birth_date: new Date(
-              new Date().setFullYear(new Date().getFullYear() - parseInt(formData.age))
-            ).toISOString(),
-          },
-          hospital_id: resolvedHospitalId,
-        })
-        .select()
-        .single()
-
-      if (patientError || !patient) throw new Error(`Patient Error: ${patientError?.message}`)
-
-      // 2. Insert Vitals
-      const now = new Date().toISOString()
-      await supabase.from("vitals").insert([
-        { patient_id: patient.id, type: "BMI", value: formData.bmi, unit: "kg/m²", recorded_at: now },
-        { patient_id: patient.id, type: "Blood Pressure Systolic", value: formData.bpSystolic, unit: "mmHg", recorded_at: now },
-      ])
-
-      // 3. Insert Lab Results
-      const labRows = formData.labs
-        .filter(l => l.testName.trim() && l.value.trim())
-        .map((lab) => ({
-          patient_id: patient.id,
-          test_name: lab.testName,
-          value: lab.value,
-          unit: lab.unit,
-          recorded_at: lab.recordedAt || now,
-        }))
-
-      if (labRows.length > 0) {
-        await supabase.from("lab_results").insert(labRows)
-      }
-
-      // 4. Insert Diagnoses History
-      const diagnosesToInsert = []
-      const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD date only
-      if (formData.historyHeartDisease)
-        diagnosesToInsert.push({ patient_id: patient.id, condition: "Heart Disease", diagnosed_at: today })
-      if (formData.historyStroke)
-        diagnosesToInsert.push({ patient_id: patient.id, condition: "Stroke", diagnosed_at: today })
-      if (diagnosesToInsert.length > 0)
-        await supabase.from("diagnoses").insert(diagnosesToInsert)
-
-      // 4. Call local FastAPI /predict
+      // 1. Run the model FIRST. Until the score exists, nothing is
+      // written: if the ML service is down (503), the submit aborts here
+      // and no half-created patient record is left behind.
       const ageNum = parseInt(formData.age)
       const ageGroup = brfssAgeBand(ageNum)
-      const bmiNum = parseFloat(formData.bmi) || 25
-      const bpHigh = parseInt(formData.bpSystolic) >= 130 ? 1.0 : 0.0
+      const bmiNum = parseFloat(formData.bmi)
+      if (!Number.isFinite(bmiNum)) throw new Error("Please enter the patient's measured BMI.")
+      const bpNum = parseInt(formData.bpSystolic)
+      if (!Number.isFinite(bpNum)) throw new Error("Please enter the patient's measured systolic blood pressure.")
+      const bpHigh = bpNum >= 130 ? 1.0 : 0.0
 
       const mlPayload = {
         HighBP: bpHigh,
@@ -161,31 +117,158 @@ export default function NewPatientPage() {
 
       const prediction = await mlRes.json()
 
-      // 5. Save prediction to Supabase (only use confirmed schema columns)
-      const { error: predSaveErr } = await supabase.from("predictions").insert({
+      // 2. Insert Patient
+      const mrn = `MRN-${Math.floor(Math.random() * 900000) + 100000}`
+      const { data: patient, error: patientError } = await supabase
+        .from("patients")
+        .insert({
+          mrn,
+          demographics: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            age: parseInt(formData.age),
+            gender: formData.gender,
+            birth_date: new Date(
+              new Date().setFullYear(new Date().getFullYear() - parseInt(formData.age))
+            ).toISOString(),
+          },
+          hospital_id: resolvedHospitalId,
+        })
+        .select()
+        .single()
+
+      if (patientError || !patient) throw new Error(`Patient Error: ${patientError?.message}`)
+
+      // From here on the patient row exists — every failure must say so
+      // honestly instead of implying nothing was saved.
+      const partial = (what: string, detail?: string) =>
+        new Error(`The patient was created, but ${what} could not be saved${detail ? `: ${detail}` : ""}. Open the patient record to review what is missing.`)
+
+      // 3. Assign the creating clinician — the Risk Queue reads
+      // doctor_patient_assignments; best-effort (duplicate/RLS refusal
+      // must not block registration).
+      await supabase.from("doctor_patient_assignments").insert({
+        doctor_id: user.id,
         patient_id: patient.id,
-        disease: "Diabetes",
-        probability: prediction.probability,
-        severity: prediction.severity,
-        confidence: prediction.confidence,
-        model_version: prediction.model_version,
+        hospital_id: resolvedHospitalId,
       })
 
-      if (predSaveErr) {
-        console.warn("Prediction save warning:", predSaveErr.message)
+      // 4. Insert Vitals
+      const now = new Date().toISOString()
+      const { error: vitalsError } = await supabase.from("vitals").insert([
+        { patient_id: patient.id, type: "BMI", value: formData.bmi, unit: "kg/m²", recorded_at: now },
+        { patient_id: patient.id, type: "Blood Pressure Systolic", value: formData.bpSystolic, unit: "mmHg", recorded_at: now },
+      ])
+      if (vitalsError) throw partial("the vitals", vitalsError.message)
+
+      // 5. Insert Lab Results
+      const labRows = formData.labs
+        .filter(l => l.testName.trim() && l.value.trim())
+        .map((lab) => ({
+          patient_id: patient.id,
+          test_name: lab.testName,
+          value: lab.value,
+          unit: lab.unit,
+          recorded_at: lab.recordedAt || now,
+        }))
+
+      if (labRows.length > 0) {
+        const { error: labsError } = await supabase.from("lab_results").insert(labRows)
+        if (labsError) throw partial("the lab results", labsError.message)
       }
 
-      // 6. Auto-generate alert for High or Critical risk patients
+      // 6. Insert Diagnoses History
+      const diagnosesToInsert = []
+      const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD date only
+      if (formData.historyHeartDisease)
+        diagnosesToInsert.push({ patient_id: patient.id, condition: "Heart Disease", diagnosed_at: today })
+      if (formData.historyStroke)
+        diagnosesToInsert.push({ patient_id: patient.id, condition: "Stroke", diagnosed_at: today })
+      if (diagnosesToInsert.length > 0) {
+        const { error: diagnosesError } = await supabase.from("diagnoses").insert(diagnosesToInsert)
+        if (diagnosesError) throw partial("the medical history", diagnosesError.message)
+      }
+
+      // 7. Save the prediction (only confirmed schema columns)
+      const { data: savedPrediction, error: predSaveErr } = await supabase
+        .from("predictions")
+        .insert({
+          patient_id: patient.id,
+          disease: "Diabetes",
+          probability: prediction.probability,
+          severity: prediction.severity,
+          confidence: prediction.confidence,
+          model_version: prediction.model_version,
+        })
+        .select("id")
+        .single()
+
+      if (predSaveErr || !savedPrediction) {
+        throw partial("the prediction", predSaveErr?.message)
+      }
+
+      // Non-blocking follow-ups: if any of these fail, the page shows a
+      // warning with a link to the record instead of navigating away and
+      // hiding it.
+      const warnings: string[] = []
+
+      // 8. Snapshot the exact inputs this score was computed from
+      // (predictions.features, migration 20261025200000) — best-effort.
+      const { error: featuresErr } = await supabase
+        .from("predictions")
+        .update({ features: mlPayload })
+        .eq("id", savedPrediction.id)
+      if (featuresErr) {
+        console.warn("Prediction feature snapshot was not stored:", featuresErr.message)
+      }
+
+      // 9. Persist the SHAP explanation (/predict returns none, so call
+      // /explain with the same payload). Stored in the array shape the
+      // detail page/report render: [{feature, value, impact}].
+      try {
+        const expRes = await fetch("/api/explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mlPayload),
+        })
+        if (!expRes.ok) throw new Error("Explanation request failed")
+        const explanation = await expRes.json()
+        const shapPayload = Object.entries(
+          (explanation.shap_values ?? {}) as Record<string, number>
+        ).map(([feature, impact]) => ({
+          feature,
+          value: (mlPayload as Record<string, number>)[feature] ?? null,
+          impact: Number(impact),
+        }))
+        const { error: expErr } = await supabase.from("explanations").insert({
+          prediction_id: savedPrediction.id,
+          shap_payload: shapPayload,
+          clinical_explanation: explanation.clinical_explanation,
+        })
+        if (expErr) throw new Error(expErr.message)
+      } catch {
+        warnings.push("its SHAP explanation could not be stored — the detail page will show this score without factor contributions")
+      }
+
+      // 10. Auto-generate alert for High or Critical risk patients
       if (prediction.severity === "High" || prediction.severity === "Critical") {
-        await supabase.from("alerts").insert({
+        const { error: alertErr } = await supabase.from("alerts").insert({
           patient_id: patient.id,
           type: `${prediction.severity} Diabetes Risk`,
           severity: prediction.severity,
           status: "New",
         })
+        if (alertErr) warnings.push("the high-risk alert could not be created")
       }
 
-      // 7. Navigate to patient detail page
+      if (warnings.length > 0) {
+        setCreatedPatientId(patient.id)
+        setWarning(`The patient and prediction were saved, but ${warnings.join("; and ")}.`)
+        setLoading(false)
+        return
+      }
+
+      // 11. Navigate to patient detail page
       router.push(`/patients/${patient.id}`)
     } catch (err: unknown) {
       console.error(err)
@@ -236,13 +319,24 @@ export default function NewPatientPage() {
             </CardHeader>
             <CardContent className="space-y-8 pt-8">
               {error && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                   className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 text-sm font-medium flex items-start gap-3"
                 >
                   <Loader2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
                   <p>{error}</p>
                 </motion.div>
+              )}
+
+              {warning && (
+                <div className="p-4 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-500/20 text-sm font-medium flex items-start justify-between gap-3">
+                  <p>{warning}</p>
+                  {createdPatientId && (
+                    <Link href={`/patients/${createdPatientId}`} className="shrink-0 font-semibold underline underline-offset-2">
+                      Open patient record
+                    </Link>
+                  )}
+                </div>
               )}
 
               {/* Patient Identity */}

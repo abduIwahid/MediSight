@@ -6,12 +6,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, UserCheck, RefreshCw } from "lucide-react"
 import type { ProfileRow } from "@/lib/types"
 
-const ALL_ROLES = ['super_admin', 'hospital_admin', 'doctor', 'nurse', 'data_scientist']
+const ALL_ROLES = ['super_admin', 'hospital_admin', 'doctor', 'nurse', 'data_scientist', 'patient']
 
-export function UserManagementView({ profiles, hospitals }: { profiles: ProfileRow[], hospitals: { id: string; name: string }[] }) {
+// Roles an admin may assign from this screen. 'doctor' is deliberately
+// absent: setting profiles.role = 'doctor' without a doctors-table row
+// traps the account on the pending-approval screen with no application
+// for anyone to approve. Doctor accounts are created through signup and
+// verification instead.
+const ASSIGNABLE_ROLES = ['super_admin', 'hospital_admin', 'nurse', 'data_scientist', 'patient']
+
+export function UserManagementView({ profiles, hospitals, viewerRole }: { profiles: ProfileRow[], hospitals: { id: string; name: string }[], viewerRole: string }) {
   const [query, setQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [localProfiles, setLocalProfiles] = useState(profiles)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,13 +33,22 @@ export function UserManagementView({ profiles, hospitals }: { profiles: ProfileR
     return matchesQuery && matchesRole
   })
 
+  // RLS can refuse a write by matching zero rows WITHOUT returning an
+  // error (e.g. a role the viewer's policies may not write). Every update
+  // therefore asks for the row back with .select() and treats "nothing
+  // came back" as the failure it is — a silent no-op styled as success
+  // is how admins end up believing a change happened when it did not.
   const handleRoleChange = async (profileId: string, newRole: string) => {
     setUpdatingId(profileId)
-    const { error } = await supabase
+    setActionError(null)
+    const { data, error } = await supabase
       .from('profiles')
       .update({ role: newRole })
       .eq('id', profileId)
-    if (!error) {
+      .select('id')
+    if (error || !data || data.length === 0) {
+      setActionError("The role change could not be saved. You may not have permission to change this user's role.")
+    } else {
       setLocalProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role: newRole } : p))
     }
     setUpdatingId(null)
@@ -39,11 +56,15 @@ export function UserManagementView({ profiles, hospitals }: { profiles: ProfileR
 
   const handleHospitalChange = async (profileId: string, newHospitalId: string) => {
     setUpdatingId(profileId)
-    const { error } = await supabase
+    setActionError(null)
+    const { data, error } = await supabase
       .from('profiles')
       .update({ hospital_id: newHospitalId || null })
       .eq('id', profileId)
-    if (!error) {
+      .select('id')
+    if (error || !data || data.length === 0) {
+      setActionError("The hospital change could not be saved. You may not have permission to change this user's hospital.")
+    } else {
       setLocalProfiles(prev => prev.map(p => {
         if (p.id === profileId) {
           const hospital = hospitals.find(h => h.id === newHospitalId)
@@ -55,8 +76,26 @@ export function UserManagementView({ profiles, hospitals }: { profiles: ProfileR
     setUpdatingId(null)
   }
 
+  // Options for a row's role dropdown: the assignable roles, minus
+  // super_admin when the viewer is a hospital_admin (only a super_admin
+  // may grant super_admin — the DB guard enforces the same rule), plus
+  // the user's current role when it isn't assignable (e.g. 'doctor') so
+  // the control can still display it truthfully.
+  const roleOptionsFor = (currentRole?: string | null) => {
+    const options = ASSIGNABLE_ROLES.filter(
+      r => !(viewerRole === 'hospital_admin' && r === 'super_admin')
+    )
+    if (currentRole && !options.includes(currentRole)) options.push(currentRole)
+    return options
+  }
+
   return (
     <div className="space-y-4">
+      {actionError && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {actionError}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -124,7 +163,7 @@ export function UserManagementView({ profiles, hospitals }: { profiles: ProfileR
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {ALL_ROLES.map(r => (
+                        {roleOptionsFor(profile.role).map(r => (
                           <SelectItem key={r} value={r} className="text-xs">{r.replace('_', ' ')}</SelectItem>
                         ))}
                       </SelectContent>
@@ -166,6 +205,9 @@ export function UserManagementView({ profiles, hospitals }: { profiles: ProfileR
           {filtered.length} of {localProfiles.length} users shown
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Doctor accounts are created through signup and verification.
+      </p>
     </div>
   )
 }
