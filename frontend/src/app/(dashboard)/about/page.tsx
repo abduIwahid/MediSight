@@ -54,7 +54,7 @@ export default function AboutPage() {
             <span className="text-xs uppercase tracking-wider font-semibold text-primary">24 Hours Monitoring</span>
             <h3 className="text-lg font-bold mt-1">Predictive Risk Assessment</h3>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-              Instant multi-disease risk calculation for Heart Disease, Diabetes, and Chronic Kidney Disease powered by trained ML pipelines.
+              Instant diabetes risk calculation powered by a trained ML model (LightGBM, CDC BRFSS 2015), plus a rule-based symptom screening wizard for triage. Models for further conditions are on the roadmap.
             </p>
           </div>
           <Link href="/patients/new" className="text-xs font-semibold text-primary hover:underline mt-4 inline-flex items-center">

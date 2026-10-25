@@ -27,7 +27,7 @@ import { createClient } from "@/lib/supabase/client"
 /*  Static config                                                      */
 /* ------------------------------------------------------------------ */
 
-const STEPS = ["Select Symptoms", "Patient Details", "AI Prediction", "Book Doctor"]
+const STEPS = ["Select Symptoms", "Patient Details", "Screening Result", "Book Doctor"]
 
 function formatSymptomLabel(id: string) {
   return id
@@ -172,10 +172,10 @@ export default function PredictPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-16 print:max-w-full">
       <div className="print:hidden">
-        <p className="kicker mb-3">AI-Powered Screening</p>
+        <p className="kicker mb-3">Rule-Based Symptom Screening</p>
         <h1 className="font-heading text-3xl font-bold">Disease Prediction Wizard</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Answer a few questions and get an instant AI-assisted risk screening, plus a matched specialist.
+          Answer a few questions and get an instant rule-based symptom screening, plus a matched specialist. This checker uses fixed symptom rules — it is not the trained prediction model.
         </p>
       </div>
 
@@ -332,13 +332,13 @@ export default function PredictPage() {
           </motion.div>
         )}
 
-        {/* ---------------- Step 3: AI Prediction Result ---------------- */}
+        {/* ---------------- Step 3: Screening Result ---------------- */}
         {step === 2 && result && (
           <motion.div key="result" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-6">
             <div id="report" className="rounded-2xl border border-border bg-card p-7 shadow-premium">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="kicker mb-3">AI Screening Result</p>
+                  <p className="kicker mb-3">Screening Result</p>
                   <h2 className="font-heading text-2xl font-bold">{result.disease}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">for {patient.name}, {patient.age} yrs</p>
                 </div>
@@ -382,7 +382,7 @@ export default function PredictPage() {
 
               <div className="mt-6 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                This is an AI-assisted screening tool, not a medical diagnosis. Please consult a licensed doctor to confirm any results.
+                This is a rule-based screening tool, not a medical diagnosis. Please consult a licensed doctor to confirm any results.
               </div>
             </div>
 
