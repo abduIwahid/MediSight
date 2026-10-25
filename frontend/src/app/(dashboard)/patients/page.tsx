@@ -38,8 +38,13 @@ export default async function PatientListPage({
 
   if (search) {
     const term = search.replace(/[%_,()]/g, " ").trim()
+    // Name matching must cover the fields the app actually writes: the
+    // New Patient flow stores first_name/last_name in demographics (and
+    // the in-page filter additionally matches the two combined, so a
+    // "first last" query works). full_name/name stay for seeded and
+    // legacy records that use those conventions.
     patientsQuery = patientsQuery
-      .or(`mrn.ilike.%${term}%,demographics->>full_name.ilike.%${term}%,demographics->>name.ilike.%${term}%`)
+      .or(`mrn.ilike.%${term}%,demographics->>full_name.ilike.%${term}%,demographics->>name.ilike.%${term}%,demographics->>first_name.ilike.%${term}%,demographics->>last_name.ilike.%${term}%`)
       .limit(200)
   } else {
     patientsQuery = patientsQuery.limit(25)

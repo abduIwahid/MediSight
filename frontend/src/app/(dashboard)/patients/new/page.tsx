@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { brfssAgeBand } from "@/lib/prediction-features"
+import { brfssAgeBand, INTAKE_RISK_FACTOR_KEYS } from "@/lib/prediction-features"
 import { useStagedLoadingLabel } from "@/lib/use-staged-loading-label"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -133,6 +133,14 @@ export default function NewPatientPage() {
             birth_date: new Date(
               new Date().setFullYear(new Date().getFullYear() - parseInt(formData.age))
             ).toISOString(),
+            // The four risk factors collected on this form are persisted
+            // with the record, so every later re-run scores the values
+            // entered here instead of silently falling back to the
+            // population defaults in buildMLPayload (QA Round 2, cluster 2).
+            [INTAKE_RISK_FACTOR_KEYS.HighChol]: formData.highChol ? 1 : 0,
+            [INTAKE_RISK_FACTOR_KEYS.Smoker]: formData.smoker ? 1 : 0,
+            [INTAKE_RISK_FACTOR_KEYS.PhysActivity]: formData.physActivity ? 1 : 0,
+            [INTAKE_RISK_FACTOR_KEYS.GenHlth]: parseFloat(formData.genHlth) || 3,
           },
           hospital_id: resolvedHospitalId,
         })
@@ -214,43 +222,49 @@ export default function NewPatientPage() {
       // hiding it.
       const warnings: string[] = []
 
-      // 8. Snapshot the exact inputs this score was computed from
-      // (predictions.features, migration 20261025200000) — best-effort.
-      const { error: featuresErr } = await supabase
-        .from("predictions")
-        .update({ features: mlPayload })
-        .eq("id", savedPrediction.id)
+      // 8 + 9 run in PARALLEL: snapshot the exact inputs this score was
+      // computed from (predictions.features, migration 20261025200000 —
+      // a follow-up update, NOT part of the insert, because the column
+      // only exists once that migration is applied; its failure stays
+      // tolerated) and persist the SHAP explanation (/predict returns
+      // none, so /explain is called with the same payload; stored in the
+      // array shape the detail page/report render).
+      const explainPromise = (async (): Promise<string | null> => {
+        try {
+          const expRes = await fetch("/api/explain", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(mlPayload),
+          })
+          if (!expRes.ok) throw new Error("Explanation request failed")
+          const explanation = await expRes.json()
+          const shapPayload = Object.entries(
+            (explanation.shap_values ?? {}) as Record<string, number>
+          ).map(([feature, impact]) => ({
+            feature,
+            value: (mlPayload as Record<string, number>)[feature] ?? null,
+            impact: Number(impact),
+          }))
+          const { error: expErr } = await supabase.from("explanations").insert({
+            prediction_id: savedPrediction.id,
+            shap_payload: shapPayload,
+            clinical_explanation: explanation.clinical_explanation,
+          })
+          if (expErr) throw new Error(expErr.message)
+          return null
+        } catch {
+          return "its SHAP explanation could not be stored — the detail page will show this score without factor contributions"
+        }
+      })()
+
+      const [{ error: featuresErr }, explainWarning] = await Promise.all([
+        supabase.from("predictions").update({ features: mlPayload }).eq("id", savedPrediction.id),
+        explainPromise,
+      ])
       if (featuresErr) {
         console.warn("Prediction feature snapshot was not stored:", featuresErr.message)
       }
-
-      // 9. Persist the SHAP explanation (/predict returns none, so call
-      // /explain with the same payload). Stored in the array shape the
-      // detail page/report render: [{feature, value, impact}].
-      try {
-        const expRes = await fetch("/api/explain", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(mlPayload),
-        })
-        if (!expRes.ok) throw new Error("Explanation request failed")
-        const explanation = await expRes.json()
-        const shapPayload = Object.entries(
-          (explanation.shap_values ?? {}) as Record<string, number>
-        ).map(([feature, impact]) => ({
-          feature,
-          value: (mlPayload as Record<string, number>)[feature] ?? null,
-          impact: Number(impact),
-        }))
-        const { error: expErr } = await supabase.from("explanations").insert({
-          prediction_id: savedPrediction.id,
-          shap_payload: shapPayload,
-          clinical_explanation: explanation.clinical_explanation,
-        })
-        if (expErr) throw new Error(expErr.message)
-      } catch {
-        warnings.push("its SHAP explanation could not be stored — the detail page will show this score without factor contributions")
-      }
+      if (explainWarning) warnings.push(explainWarning)
 
       // 10. Auto-generate alert for High or Critical risk patients
       if (prediction.severity === "High" || prediction.severity === "Critical") {

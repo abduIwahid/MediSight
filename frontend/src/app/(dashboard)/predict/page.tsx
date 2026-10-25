@@ -272,7 +272,7 @@ export default function PredictPage() {
         {step === 1 && (
           <motion.div key="details" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <h2 ref={headingRef} tabIndex={-1} className="font-heading text-lg font-bold outline-none">Patient Details</h2>
-            <p className="mt-1 text-sm text-muted-foreground">These help personalize your recommendations.</p>
+            <p className="mt-1 text-sm text-muted-foreground">These details appear on the screening report. The match itself is based only on the symptoms you selected.</p>
 
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <div className="space-y-1.5">

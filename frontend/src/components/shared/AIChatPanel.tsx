@@ -200,6 +200,11 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
   // every send, adding two round trips of latency to each message.
   const [patientData, setPatientData] = useState<PatientRow | null>(null)
   const [modelStatus, setModelStatus] = useState<ModelStatusInfo | null>(null)
+  // Generation counter for the patient-context fetch: rapid re-selection
+  // (patient A slow, patient B fast) must never let A's late response
+  // overwrite B's context and reset the conversation to the wrong
+  // patient (QA Round 2, cluster 10).
+  const contextGeneration = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -228,6 +233,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
 
   // Auto-load patient context when a patient is selected
   useEffect(() => {
+    const generation = ++contextGeneration.current
     if (!patientId) {
       setContextStatus("idle")
       setPatientData(null)
@@ -238,6 +244,9 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     setContextStatus("loading")
     fetchPatientContext(patientId, supabase)
       .then((patient) => {
+        // A newer selection superseded this fetch — discard the result
+        // entirely (data, header status, and conversation alike).
+        if (contextGeneration.current !== generation) return
         if (patient) {
           setPatientData(patient)
           setContextStatus("loaded")
@@ -260,10 +269,13 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
         }
       })
       .catch(() => {
+        if (contextGeneration.current !== generation) return
         setPatientData(null)
         setContextStatus("error")
       })
-      .finally(() => setIsLoadingContext(false))
+      .finally(() => {
+        if (contextGeneration.current === generation) setIsLoadingContext(false)
+      })
   }, [patientId]) // eslint-disable-line
 
   const handleSend = async (text: string) => {

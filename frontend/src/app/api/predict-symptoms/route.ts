@@ -59,7 +59,10 @@ export async function POST(request: Request) {
       return NextResponse.json({
         disease: "Non-specific symptoms",
         specialty: "General Practitioner",
-        confidence: 0.35,
+        // Integer percent, like every other response from this route —
+        // this fallback used to return the fraction 0.35, which the
+        // wizard rendered as a "0%" / "1%" match (QA Round 2, cluster 8).
+        confidence: 35,
         risk: "Low",
         recommendations: [
           "Monitor your symptoms over the next 24-48 hours",
