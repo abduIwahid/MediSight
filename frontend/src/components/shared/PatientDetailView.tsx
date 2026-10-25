@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation"
 import { PatientRiskCard } from "@/components/shared/PatientRiskCard"
 import { DataTable } from "@/components/shared/DataTable"
 import { RunPredictionButton } from "@/components/shared/RunPredictionButton"
+import { RiskTrendChart } from "@/components/shared/RiskTrendChart"
+import { EmptyState } from "@/components/shared/EmptyState"
 import Link from "next/link"
-import { ArrowLeft, User, Calendar, Activity, FlaskConical, Stethoscope, Heart, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, User, Calendar, Activity, FlaskConical, Stethoscope, Heart, Pencil, Trash2, TrendingUp } from "lucide-react"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -410,6 +412,24 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
             <div className="bg-card border rounded-2xl p-5 shadow-sm">
               <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-4">Run Updated Assessment</h3>
               <RunPredictionButton patient={patient} />
+            </div>
+          )}
+
+          {sortedPreds.length >= 1 && (
+            <div className="bg-card border rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" /> Risk Trend
+              </h3>
+              {sortedPreds.length >= 2 ? (
+                <RiskTrendChart predictions={sortedPreds} />
+              ) : (
+                <EmptyState
+                  icon={TrendingUp}
+                  title="Not enough assessments for a trend"
+                  description="A trend needs at least two assessments. Run an updated assessment to start tracking how this patient's risk changes over time."
+                  className="border-none bg-transparent px-2 py-6"
+                />
+              )}
             </div>
           )}
 
