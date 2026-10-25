@@ -59,17 +59,27 @@ export default function BookAppointmentPage() {
       return
     }
 
-    const { error: insertError } = await supabase.from("appointments").insert({
+    const { data: inserted, error: insertError } = await supabase.from("appointments").insert({
       patient_id: user.id,
       doctor_id: doctorId,
       scheduled_at: new Date(date).toISOString(),
       reason: reason || null,
       status: "Requested",
-    })
+    }).select("id").single()
 
     if (insertError) {
       setError(insertError.message)
     } else {
+      // Fire-and-forget confirmation email. The notify route skips
+      // sending when email is not configured, and an email failure never
+      // affects the booking — so this is never awaited.
+      if (inserted?.id) {
+        fetch("/api/appointments/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointmentId: inserted.id, kind: "confirmation" }),
+        }).catch(() => {})
+      }
       setSuccess(true)
       setTimeout(() => router.push("/patient/appointments"), 1200)
     }
