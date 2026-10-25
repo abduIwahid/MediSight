@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import BrandMark from "@/components/shared/BrandMark"
 
 export default function DoctorOnboardingPage() {
   const [checking, setChecking] = useState(true)
@@ -73,7 +74,11 @@ export default function DoctorOnboardingPage() {
   if (checking) return <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">Loading...</div>
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-muted/30 px-4 py-10">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
+      <div className="flex items-center gap-2.5">
+        <BrandMark className="h-10 w-10 shrink-0" />
+        <span className="text-xl font-bold tracking-tight">WhyRisk</span>
+      </div>
       <div className="w-full max-w-lg space-y-6 rounded-2xl border bg-card p-8 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Complete Doctor Registration</h1>
@@ -91,7 +96,7 @@ export default function DoctorOnboardingPage() {
             <Label htmlFor="hospital">Hospital / Clinic name</Label>
             <Input id="hospital" value={hospital} onChange={(e) => setHospital(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="specialization">Specialization</Label>
               <Input id="specialization" value={specialization} onChange={(e) => setSpecialization(e.target.value)} />
@@ -103,7 +108,7 @@ export default function DoctorOnboardingPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
 
           {error && <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}

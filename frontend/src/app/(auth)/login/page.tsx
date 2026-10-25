@@ -9,6 +9,7 @@ import Link from "next/link"
 import { AtSign, Lock, Eye, EyeOff } from "lucide-react"
 import { motion } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 // Google sign-in is NOT enabled in the Supabase project yet — rendering
 // the button sends users to a raw provider error page. The OAuth code
@@ -18,7 +19,13 @@ const GOOGLE_OAUTH_ENABLED = false
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <PulseLoader />
+        </div>
+      }
+    >
       <LoginPageInner />
     </Suspense>
   )
@@ -29,7 +36,6 @@ function LoginPageInner() {
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<"google" | null>(null)
@@ -78,7 +84,17 @@ function LoginPageInner() {
     const staffRoles = ["doctor", "super_admin", "hospital_admin", "nurse", "data_scientist"]
     const actualRole = profile?.role
 
-    if (portal === "doctor" && (!actualRole || !staffRoles.includes(actualRole))) {
+    if (!actualRole) {
+      // Signed in, but no profile row resolved (e.g. a first-time OAuth
+      // signup whose setup isn't finished) — onboarding is where the
+      // profile gets completed, not a portal-mismatch error.
+      router.push("/onboarding")
+      router.refresh()
+      setLoading(false)
+      return
+    }
+
+    if (portal === "doctor" && !staffRoles.includes(actualRole)) {
       await supabase.auth.signOut()
       setError("This account is registered as a Patient. Please sign in through the Patient Portal.")
       setLoading(false)
@@ -87,7 +103,7 @@ function LoginPageInner() {
 
     if (portal === "patient" && actualRole !== "patient") {
       await supabase.auth.signOut()
-      setError("This account is registered as a Doctor. Please sign in through the Doctor Portal.")
+      setError("This account is registered as a staff account. Use the Doctor Portal to sign in.")
       setLoading(false)
       return
     }
@@ -151,12 +167,12 @@ function LoginPageInner() {
               Clinical intelligence, delivered with confidence.
             </h2>
             <p className="max-w-sm text-sm leading-6 text-white/80">
-              Predictive risk models, explainable AI, and real-time patient insights — all in one secure workspace built for modern care teams.
+              A trained diabetes risk model with explainable AI — every score shows the factors behind it — in one secure workspace for care teams.
             </p>
             <ul className="space-y-3 text-sm text-white/85">
-              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> Early disease risk prediction</li>
+              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> Diabetes risk prediction</li>
               <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> SHAP-powered explainability</li>
-              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> Row-level security on every record</li>
+              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> Role-based access for patients, doctors and admins</li>
             </ul>
           </div>
           <p className="relative z-10 text-xs text-white/60">One workspace for patients, doctors and admins.</p>
@@ -165,6 +181,11 @@ function LoginPageInner() {
         {/* Form panel */}
         <div className="flex flex-col justify-center bg-card px-8 py-10 md:px-12 md:py-12">
           <div className="space-y-6">
+            {/* Brand lockup for small screens — the brand panel is hidden there */}
+            <div className="flex items-center gap-2.5 md:hidden">
+              <BrandMark className="h-10 w-10 shrink-0" />
+              <span className="text-xl font-bold tracking-tight">WhyRisk</span>
+            </div>
             <div className="space-y-2">
               <p className="eyebrow">Welcome back</p>
               <h1 className="font-heading text-3xl font-bold text-foreground">Sign in to your workspace</h1>
@@ -197,11 +218,12 @@ function LoginPageInner() {
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="identifier">Email or Phone</Label>
-                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <AtSign className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <Input
                     id="identifier"
                     type="text"
+                    autoComplete="email"
                     value={identifier}
                     onChange={e => setIdentifier(e.target.value)}
                     placeholder="Enter your email or phone number"
@@ -218,11 +240,12 @@ function LoginPageInner() {
                     Forgot password?
                   </Link>
                 </div>
-                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <Lock className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Enter your password"
@@ -240,21 +263,15 @@ function LoginPageInner() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <label className="inline-flex items-center gap-2 text-sm text-foreground/80">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={e => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  Remember me
-                </label>
-                <span className="text-sm text-muted-foreground">Secure session</span>
-              </div>
-
               {callbackError && <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">{callbackError}</div>}
-              {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+              {error && (
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  <span>{error}</span>
+                  <Link href="/forgot-password" className="shrink-0 font-medium underline underline-offset-2">
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
 
               <Button type="submit" className="w-full py-3" disabled={loading}>
                 {loading ? "Signing in..." : portal === "doctor" ? "Sign In as Doctor" : "Sign In"}

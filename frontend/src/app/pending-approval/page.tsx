@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Clock, XCircle, LogOut } from "lucide-react"
+import BrandMark from "@/components/shared/BrandMark"
 
 export default function PendingApprovalPage() {
   const [status, setStatus] = useState<"pending" | "rejected" | null>(null)
@@ -40,7 +41,11 @@ export default function PendingApprovalPage() {
   const isRejected = status === "rejected"
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-muted/30 px-4">
+    <div className="flex min-h-dvh w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
+      <div className="flex items-center gap-2.5">
+        <BrandMark className="h-10 w-10 shrink-0" />
+        <span className="text-xl font-bold tracking-tight">WhyRisk</span>
+      </div>
       <div className="w-full max-w-md space-y-6 rounded-2xl border bg-card p-8 text-center shadow-sm">
         <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${isRejected ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-600"}`}>
           {isRejected ? <XCircle className="h-7 w-7" /> : <Clock className="h-7 w-7" />}

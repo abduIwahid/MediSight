@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { CheckCircle2, ArrowLeft } from "lucide-react"
+import BrandMark from "@/components/shared/BrandMark"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -36,7 +37,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-muted/30">
+    <div className="flex min-h-dvh w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
+      <div className="flex items-center gap-2.5">
+        <BrandMark className="h-10 w-10 shrink-0" />
+        <span className="text-xl font-bold tracking-tight">WhyRisk</span>
+      </div>
       <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-sm">
         {sent ? (
           <div className="flex flex-col items-center text-center space-y-4 py-4">
@@ -69,14 +74,15 @@ export default function ForgotPasswordPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@hospital.com"
+                  autoComplete="email"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
 
-              {error && <div className="text-red-500 text-sm">{error}</div>}
+              {error && <div className="text-destructive text-sm">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Sending..." : "Send Reset Link"}

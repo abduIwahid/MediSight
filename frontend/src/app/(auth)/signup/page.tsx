@@ -57,12 +57,12 @@ export default function SignupPage() {
         data: {
           full_name: fullName,
           role: portal, // 'patient' or 'doctor' — read by the handle_new_user DB trigger
+          phone, // stored in metadata for both portals (handle_new_user reads it)
           ...(portal === "doctor" && {
             license_number: licenseNumber,
             hospital,
             specialization,
             experience,
-            phone,
           }),
         },
       },
@@ -71,9 +71,9 @@ export default function SignupPage() {
     if (error) {
       setError(error.message)
     } else if (portal === "doctor") {
-      setMsg("Check your email to confirm your account. Once confirmed, your doctor application will be reviewed by an administrator before you can access the Doctor Portal.")
+      setMsg("Check your email to confirm your account. Once confirmed, your doctor application will be reviewed by an administrator before you can access the Doctor Portal. Check your spam folder if you don't see it.")
     } else {
-      setMsg("Check your email for the confirmation link.")
+      setMsg("Check your email for the confirmation link. Check your spam folder if you don't see it.")
     }
     setLoading(false)
   }
@@ -99,27 +99,27 @@ export default function SignupPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }} className="flex min-h-screen w-full items-center justify-center bg-slate-950/10 px-4 py-10">
-      <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-xl shadow-slate-900/5 backdrop-blur-md">
+    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }} className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-premium">
         <div className="grid gap-8 px-8 py-10 grid-cols-1 md:px-12 md:py-12">
           <div className="space-y-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <BrandMark className="h-10 w-10 shrink-0" />
-                <span className="text-xl font-bold tracking-tight text-slate-950">WhyRisk</span>
+                <span className="text-xl font-bold tracking-tight">WhyRisk</span>
               </div>
-              <h1 className="text-3xl font-semibold text-slate-950">Create your account</h1>
-              <p className="max-w-xl text-sm leading-6 text-slate-600">
+              <h1 className="font-heading text-3xl font-bold text-foreground">Create your account</h1>
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
                 Start your journey with WhyRisk and access secure clinical insights in one place.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-muted/40 p-1">
               <button
                 type="button"
                 onClick={() => { setPortal("patient"); setError(null) }}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  portal === "patient" ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  portal === "patient" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
                 }`}
               >
                 I&apos;m a Patient
@@ -128,7 +128,7 @@ export default function SignupPage() {
                 type="button"
                 onClick={() => { setPortal("doctor"); setError(null) }}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  portal === "doctor" ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  portal === "doctor" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
                 }`}
               >
                 I&apos;m a Doctor
@@ -136,7 +136,7 @@ export default function SignupPage() {
             </div>
 
             {portal === "doctor" && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
                 Doctor accounts require administrator approval before the Doctor Portal becomes accessible.
               </div>
             )}
@@ -144,30 +144,32 @@ export default function SignupPage() {
             <form onSubmit={handleSignup} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full name</Label>
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="fullName"
                     type="text"
+                    autoComplete="name"
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
                     placeholder="Enter your full name"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone number</Label>
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="phone"
                     type="tel"
+                    autoComplete="tel"
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
                     placeholder="Enter your phone number"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
@@ -176,7 +178,7 @@ export default function SignupPage() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="licenseNumber">Medical license number (PMC/PMDC or equivalent)</Label>
-                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                    <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                       <input
                         id="licenseNumber"
                         type="text"
@@ -184,14 +186,14 @@ export default function SignupPage() {
                         onChange={e => setLicenseNumber(e.target.value)}
                         placeholder="e.g. PMC-12345"
                         required
-                        className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                        className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="hospital">Hospital / Clinic name</Label>
-                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                    <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                       <input
                         id="hospital"
                         type="text"
@@ -199,15 +201,15 @@ export default function SignupPage() {
                         onChange={e => setHospital(e.target.value)}
                         placeholder="Enter your hospital or clinic"
                         required
-                        className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                        className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="specialization">Specialization</Label>
-                      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                      <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                         <input
                           id="specialization"
                           type="text"
@@ -215,14 +217,14 @@ export default function SignupPage() {
                           onChange={e => setSpecialization(e.target.value)}
                           placeholder="e.g. Cardiology"
                           required
-                          className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                          className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="experience">Years of experience</Label>
-                      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                      <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                         <input
                           id="experience"
                           type="number"
@@ -231,7 +233,7 @@ export default function SignupPage() {
                           onChange={e => setExperience(e.target.value)}
                           placeholder="e.g. 6"
                           required
-                          className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                          className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                         />
                       </div>
                     </div>
@@ -241,68 +243,71 @@ export default function SignupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Create a password"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(prev => !prev)}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200/60 hover:text-slate-700"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
+                <p className="text-xs text-muted-foreground">Use at least 6 characters.</p>
               </div>
 
-              {error && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
-              {msg && <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{msg}</div>}
+              {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+              {msg && <div className="rounded-2xl bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">{msg}</div>}
 
-              <Button type="submit" className="w-full rounded-2xl py-3" disabled={loading}>
+              <Button type="submit" className="w-full py-3" disabled={loading}>
                 {loading ? "Signing up..." : portal === "doctor" ? "Apply as Doctor" : "Sign Up"}
               </Button>
             </form>
 
             {GOOGLE_OAUTH_ENABLED && (
               <>
-                <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-slate-400">
-                  <span className="h-px flex-1 bg-slate-200" /> or continue with <span className="h-px flex-1 bg-slate-200" />
+                <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground">
+                  <span className="h-px flex-1 bg-border" /> or continue with <span className="h-px flex-1 bg-border" />
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <button
                     type="button"
                     onClick={() => handleOAuth("google")}
                     disabled={oauthLoading !== null}
-                    className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 hover:-translate-y-px hover:bg-slate-50 hover:shadow-md disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-px hover:bg-muted hover:shadow-md disabled:opacity-60"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.05l3.66 2.85C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
                     Google
                   </button>
                 </div>
                 {portal === "doctor" && (
-                  <p className="text-center text-xs text-slate-500">
+                  <p className="text-center text-xs text-muted-foreground">
                     Google sign-up as a doctor takes you to a short verification form right after — your account
                     stays pending until an administrator approves it.
                   </p>
@@ -310,7 +315,7 @@ export default function SignupPage() {
               </>
             )}
 
-            <div className="text-center text-sm text-slate-600">
+            <div className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
               <Link href="/login" className="font-medium text-primary hover:underline">
                 Sign in
@@ -318,9 +323,9 @@ export default function SignupPage() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-6">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-slate-500">Why join?</p>
-            <ul className="mt-6 space-y-3 text-sm text-slate-600">
+          <div className="rounded-2xl border border-border bg-muted/40 p-6">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">Why join?</p>
+            <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
                 Secure AI-powered patient insights
