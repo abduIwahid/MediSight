@@ -83,6 +83,7 @@ export interface ProfileRow {
   specialty?: string | null
   bio?: string | null
   available?: boolean | null
+  availability_status?: string | null
   consultation_fee?: number | null
   services?: string[] | null
   hospital_id?: string | null
@@ -121,6 +122,8 @@ export interface AuditLogRow {
   table_name: string
   action: string
   row_id?: string | null
+  old_values?: Record<string, unknown> | null
+  new_values?: Record<string, unknown> | null
   created_at: string
   profiles?: { full_name: string | null; role?: string | null } | null
   [key: string]: unknown

@@ -160,12 +160,12 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
         )}
       </button>
       {error && (
-        <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {error}
         </p>
       )}
       {warning && (
-        <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+        <p role="alert" className="rounded-lg border border-[#D97706]/30 bg-[#FDF0DC] px-3 py-2 text-xs text-[#A85008]">
           {warning}
         </p>
       )}

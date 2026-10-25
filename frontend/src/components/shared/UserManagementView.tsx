@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, UserCheck, RefreshCw } from "lucide-react"
 import type { ProfileRow } from "@/lib/types"
+import { roleLabel } from "@/lib/roles"
+import { fmtDate } from "@/lib/dates"
 
 const ALL_ROLES = ['super_admin', 'hospital_admin', 'doctor', 'nurse', 'data_scientist', 'patient']
 
@@ -21,6 +23,9 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [localProfiles, setLocalProfiles] = useState(profiles)
+  // A role change is confirmed before it is written (QA Round 1, item 26):
+  // picking a new role in the dropdown only stages it here.
+  const [pendingRoleChange, setPendingRoleChange] = useState<{ profileId: string; name: string; from: string; to: string } | null>(null)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -38,7 +43,13 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
   // therefore asks for the row back with .select() and treats "nothing
   // came back" as the failure it is — a silent no-op styled as success
   // is how admins end up believing a change happened when it did not.
+  const stageRoleChange = (profile: ProfileRow, newRole: string) => {
+    if (!profile.role || newRole === profile.role) return
+    setPendingRoleChange({ profileId: profile.id, name: profile.full_name || "This user", from: profile.role, to: newRole })
+  }
+
   const handleRoleChange = async (profileId: string, newRole: string) => {
+    setPendingRoleChange(null)
     setUpdatingId(profileId)
     setActionError(null)
     const { data, error } = await supabase
@@ -92,8 +103,31 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
   return (
     <div className="space-y-4">
       {actionError && (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {actionError}
+        </div>
+      )}
+      {pendingRoleChange && (
+        <div role="alertdialog" aria-label="Confirm role change" className="flex flex-wrap items-center gap-3 rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] px-4 py-3 text-sm">
+          <p className="text-[#A85008]">
+            Change <strong>{pendingRoleChange.name}</strong>&apos;s role from <strong>{roleLabel(pendingRoleChange.from)}</strong> to <strong>{roleLabel(pendingRoleChange.to)}</strong>?
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleRoleChange(pendingRoleChange.profileId, pendingRoleChange.to)}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Confirm change
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingRoleChange(null)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -113,7 +147,7 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
             {ALL_ROLES.map(r => (
-              <SelectItem key={r} value={r}>{r.replace('_', ' ')}</SelectItem>
+              <SelectItem key={r} value={r}>{roleLabel(r)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -156,15 +190,15 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
                   <td className="p-4">
                     <Select
                       value={profile.role ?? undefined}
-                      onValueChange={(val) => handleRoleChange(profile.id, val)}
+                      onValueChange={(val) => stageRoleChange(profile, val)}
                       disabled={updatingId === profile.id}
                     >
-                      <SelectTrigger className="w-44 h-8 text-xs">
+                      <SelectTrigger className="w-44 h-8 text-xs" aria-label={`Role for ${profile.full_name || "user"}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {roleOptionsFor(profile.role).map(r => (
-                          <SelectItem key={r} value={r} className="text-xs">{r.replace('_', ' ')}</SelectItem>
+                          <SelectItem key={r} value={r} className="text-xs">{roleLabel(r)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -187,13 +221,13 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
                     </Select>
                   </td>
                   <td className="p-4 text-muted-foreground">
-                    {profile.created_at ? new Date(profile.created_at).toLocaleDateString() : "—"}
+                    {profile.created_at ? fmtDate(profile.created_at) : "—"}
                   </td>
                   <td className="p-4">
                     {updatingId === profile.id ? (
                       <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
-                      <UserCheck className="h-4 w-4 text-green-500" />
+                      <UserCheck className="h-4 w-4 text-[#1E7A46]" />
                     )}
                   </td>
                 </tr>
@@ -203,6 +237,7 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
         </div>
         <div className="p-3 border-t bg-muted/10 text-xs text-muted-foreground">
           {filtered.length} of {localProfiles.length} users shown
+          {localProfiles.length >= 1000 ? " · Showing the most recent 1,000 users." : ""}
         </div>
       </div>
       <p className="text-xs text-muted-foreground">

@@ -10,22 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createBrowserClient } from "@supabase/ssr"
 import { CheckCircle2, Mail, Shield, Building2, Phone, Stethoscope } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Admin",
-  hospital_admin: "Hospital Admin",
-  doctor: "Doctor",
-  nurse: "Nurse",
-  data_scientist: "Data Scientist",
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: "bg-red-500/10 text-red-600 border-red-500/20",
-  hospital_admin: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  doctor: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  nurse: "bg-green-500/10 text-green-600 border-green-500/20",
-  data_scientist: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-}
+import { ROLE_BADGE_CLASSES, roleLabel } from "@/lib/roles"
 
 const SPECIALTIES = [
   "General Practice", "Cardiology", "Endocrinology", "Nephrology",
@@ -45,7 +30,13 @@ export function ProfileForm({ user, profile, hospitals }: {
   const [bio, setBio] = useState(profile?.bio || "")
   const [consultationFee, setConsultationFee] = useState(profile?.consultation_fee ? String(profile.consultation_fee) : "")
   const [servicesString, setServicesString] = useState(Array.isArray(profile?.services) ? profile.services.join(", ") : "")
-  const [available, setAvailable] = useState(profile?.available ?? true)
+  // Availability has ONE source of truth: availability_status (QA Round 1,
+  // item 89). The legacy `available` bool is still written, derived from
+  // the status, so nothing downstream can disagree with it.
+  const [availabilityStatus, setAvailabilityStatus] = useState(
+    profile?.availability_status || (profile?.available === false ? "busy" : "available")
+  )
+  const isDoctor = profile?.role === "doctor"
 
   const [hospitalId, setHospitalId] = useState(profile?.hospital_id || "")
   const [saving, setSaving] = useState(false)
@@ -71,7 +62,8 @@ export function ProfileForm({ user, profile, hospitals }: {
           specialty,
           phone,
           bio,
-          available,
+          availability_status: availabilityStatus,
+          available: availabilityStatus === "available",
           consultation_fee: consultationFee ? Number(consultationFee) : null,
           services: servicesString.split(',').map((item: string) => item.trim()).filter(Boolean),
           hospital_id: (hospitalId && hospitalId !== 'none') ? hospitalId : null,
@@ -83,7 +75,8 @@ export function ProfileForm({ user, profile, hospitals }: {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Unable to save profile.")
+      console.error("Profile save failed:", e)
+      setError("Unable to save your profile. Please check your connection and try again.")
     } finally {
       setSaving(false)
     }
@@ -93,13 +86,13 @@ export function ProfileForm({ user, profile, hospitals }: {
     <div className="space-y-8">
       {/* Profile preview header */}
       <div className="flex items-center gap-5 pb-6 border-b">
-        <AvatarUploader uid={user.id} url={avatarUrl} onUpload={(url) => setAvatarUrl(url)} />
+        <AvatarUploader uid={user.id} url={avatarUrl} name={fullName} onUpload={(url) => setAvatarUrl(url)} />
         <div>
           <h2 className="text-xl font-bold">{fullName || "Your Name"}</h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <Badge className={`border text-xs ${ROLE_COLORS[profile?.role ?? ""] || "bg-muted text-muted-foreground"}`}>
+            <Badge className={`border text-xs ${ROLE_BADGE_CLASSES[profile?.role ?? ""] || "bg-muted text-muted-foreground border-border"}`}>
               <Shield className="h-2.5 w-2.5 mr-1" />
-              {ROLE_LABELS[profile?.role ?? ""] || profile?.role || "No Role"}
+              {roleLabel(profile?.role)}
             </Badge>
             {specialty && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -128,7 +121,7 @@ export function ProfileForm({ user, profile, hospitals }: {
             <Label className="text-xs text-muted-foreground">System Role</Label>
             <div className="flex items-center gap-2 h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
               <Shield className="h-3.5 w-3.5" />
-              {ROLE_LABELS[profile?.role ?? ""] || profile?.role || "Unassigned"}
+              {profile?.role ? roleLabel(profile.role) : "Unassigned"}
               <span className="text-xs text-muted-foreground/60 ml-1">(managed by admin)</span>
             </div>
           </div>
@@ -143,9 +136,10 @@ export function ProfileForm({ user, profile, hospitals }: {
             <Label htmlFor="fullName">Full Name</Label>
             <Input
               id="fullName"
+              autoComplete="name"
               value={fullName}
               onChange={e => setFullName(e.target.value)}
-              placeholder="Dr. John Smith"
+              placeholder="e.g. Ayesha Khan"
             />
           </div>
           <div className="space-y-2">
@@ -155,6 +149,7 @@ export function ProfileForm({ user, profile, hospitals }: {
             <Input
               id="phone"
               type="tel"
+              autoComplete="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="+92 300 1234567"
@@ -168,6 +163,7 @@ export function ProfileForm({ user, profile, hospitals }: {
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Clinical Information</h3>
         <div className="grid sm:grid-cols-2 gap-4">
+          {isDoctor && (
           <div className="space-y-2">
             <Label htmlFor="specialty">
               <Stethoscope className="h-3.5 w-3.5 inline mr-1" /> Specialty
@@ -183,6 +179,7 @@ export function ProfileForm({ user, profile, hospitals }: {
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="department">
               <Building2 className="h-3.5 w-3.5 inline mr-1" /> Department
@@ -212,27 +209,32 @@ export function ProfileForm({ user, profile, hospitals }: {
           )}
         </div>
 
+        {isDoctor && (
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Doctor Profile</h3>
           <div className="grid gap-4">
-            <div className="flex items-center gap-2">
-              <input
-                id="available"
-                type="checkbox"
-                checked={available}
-                onChange={(event) => setAvailable(event.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <Label htmlFor="available">Accepting new patient referrals</Label>
+            <div className="space-y-2">
+              <Label htmlFor="availabilityStatus">Availability</Label>
+              <Select value={availabilityStatus} onValueChange={setAvailabilityStatus}>
+                <SelectTrigger id="availabilityStatus">
+                  <SelectValue placeholder="Select availability" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available — accepting new patients</SelectItem>
+                  <SelectItem value="busy">Busy — not taking new bookings</SelectItem>
+                  <SelectItem value="on_leave">On leave</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">This is the status patients see when booking.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="consultationFee">Consultation Fee</Label>
+              <Label htmlFor="consultationFee">Consultation Fee (PKR)</Label>
               <Input
                 id="consultationFee"
                 type="number"
                 value={consultationFee}
                 onChange={(e) => setConsultationFee(e.target.value)}
-                placeholder="e.g. 150"
+                placeholder="e.g. 1500"
               />
             </div>
             <div className="space-y-2">
@@ -256,13 +258,14 @@ export function ProfileForm({ user, profile, hospitals }: {
             </div>
           </div>
         </div>
+        )}
       </div>
 
 
 
       {/* Footer */}
       {error && (
-        <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg border border-destructive/20">
+        <div role="alert" className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg border border-destructive/20">
           {error}
         </div>
       )}
@@ -272,7 +275,7 @@ export function ProfileForm({ user, profile, hospitals }: {
           {saving ? "Saving..." : "Save Changes"}
         </Button>
         {saved && (
-          <span className="flex items-center gap-1.5 text-sm text-green-600">
+          <span className="flex items-center gap-1.5 text-sm text-[#1E7A46]">
             <CheckCircle2 className="h-4 w-4" /> Profile updated!
           </span>
         )}

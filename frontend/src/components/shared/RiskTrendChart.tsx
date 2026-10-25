@@ -9,12 +9,12 @@ const SEVERITY_DOT: Record<string, string> = {
 
 function fmtShortDate(iso?: string | null): string {
   if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Karachi" })
 }
 
 function fmtFullDate(iso?: string | null): string {
   if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Karachi" })
 }
 
 /**
@@ -65,8 +65,8 @@ export function RiskTrendChart({ predictions }: { predictions: PredictionRow[] }
         <polygon points={area} fill="#2E7FA8" opacity={0.08} />
         <polyline points={polyline} fill="none" stroke="#2E7FA8" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {coords.map((c, i) => (
-          <circle key={i} cx={c.x} cy={c.y} r={4} fill={SEVERITY_DOT[c.p.severity ?? "Low"] ?? "#2E7FA8"} stroke="#fff" strokeWidth={1.5}>
-            <title>{`${fmtFullDate(c.p.created_at)} — ${((c.p.probability ?? 0) * 100).toFixed(1)}% (${c.p.severity ?? "Low"})`}</title>
+          <circle key={i} cx={c.x} cy={c.y} r={4} fill={c.p.severity ? (SEVERITY_DOT[c.p.severity] ?? "#5A6B73") : "#5A6B73"} stroke="#fff" strokeWidth={1.5}>
+            <title>{`${fmtFullDate(c.p.created_at)} — ${((c.p.probability ?? 0) * 100).toFixed(1)}% (${c.p.severity ?? "severity not recorded"})`}</title>
           </circle>
         ))}
         <text x={PAD.left} y={H - 6} fontSize="9" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">

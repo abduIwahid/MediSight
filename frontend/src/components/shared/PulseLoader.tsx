@@ -3,6 +3,8 @@ interface PulseLoaderProps {
   showWordmark?: boolean
   /** Show the mono "Loading" label under the wordmark. Default true. */
   showLabel?: boolean
+  /** Accessible name for the loading region, e.g. "Loading doctors". Default "Loading". */
+  label?: string
   className?: string
 }
 
@@ -22,13 +24,14 @@ interface PulseLoaderProps {
 export function PulseLoader({
   showWordmark = true,
   showLabel = true,
+  label = "Loading",
   className = "",
 }: PulseLoaderProps) {
   return (
     <div
       className={`flex flex-col items-center ${className}`}
       role="status"
-      aria-label="Loading"
+      aria-label={label}
     >
       <svg
         viewBox="0 0 230 100"

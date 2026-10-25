@@ -7,8 +7,10 @@ import Link from "next/link"
 
 interface PatientRiskCardProps {
   disease: string
-  probability: number
-  confidence: number
+  /** Null when no value was stored — rendered as "Not recorded",
+   *  never as a defaulted 0% (QA Round 1, item 90). */
+  probability: number | null
+  confidence: number | null
   severity: RiskSeverity | string
   patientId: string
   predictionId: string
@@ -40,17 +42,21 @@ export function PatientRiskCard({ disease, probability, confidence, severity, pa
         <div className="grid grid-cols-2 gap-4 mt-2">
           <div>
             <div className="text-sm text-muted-foreground">Probability</div>
-            <div className="text-2xl font-bold">{(probability * 100).toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{probability != null ? `${(probability * 100).toFixed(1)}%` : "Not recorded"}</div>
           </div>
           <div>
             <div className="text-sm text-muted-foreground">Confidence</div>
-            <div className="text-2xl font-medium">{(confidence * 100).toFixed(1)}%</div>
+            <div className="text-2xl font-medium">{confidence != null ? `${(confidence * 100).toFixed(1)}%` : "Not recorded"}</div>
           </div>
         </div>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          Confidence is the probability the model assigns to the class it predicted — not a calibrated accuracy estimate.
+        </p>
 
         <div className="rounded-2xl border border-border/70 bg-muted/50 p-4 mt-6 text-sm">
           <div className="text-muted-foreground text-xs uppercase tracking-[0.18em] mb-2">Recommended Care</div>
           <p className="font-semibold">{recommended}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Rule-based suggestion from the severity band — confirm with the care team.</p>
         </div>
 
         <div className="mt-6">

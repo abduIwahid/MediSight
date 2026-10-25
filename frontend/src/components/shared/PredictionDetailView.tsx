@@ -33,9 +33,13 @@ export function PredictionDetailView({
   clinicalExplanation,
   patientId
 }: PredictionDetailViewProps) {
-  const probability = prediction.probability ?? 0
-  const severity = prediction.severity ?? "Low"
+  // A missing value is "not recorded" — never a defaulted 0% or "Low",
+  // which would read as a confident low-risk result (QA Round 1, item 90).
+  const probability = prediction.probability ?? null
+  const severity = prediction.severity ?? "Unknown"
   const gaugeColor = SEVERITY_GAUGE_COLOR[severity] ?? "#2E7FA8"
+  const patientName = patient?.demographics?.full_name || patient?.demographics?.name ||
+    `${patient?.demographics?.first_name || ""} ${patient?.demographics?.last_name || ""}`.trim() || "Unknown Patient"
 
   // The exact payload this prediction was generated with, rebuilt from
   // the patient record by the same derivation the run flow uses.
@@ -53,7 +57,7 @@ export function PredictionDetailView({
           <p className="eyebrow">Prediction detail</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Why this score</h1>
           <p className="text-muted-foreground">
-            Patient: {patient?.demographics?.first_name} {patient?.demographics?.last_name} | MRN: {patient?.mrn}
+            Patient: {patientName} | MRN: {patient?.mrn}
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -74,21 +78,33 @@ export function PredictionDetailView({
             <CardContent className="space-y-6">
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Risk probability</div>
-                <div className="font-display text-5xl leading-none">
-                  {(probability * 100).toFixed(1)}
-                  <span className="font-sans text-base font-semibold text-muted-foreground">%</span>
-                </div>
-                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${Math.min(100, Math.max(0, probability * 100))}%`, background: gaugeColor }}
-                  />
-                </div>
-                <div className="mt-1 flex justify-between font-mono text-[11px] text-muted-foreground">
-                  <span>LOW</span>
-                  <span>MODERATE</span>
-                  <span>HIGH</span>
-                </div>
+                {probability !== null ? (
+                  <>
+                    <div className="font-display text-5xl leading-none">
+                      {(probability * 100).toFixed(1)}
+                      <span className="font-sans text-base font-semibold text-muted-foreground">%</span>
+                    </div>
+                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${Math.min(100, Math.max(0, probability * 100))}%`, background: gaugeColor }}
+                      />
+                    </div>
+                    <div className="mt-1 flex justify-between font-mono text-[11px] text-muted-foreground">
+                      <span>LOW</span>
+                      <span>MODERATE</span>
+                      <span>HIGH</span>
+                      <span>CRITICAL</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xl font-medium">Not recorded</div>
+                )}
+                {/* The severity bands the ML service assigns, shown where
+                    the score is read (QA Round 1, item 60). */}
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  Bands: Low under 0.20 · Moderate 0.20–0.49 · High 0.50–0.79 · Critical 0.80 and above.
+                </p>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Severity</span>
@@ -96,7 +112,7 @@ export function PredictionDetailView({
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Model confidence</div>
-                <div className="text-xl font-medium">{((prediction.confidence ?? 0) * 100).toFixed(1)}%</div>
+                <div className="text-xl font-medium">{prediction.confidence != null ? `${(prediction.confidence * 100).toFixed(1)}%` : "Not recorded"}</div>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   The probability the model assigns to the class it predicted — not a calibrated accuracy estimate.
                 </p>
@@ -136,7 +152,7 @@ export function PredictionDetailView({
         </div>
       </div>
 
-      {baseline && (
+      {baseline && probability !== null && (
         <WhatIfSimulator
           baseline={baseline}
           originalProbability={probability}
