@@ -1,6 +1,5 @@
 import Link from "next/link"
 import BrandMark from "@/components/shared/BrandMark"
-import { Button } from "@/components/ui/button"
 
 export default function NotFound() {
   return (
@@ -16,9 +15,12 @@ export default function NotFound() {
             The page you&apos;re looking for doesn&apos;t exist or has moved.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/welcome">Back to home</Link>
-        </Button>
+        <Link
+          href="/welcome"
+          className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-card transition-all duration-200 hover:bg-primary/90 hover:shadow-premium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Back to home
+        </Link>
       </div>
     </div>
   )
