@@ -1,4 +1,4 @@
-"""Train and benchmark the MediSight diabetes model (BRFSS 2015).
+"""Train and benchmark the WhyRisk diabetes model (BRFSS 2015).
 
 Dataset: run `python model_training/fetch_dataset.py` first -- it
 downloads the canonical UCI file (dataset 891, CDC Diabetes Health
@@ -163,7 +163,7 @@ def train_and_evaluate():
 def generate_markdown_report(results, best_model_name, best_auc):
     report_path = os.path.join(BASE_DIR, "evaluation_report.md")
     
-    report_content = f"""# MediSight AI Model Evaluation Report
+    report_content = f"""# WhyRisk Model Evaluation Report
 Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 Seed Disease: **Diabetes**
 Dataset: **CDC BRFSS 2015 (50-50 Split, 70,692 Rows)**

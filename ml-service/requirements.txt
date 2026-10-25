@@ -1,4 +1,4 @@
-# MediSight ML service -- production (inference) dependencies.
+# WhyRisk ML service -- production (inference) dependencies.
 # Exact pins, verified to install and run together in a fresh venv
 # (Python 3.12) and against the full pytest suite.
 #

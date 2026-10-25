@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="MediSight AI ML Inference Service",
+    title="WhyRisk ML Inference Service",
     description="FastAPI prediction and explainability service for early disease risk scoring.",
     version="1.0.0",
     lifespan=lifespan
@@ -128,7 +128,7 @@ def require_api_key(x_api_key: Optional[str] = Header(default=None, alias="X-API
 @app.get("/")
 def read_root():
     return {
-        "message": "Welcome to the MediSight AI Clinical Prediction Engine API.",
+        "message": "Welcome to the WhyRisk Clinical Prediction Engine API.",
         "documentation": "/docs",
         "status": "active"
     }

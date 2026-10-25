@@ -1,4 +1,4 @@
-# MediSight ML service -- inference image.
+# WhyRisk ML service -- inference image.
 # Build context: this directory (ml-service/), matching render.yaml.
 #
 # TRAIN BEFORE YOU BUILD: the image ships the trained artifact, so
