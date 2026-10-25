@@ -1,6 +1,7 @@
 import Link from "next/link"
 import type { CSSProperties } from "react"
 import { Activity, ArrowRight, CalendarCheck, ListChecks } from "lucide-react"
+import BrandMark from "@/components/shared/BrandMark"
 
 /* ------------------------------------------------------------------ */
 /*  WhyRisk public landing page.                                     */
@@ -61,9 +62,7 @@ export default function WelcomePage() {
       <header className="sticky top-0 z-40 border-b border-border bg-background/95">
         <div className="mx-auto flex max-w-6xl items-center gap-3.5 px-5 py-3.5">
           <Link href="/welcome" className="flex items-center gap-3">
-            <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] bg-primary font-display text-[19px] text-white">
-              M
-            </span>
+            <BrandMark className="h-[38px] w-[38px] shrink-0 drop-shadow-sm" />
             <span className="font-display text-[21px] uppercase leading-none tracking-wide">
               WhyRisk
               <span className="mt-1 block font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand-text">

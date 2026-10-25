@@ -1,11 +1,11 @@
 "use client"
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, CalendarPlus, CalendarClock, Bot, User, LogOut } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 import { motion } from "framer-motion"
+import BrandMark from "@/components/shared/BrandMark"
 
 interface PatientSidebarProps {
   onClose?: () => void
@@ -47,9 +47,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
     >
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/patient/dashboard" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
-          <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg shadow-md group-hover:scale-105 transition-transform">
-            <Image src="/logo.png" alt="WhyRisk Logo" fill className="object-cover" />
-          </div>
+          <BrandMark className="h-9 w-9 shrink-0 drop-shadow-md transition-transform group-hover:scale-105" />
           <span className="text-xl font-bold tracking-tight text-primary">WhyRisk</span>
         </Link>
       </div>
