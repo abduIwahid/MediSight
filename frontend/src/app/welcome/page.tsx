@@ -1,649 +1,302 @@
-"use client"
-
 import Link from "next/link"
-import Image from "next/image"
-import { useState, useEffect, useRef } from "react"
-import { motion, useInView, animate } from "framer-motion"
-import { createClient } from "@/lib/supabase/client"
-import {
-  Phone,
-  Mail,
-  ArrowRight,
-  Stethoscope,
-  HeartPulse,
-  Brain,
-  Activity,
-  Shield,
-  Droplet,
-  Star,
-  ChevronDown,
-  Award,
-  Clock,
-  BadgeCheck,
-  HeadphonesIcon,
-  Globe,
-  MessageCircle,
-  Share2,
-} from "lucide-react"
+import type { CSSProperties } from "react"
+import { Activity, ArrowRight, CalendarCheck, ListChecks } from "lucide-react"
 
 /* ------------------------------------------------------------------ */
-/*  Count-up number animation for stats                                */
+/*  MediSight public landing page.                                     */
+/*  Every number on this page is a verified project fact (see the      */
+/*  README): one trained diabetes model, its held-out AUC-ROC, the     */
+/*  BRFSS 2015 dataset, and a SHAP explanation on every prediction.    */
+/*  Nothing else is claimed.                                           */
 /* ------------------------------------------------------------------ */
 
-function CountUp({ value }: { value: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true, margin: "-50px" })
-  const numeric = parseFloat(value.replace(/[^0-9.]/g, "")) || 0
-  const suffix = value.replace(/[0-9.,]/g, "")
-
-  useEffect(() => {
-    if (!inView || !ref.current) return
-    const controls = animate(0, numeric, {
-      duration: 1.6,
-      ease: "easeOut",
-      onUpdate(v) {
-        if (ref.current) {
-          ref.current.textContent = (numeric % 1 !== 0 ? v.toFixed(1) : Math.round(v).toLocaleString()) + suffix
-        }
-      },
-    })
-    return () => controls.stop()
-  }, [inView, numeric, suffix])
-
-  return <span ref={ref}>0{suffix}</span>
-}
-
-/* Rotating accent colors for cards — keeps the site colorful, not monotone */
-const ACCENTS = [
-  { text: "text-blue-600", bg: "bg-blue-500/10", ring: "group-hover:shadow-blue-500/20" },
-  { text: "text-sky-600", bg: "bg-sky-500/10", ring: "group-hover:shadow-sky-500/20" },
-  { text: "text-indigo-600", bg: "bg-indigo-500/10", ring: "group-hover:shadow-indigo-500/20" },
-  { text: "text-cyan-600", bg: "bg-cyan-500/10", ring: "group-hover:shadow-cyan-500/20" },
-]
-
-/* ------------------------------------------------------------------ */
-/*  Content data                                                       */
-/* ------------------------------------------------------------------ */
-
-const stats = [
-  { value: "50,000+", label: "Patients Monitored" },
-  { value: "1,200+", label: "Expert Doctors" },
-  { value: "98.4%", label: "Prediction Accuracy" },
-  { value: "7+", label: "Years of Innovation" },
-]
-
-const services = [
+const FACTS = [
   {
-    num: "01",
-    title: "AI Risk Prediction",
-    icon: Brain,
-    desc: "Instant multi-disease risk scoring for heart disease, diabetes, and kidney disease powered by trained clinical ML pipelines.",
+    value: "0.8307",
+    text: "AUC-ROC of the diabetes model on a held-out test split — the only accuracy figure we claim",
   },
   {
-    num: "02",
-    title: "Cardiology Screening",
-    icon: HeartPulse,
-    desc: "AI-assisted ischemic heart disease risk scoring paired with real-time cardiovascular analytics for early intervention.",
+    value: "1",
+    text: "Trained model in production. Six more conditions are on the roadmap, labelled as such",
   },
   {
-    num: "03",
-    title: "Diabetes & Endocrinology",
+    value: "21",
+    text: "Health indicators per assessment, from the CDC BRFSS 2015 dataset (253,680 records)",
+  },
+  {
+    value: "100%",
+    text: "Of predictions ship with a SHAP explanation — every score shows its reasons",
+  },
+]
+
+const CAPABILITIES = [
+  {
     icon: Activity,
-    desc: "Predictive early-onset diabetes modeling with continuous glucose trend monitoring and personalized alerts.",
+    title: "Risk prediction",
+    text: "A LightGBM model trained on CDC survey data estimates diabetes risk from 21 everyday health indicators — no lab visit needed for a first screening.",
   },
   {
-    num: "04",
-    title: "Kidney Health Monitoring",
-    icon: Droplet,
-    desc: "Chronic kidney disease trajectory modeling with eGFR drift detection so care teams can act before symptoms appear.",
+    icon: ListChecks,
+    title: "The reason, not just the score",
+    text: "Every result lists the factors that pushed the score up or down, with their weights. A doctor can argue with it — that is the point.",
   },
   {
-    num: "05",
-    title: "Telemedicine Consults",
-    icon: Stethoscope,
-    desc: "Secure virtual consultations that connect patients with specialists, with full history and AI insights on hand.",
-  },
-  {
-    num: "06",
-    title: "24/7 Critical Alerts",
-    icon: Shield,
-    desc: "Automated clinical alerting pipeline that flags high-risk changes in patient vitals the moment they occur.",
+    icon: CalendarCheck,
+    title: "Records & appointments",
+    text: "Patient and doctor portals with role-based access, appointment booking and an admin overview — protected by row-level security.",
   },
 ]
 
-const testimonials = [
-  { name: "Dr. Sara Ahmed", role: "Cardiologist", quote: "The AI risk scores catch patterns I would have needed weeks of data to notice. It's changed how our team prioritizes patients." },
-  { name: "Dr. Bilal Hussain", role: "General Physician", quote: "Explainable predictions mean I can actually justify a recommendation to my patient, not just point at a black box." },
-  { name: "Ayesha Khan", role: "Patient", quote: "Booking, results, and my doctor's notes are all in one place now. It genuinely feels like a modern hospital experience." },
-  { name: "Dr. Omar Farooq", role: "Nephrologist", quote: "The CKD drift alerts flagged a patient three weeks before they would have shown clinical symptoms. That's real impact." },
-  { name: "Dr. Hina Malik", role: "Endocrinologist", quote: "My favorite part is how fast the dashboard loads during rounds — under 200ms inference means zero waiting." },
-  { name: "Usman Tariq", role: "Patient", quote: "I finally understand my own lab trends because the platform explains what each number actually means for me." },
+const DEMO_FACTORS = [
+  { label: "BMI 29.4", width: "62%", color: "#D97706", value: "+0.14" },
+  { label: "High blood pressure", width: "48%", color: "#D97706", value: "+0.10" },
+  { label: "Glucose history", width: "38%", color: "#2E7FA8", value: "+0.08" },
+  { label: "Physically active", width: "30%", color: "#1E7A46", value: "−0.06" },
 ]
-
-const whyChooseUs = [
-  { icon: Award, title: "Expert Doctors", desc: "Board-certified specialists across cardiology, endocrinology, and nephrology." },
-  { icon: Brain, title: "AI-Powered Diagnostics", desc: "SHAP-explainable predictions your care team can trust and act on." },
-  { icon: BadgeCheck, title: "Enterprise-Grade Security", desc: "HIPAA-minded architecture with row-level security on every record." },
-  { icon: HeadphonesIcon, title: "24/7 Support", desc: "Round-the-clock monitoring and rapid clinical alert response." },
-]
-
-const faqs = [
-  { q: "What is MediSight AI?", a: "MediSight AI is a clinical decision-support platform that combines patient records, real-time monitoring, and explainable machine learning to help doctors detect disease risk earlier." },
-  { q: "How accurate are the AI predictions?", a: "Our models are trained on large clinical datasets and validated for accuracy, with every prediction accompanied by a SHAP-based explanation so doctors can see exactly why a score was given." },
-  { q: "Is my medical data secure?", a: "Yes. We use row-level security, encrypted storage, and role-based access control so only authorized care providers can view patient data." },
-  { q: "Can patients book appointments directly?", a: "Yes, patients can register, book consultations, and view their own risk insights and lab results through their secure dashboard." },
-  { q: "Do I need to be a hospital to use this?", a: "No. MediSight AI supports independent clinics, multi-hospital networks, and individual practitioners alike." },
-]
-
-/* ------------------------------------------------------------------ */
-/*  Page                                                                */
-/* ------------------------------------------------------------------ */
 
 export default function WelcomePage() {
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
-  const [doctors, setDoctors] = useState<{ id: string; full_name: string; specialty: string; avatar_url?: string | null; consultation_fee?: number | null }[]>([])
-  const supabase = createClient()
-
-  useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("id, full_name, specialty, avatar_url, consultation_fee")
-      .eq("role", "doctor")
-      .limit(8)
-      .then(({ data }) => setDoctors(data || []))
-  }, [])
-
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Top utility bar */}
-      <div className="hidden bg-gradient-brand text-white md:block">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 text-xs">
-          <div className="flex items-center gap-6">
-            <span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Emergency: +92 800 987 654</span>
-            <span className="inline-flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> support@medisight.ai</span>
-          </div>
-          <span>Get 30% off your first AI health screening</span>
-        </div>
-      </div>
-
-      {/* Header / nav */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/welcome" className="flex items-center gap-2.5">
-            <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-sm">
-              <Image src="/logo.png" alt="MediSight AI" fill className="object-cover" />
-            </div>
-            <span className="font-heading text-lg font-bold">MediSight AI</span>
-          </Link>
-          <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground lg:flex">
-            <a href="#services" className="transition hover:text-foreground">Services</a>
-            <a href="#doctors" className="transition hover:text-foreground">Doctors</a>
-            <a href="#about" className="transition hover:text-foreground">About</a>
-            <a href="#testimonials" className="transition hover:text-foreground">Testimonials</a>
-            <a href="#faq" className="transition hover:text-foreground">FAQ</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden text-sm font-medium text-muted-foreground transition hover:text-foreground sm:block">Sign in</Link>
-            <Link href="/signup">
-              <span className="btn-premium inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white">
-                Get Started <ArrowRight className="ml-1.5 h-4 w-4" />
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95">
+        <div className="mx-auto flex max-w-6xl items-center gap-3.5 px-5 py-3.5">
+          <Link href="/welcome" className="flex items-center gap-3">
+            <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] bg-primary font-display text-[19px] text-white">
+              M
+            </span>
+            <span className="font-display text-[21px] uppercase leading-none tracking-wide">
+              MediSight
+              <span className="mt-1 block font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand">
+                Risk, explained
               </span>
-            </Link>
-          </div>
+            </span>
+          </Link>
+          <nav className="ml-auto hidden items-center gap-6 text-sm font-semibold md:flex">
+            <a href="#model" className="text-foreground/75 transition hover:text-foreground">The model</a>
+            <a href="#how" className="text-foreground/75 transition hover:text-foreground">How it works</a>
+            <a href="#scope" className="text-foreground/75 transition hover:text-foreground">Scope</a>
+            <Link href="/login" className="text-foreground/75 transition hover:text-foreground">Sign in</Link>
+          </nav>
+          <Link
+            href="/signup"
+            className="ml-4 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 md:ml-6"
+          >
+            Check your risk
+          </Link>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10">
-        <div className="absolute inset-0 -z-10">
-          <Image
-            src="https://images.unsplash.com/photo-1551190822-a9333d879b1f?auto=format&fit=crop&w=2000&q=80"
-            alt="Clinical team reviewing patient data"
-            fill
-            priority
-            className="object-cover opacity-10"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/50" />
-        </div>
-
-        <div className="mx-auto max-w-7xl px-6 py-20 md:py-28">
-          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
-              className="max-w-2xl"
-            >
-              <motion.p
-                variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
-                className="kicker mb-6 border-primary/20 bg-primary/5 text-primary"
-              >
-                Trusted Clinical AI Platform
-              </motion.p>
-              <h1 className="font-heading text-4xl font-extrabold leading-[1.1] text-foreground sm:text-6xl">
-                {['Clinical intelligence,'].map((line) => (
-                  <motion.span
-                    key={line}
-                    variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } }}
-                    className="block"
-                  >
-                    {line}
-                  </motion.span>
-                ))}
-                <motion.span
-                  variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } }}
-                  className="block text-primary"
-                >
-                  delivered with confidence.
-                </motion.span>
-              </h1>
-              <motion.p
-                variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
-                className="mt-6 max-w-lg text-base leading-7 text-muted-foreground"
-              >
-                Predictive risk models, explainable AI, and real-time patient insights — all in one secure workspace built for modern care teams.
-              </motion.p>
-              <motion.div
-                variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
-                className="mt-9 flex flex-wrap gap-4"
-              >
-                <Link href="/signup">
-                  <motion.span
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="btn-premium inline-flex items-center rounded-xl px-7 py-3.5 text-sm font-semibold text-white"
-                  >
-                    Book Appointment <ArrowRight className="ml-2 h-4 w-4" />
-                  </motion.span>
-                </Link>
-                <Link href="/login">
-                  <motion.span
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="inline-flex items-center rounded-xl border border-input bg-background px-7 py-3.5 text-sm font-semibold text-foreground shadow-sm transition hover:bg-muted"
-                  >
-                    Sign In
-                  </motion.span>
-                </Link>
-              </motion.div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 34 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, ease: 'easeOut' }}
-              className="relative mx-auto w-full max-w-xl"
-            >
-              <div className="absolute -left-10 top-10 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
-              <div className="absolute -right-6 bottom-8 h-32 w-32 rounded-full bg-violet-400/20 blur-3xl" />
-
-              <div className="relative overflow-hidden rounded-[2rem] border border-primary/20 bg-white/80 p-4 shadow-[0_30px_80px_rgba(59,130,246,0.15)] backdrop-blur-sm dark:bg-slate-900/80">
-                <div className="overflow-hidden rounded-[1.5rem] border border-border/60 bg-gradient-to-br from-slate-100 via-white to-primary/5">
-                  <div className="relative h-[520px] w-full">
-                    <Image
-                      src="https://images.unsplash.com/photo-1538108149393-fbbd81895907?auto=format&fit=crop&w=1200&q=80"
-                      alt="Doctor reviewing patient records"
-                      fill
-                      priority
-                      className="object-cover"
-                    />
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-slate-950/10 to-transparent" />
-
-                    <div className="absolute left-5 top-5 rounded-2xl border border-white/20 bg-slate-950/55 px-4 py-3 text-white shadow-xl backdrop-blur-md">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/20 text-xs font-bold text-emerald-300">
-                          24
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-300">Patients monitored</div>
-                          <div className="text-lg font-semibold">Today</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="absolute right-5 top-12 rounded-2xl border border-primary/20 bg-white/90 px-4 py-3 text-slate-900 shadow-xl backdrop-blur-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-                            <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Risk alert</div>
-                          <div className="text-sm font-bold">High priority</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/15 bg-slate-950/65 p-4 text-white shadow-xl backdrop-blur-md">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-sm font-semibold">Clinical Overview</span>
-                        <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
-                          Live
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-3 text-center">
-                        <div className="rounded-xl bg-white/5 p-3">
-                          <div className="text-xl font-bold text-primary">94%</div>
-                          <div className="mt-1 text-[10px] text-slate-300">Accuracy</div>
-                        </div>
-                        <div className="rounded-xl bg-white/5 p-3">
-                          <div className="text-xl font-bold text-primary">12</div>
-                          <div className="mt-1 text-[10px] text-slate-300">Alerts</div>
-                        </div>
-                        <div className="rounded-xl bg-white/5 p-3">
-                          <div className="text-xl font-bold text-primary">7m</div>
-                          <div className="mt-1 text-[10px] text-slate-300">Response</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Scroll cue */}
-        <motion.div
-          className="relative z-10 mx-auto hidden w-full max-w-7xl justify-center pb-6 md:flex"
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <ChevronDown className="h-6 w-6 text-primary/50" />
-        </motion.div>
-
-        {/* Trust strip */}
-        <div className="relative z-10 border-t border-border/50 bg-background/40 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-6 py-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <span>HIPAA-Minded Security</span>
-            <span>SHAP Explainable AI</span>
-            <span>Real-Time Alerting</span>
-            <span>Multi-Hospital Ready</span>
-            <span>Board-Certified Specialists</span>
-          </div>
-        </div>
-      </section>
-
-      {/* About + stats */}
-      <section id="about" className="mx-auto max-w-7xl px-6 py-24">
-        <div className="grid items-center gap-14 lg:grid-cols-2">
-          <div className="relative">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="relative mt-8 aspect-[3/4] overflow-hidden rounded-2xl shadow-premium">
-                <Image src="https://images.unsplash.com/photo-1584982751601-97dcc096659c?auto=format&fit=crop&w=800&q=80" alt="Doctor with stethoscope" fill className="object-cover" />
-              </div>
-              <div className="relative aspect-[3/4] overflow-hidden rounded-2xl shadow-premium">
-                <Image src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80" alt="Clinical team" fill className="object-cover" />
-              </div>
-            </div>
-          </div>
-
+      <main className="mx-auto max-w-6xl px-5">
+        {/* Hero */}
+        <section className="grid items-start gap-10 pb-8 pt-14 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <p className="kicker mb-4">About Us</p>
-            <h2 className="font-heading text-3xl font-bold leading-tight sm:text-4xl">
-              Compassionate care, <span className="gradient-text">powered by AI</span>
-            </h2>
-            <p className="mt-5 text-sm leading-7 text-muted-foreground">
-              MediSight AI bridges the gap between traditional clinical care and state-of-the-art predictive machine learning, empowering doctors with early disease detection and actionable, explainable risk insights — so every decision is backed by evidence, not guesswork.
+            <p className="eyebrow reveal" style={{ "--d": "0ms" } as CSSProperties}>
+              Explainable healthcare ML
             </p>
-            <Link href="/welcome#services" className="mt-6 inline-flex items-center text-sm font-semibold text-primary hover:underline">
-              Read More <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Link>
-
-            <div className="mt-10 grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-              {stats.map((s) => (
-                <div key={s.label}>
-                  <div className="font-heading text-3xl font-extrabold gradient-text">
-                    <CountUp value={s.value} />
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{s.label}</div>
-                </div>
-              ))}
+            <h1
+              className="reveal mt-4 font-display text-[clamp(42px,7.5vw,76px)] uppercase leading-[1.02]"
+              style={{ "--d": "90ms" } as CSSProperties}
+            >
+              Know your risk.
+              <br />
+              <span className="text-brand">See exactly why.</span>
+            </h1>
+            <p
+              className="reveal reveal-slow mt-6 max-w-[620px] text-[17.5px] leading-relaxed text-[#33454F]"
+              style={{ "--d": "200ms" } as CSSProperties}
+            >
+              MediSight estimates your diabetes risk with a trained machine-learning model — and shows you the reasons
+              behind the score, in plain language. No black box. No invented numbers.
+            </p>
+            <div className="reveal mt-7 flex flex-wrap gap-3" style={{ "--d": "320ms" } as CSSProperties}>
+              <Link
+                href="/signup"
+                className="inline-flex items-center rounded-lg bg-brand px-5 py-3 text-sm font-bold text-white transition hover:bg-brand/90"
+              >
+                Check diabetes risk <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+              <a
+                href="#how"
+                className="inline-flex items-center rounded-lg border-[1.5px] border-primary px-5 py-3 text-sm font-bold text-primary transition hover:bg-secondary"
+              >
+                How the model works
+              </a>
+            </div>
+            <div
+              className="reveal reveal-slow mt-7 rounded-[10px] border border-[#D97706] bg-[#FDF0DC] px-4 py-3 text-[13.5px] leading-relaxed text-[#6B4A08]"
+              style={{ "--d": "430ms" } as CSSProperties}
+            >
+              <strong>Honest by design:</strong> one trained model today (diabetes). Everything else is clearly marked
+              as roadmap — this site never dresses up a guess as a prediction.
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Services */}
-      <section id="services" className="relative overflow-hidden bg-secondary/40 py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="kicker mx-auto mb-4">Welcome to MediSight AI</p>
-            <h2 className="font-heading text-3xl font-bold sm:text-4xl">Premium Clinical Intelligence</h2>
-            <p className="mt-4 text-sm leading-7 text-muted-foreground">
-              From early risk prediction to real-time critical alerts, we help care teams act sooner and treat with precision.
-            </p>
-          </div>
-
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {services.map((svc, i) => {
-              const accent = ACCENTS[i % ACCENTS.length]
-              return (
-                <motion.div
-                  key={svc.title}
-                  initial={{ opacity: 0, y: 30, scale: 0.96 }}
-                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
-                  whileHover={{ y: -6 }}
-                  className={`group relative overflow-hidden rounded-2xl border border-border bg-card p-7 shadow-sm transition-shadow duration-300 hover:shadow-2xl ${accent.ring}`}
-                >
-                  <span className={`font-heading text-4xl font-extrabold ${accent.text} opacity-10 transition group-hover:opacity-20`}>{svc.num}</span>
-                  <div className={`mt-2 flex h-12 w-12 items-center justify-center rounded-xl ${accent.bg} ${accent.text} transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6`}>
-                    <svc.icon className="h-6 w-6" />
+          {/* Hero visual — the explanation is the product */}
+          <div
+            className="reveal reveal-slow rounded-[14px] border border-border bg-card p-[22px] shadow-premium"
+            style={{ "--d": "240ms" } as CSSProperties}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[11px] uppercase tracking-[1.6px] text-muted-foreground">
+                Patient · Diabetes risk
+              </span>
+              <span className="rounded-full bg-[#E2F0E6] px-2.5 py-1 text-[11px] font-bold text-[#1E7A46]">
+                Demo data
+              </span>
+            </div>
+            <h2 className="mt-2 font-sans text-xl font-bold tracking-normal">Ahmed Raza, 47</h2>
+            <p className="text-[13px] text-muted-foreground">Sample assessment · LightGBM model</p>
+            <div className="mt-2 font-display text-[52px] leading-none">
+              0.31{" "}
+              <small className="font-sans text-sm font-semibold text-muted-foreground">/ 1.00 probability</small>
+            </div>
+            <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-secondary">
+              <div className="h-full w-[31%] rounded-full bg-brand" />
+            </div>
+            <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
+              <span>LOW</span>
+              <span>MODERATE</span>
+              <span>HIGH</span>
+            </div>
+            <div className="mt-[18px] border-t border-secondary pt-3.5">
+              <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[1.6px] text-brand">
+                Why this score — top factors
+              </h3>
+              <div className="mt-1">
+                {DEMO_FACTORS.map((f) => (
+                  <div key={f.label} className="mt-2 flex items-center gap-2.5 text-[13px]">
+                    <span className="w-[118px] shrink-0 text-[#33454F]">{f.label}</span>
+                    <span className="h-[9px] flex-1 overflow-hidden rounded-full bg-secondary">
+                      <span className="block h-full rounded-full" style={{ width: f.width, background: f.color }} />
+                    </span>
+                    <span className="w-[42px] text-right font-mono text-[11.5px]">{f.value}</span>
                   </div>
-                  <h3 className="mt-4 font-heading text-lg font-bold">{svc.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{svc.desc}</p>
-                </motion.div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Meet our doctors */}
-      {doctors.length > 0 && (
-        <section id="doctors" className="mx-auto max-w-7xl px-6 py-24">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="kicker mx-auto mb-4">Our Specialists</p>
-            <h2 className="font-heading text-3xl font-bold sm:text-4xl">Meet Our Doctors</h2>
-            <p className="mt-4 text-sm leading-7 text-muted-foreground">
-              Board-certified specialists ready to review your AI risk screening and provide expert care.
+                ))}
+              </div>
+            </div>
+            <p className="mt-4 border-t border-secondary pt-3 text-xs leading-relaxed text-muted-foreground">
+              Explanation generated with SHAP from the patient&apos;s own inputs. A screening aid — not a diagnosis.
             </p>
-          </div>
-
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {doctors.map((doc, i) => (
-              <motion.div
-                key={doc.id}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.07 }}
-                whileHover={{ y: -6 }}
-                className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-2xl"
-              >
-                <div className="relative aspect-square overflow-hidden bg-secondary">
-                  {doc.avatar_url ? (
-                    <Image src={doc.avatar_url} alt={doc.full_name} fill className="object-cover transition-transform duration-500 group-hover:scale-110" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-brand text-2xl font-bold text-white">
-                      {doc.full_name?.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                    </div>
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                    <div className="flex text-amber-400">
-                      {Array.from({ length: 5 }).map((_, j) => <Star key={j} className="h-3 w-3 fill-current" />)}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-heading text-sm font-bold">{doc.full_name}</h3>
-                  <p className="mt-0.5 text-xs text-primary">{doc.specialty}</p>
-                  {doc.consultation_fee && (
-                    <p className="mt-2 text-xs text-muted-foreground">Consultation from <span className="font-semibold text-foreground">Rs. {doc.consultation_fee}</span></p>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="mt-10 text-center">
-            <Link href="/signup" className="inline-flex items-center text-sm font-semibold text-primary hover:underline">
-              View All Doctors <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Link>
           </div>
         </section>
-      )}
 
-      {/* Testimonials */}
-      <section id="testimonials" className="mx-auto max-w-7xl px-6 py-24">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="kicker mx-auto mb-4">Testimonials</p>
-          <h2 className="font-heading text-3xl font-bold sm:text-4xl">What They Say</h2>
-        </div>
-
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {testimonials.map((t) => (
-            <div key={t.name} className="rounded-2xl border border-border bg-card p-6 shadow-sm transition hover:shadow-premium">
-              <div className="flex gap-0.5 text-amber-400">
-                {Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
-              </div>
-              <p className="mt-4 text-sm leading-6 text-muted-foreground">&ldquo;{t.quote}&rdquo;</p>
-              <div className="mt-5 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-brand text-sm font-semibold text-white">
-                  {t.name.split(" ").map(n => n[0]).slice(0, 2).join("")}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}</div>
-                </div>
-              </div>
+        {/* Honest facts */}
+        <section id="model" className="grid gap-3 pb-2 pt-8 sm:grid-cols-2 lg:grid-cols-4">
+          {FACTS.map((f) => (
+            <div key={f.value} className="rounded-xl bg-primary p-[18px] text-white">
+              <span className="block font-display text-[26px] tracking-wide">{f.value}</span>
+              <span className="mt-1 block text-[13px] leading-relaxed text-white/85">{f.text}</span>
             </div>
           ))}
-        </div>
-      </section>
+        </section>
 
-      {/* CTA banner */}
-      <section className="relative overflow-hidden rounded-3xl mx-6 my-12 bg-primary/5 border border-primary/10">
-        <div className="mx-auto max-w-4xl px-6 py-20 text-center">
-          <h2 className="font-heading text-3xl font-bold text-primary sm:text-4xl">Ready to take control of your health?</h2>
-          <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground">
-            Join thousands of doctors and patients already using MediSight AI to catch risk earlier and treat with confidence.
+        {/* What it does */}
+        <section id="how" className="pb-2 pt-12">
+          <h2 className="font-display text-[30px] uppercase tracking-wide">What it does</h2>
+          <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
+            Three things, done properly — instead of ten things done with smoke and mirrors.
           </p>
-          <Link href="/signup" className="mt-8 inline-flex items-center rounded-xl bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
-            Book Appointment <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* Why choose us */}
-      <section className="mx-auto max-w-7xl px-6 py-24">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="kicker mx-auto mb-4">Trusted &amp; Secure</p>
-          <h2 className="font-heading text-3xl font-bold sm:text-4xl">Why Choose MediSight AI?</h2>
-        </div>
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {whyChooseUs.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-border bg-card p-6 text-center transition hover:-translate-y-1 hover:shadow-premium">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <f.icon className="h-6 w-6" />
-              </div>
-              <h3 className="mt-4 font-heading text-base font-bold">{f.title}</h3>
-              <p className="mt-2 text-xs leading-6 text-muted-foreground">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="bg-secondary/40 py-24">
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="text-center">
-            <p className="kicker mx-auto mb-4">Everything You Need to Know</p>
-            <h2 className="font-heading text-3xl font-bold sm:text-4xl">Frequently Asked Questions</h2>
-          </div>
-
-          <div className="mt-10 space-y-3">
-            {faqs.map((f, i) => (
-              <div key={f.q} className="overflow-hidden rounded-2xl border border-border bg-card">
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="flex w-full items-center justify-between px-6 py-4 text-left text-sm font-semibold"
-                >
-                  {f.q}
-                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${openFaq === i ? "rotate-180" : ""}`} />
-                </button>
-                {openFaq === i && (
-                  <div className="px-6 pb-4 text-sm leading-6 text-muted-foreground">{f.a}</div>
-                )}
+          <div className="mt-[22px] grid gap-3.5 md:grid-cols-3">
+            {CAPABILITIES.map((c) => (
+              <div key={c.title} className="rounded-xl border border-border bg-card p-5">
+                <div className="mb-3 flex h-[42px] w-[42px] items-center justify-center rounded-[10px] bg-secondary text-primary">
+                  <c.icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-sans text-[17px] font-bold tracking-normal">{c.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-[#41525B]">{c.text}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="bg-secondary/20 text-muted-foreground border-t border-border">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <div className="grid gap-10 md:grid-cols-4">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-sm">
-                  <Image src="/logo.png" alt="MediSight AI" fill className="object-cover" />
-                </div>
-                <span className="font-heading text-lg font-bold text-foreground">MediSight AI</span>
-              </div>
-              <p className="mt-4 text-xs leading-6">
-                Enterprise healthcare decision support, built to help clinical teams predict risk earlier and treat with confidence.
-              </p>
-              <div className="mt-5 flex gap-3">
-                {[Globe, MessageCircle, Share2, Mail].map((Icon, i) => (
-                  <span key={i} className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary/10 text-primary transition hover:bg-primary/20">
-                    <Icon className="h-4 w-4" />
-                  </span>
+        {/* Honest scope */}
+        <section id="scope" className="pb-2 pt-12">
+          <h2 className="font-display text-[30px] uppercase tracking-wide">What is real, what is next</h2>
+          <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
+            Most health apps hide this page. We put it on the homepage.
+          </p>
+          <div className="mt-[22px] grid gap-3.5 md:grid-cols-2">
+            <div className="rounded-xl border-[1.5px] border-primary bg-card p-5">
+              <h3 className="font-mono text-xs font-semibold uppercase tracking-[1.6px] text-[#1E7A46]">Available now</h3>
+              <ul className="mt-2 text-[14.5px]">
+                {[
+                  ["Diabetes risk model (LightGBM)", "Trained · live", "bg-[#E2F0E6] text-[#1E7A46]"],
+                  ["SHAP explanation for every prediction", "Live", "bg-[#E2F0E6] text-[#1E7A46]"],
+                  ["Symptom screening", "Rule-based · labelled", "bg-[#FDF0DC] text-[#B45309]"],
+                  ["Patient / doctor portals & appointments", "Live", "bg-[#E2F0E6] text-[#1E7A46]"],
+                ].map(([label, tag, tagClass]) => (
+                  <li key={label} className="flex items-center justify-between gap-2 border-b border-foreground/[0.07] py-[7px] last:border-b-0">
+                    <span>{label}</span>
+                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${tagClass}`}>{tag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-dashed border-[#9FB3B8] bg-secondary p-5">
+              <h3 className="font-mono text-xs font-semibold uppercase tracking-[1.6px] text-muted-foreground">On the roadmap</h3>
+              <ul className="mt-2 text-[14.5px]">
+                {[
+                  "Heart disease model",
+                  "Chronic kidney disease model",
+                  "Stroke & hypertension models",
+                  "Liver disease & breast cancer models",
+                ].map((label) => (
+                  <li key={label} className="flex items-center justify-between gap-2 border-b border-foreground/[0.07] py-[7px] last:border-b-0">
+                    <span>{label}</span>
+                    <span className="whitespace-nowrap rounded-full bg-[#DDE5E7] px-2 py-0.5 text-[11px] font-bold text-[#5A6B73]">
+                      In development
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* Inside the app */}
+        <section className="pb-4 pt-12">
+          <h2 className="font-display text-[30px] uppercase tracking-wide">Inside the app</h2>
+          <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
+            One admin, one login — a live overview of the whole practice.
+          </p>
+          <div className="mt-[22px] grid overflow-hidden rounded-[14px] border border-border bg-card md:grid-cols-[200px_1fr]">
+            <div className="hidden bg-foreground p-5 text-[#DCE7EA] md:block">
+              <div className="font-display text-[17px] uppercase tracking-wide text-white">MediSight</div>
+              <ul className="mt-[18px] space-y-1 text-[13.5px]">
+                {["Overview", "Patients", "Doctors", "Appointments", "ML Models", "MLOps", "Audit log"].map((item, i) => (
+                  <li key={item} className={i === 0 ? "rounded-lg bg-primary px-2.5 py-[9px] font-bold text-white" : "px-2.5 py-[9px] opacity-80"}>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="p-5">
+              <div className="font-mono text-[11px] uppercase tracking-[1.6px] text-muted-foreground">Admin · Overview</div>
+              <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                {["Total patients (live count)", "Total doctors (live count)", "Pending approvals", "Appointments"].map((label) => (
+                  <div key={label} className="rounded-[10px] border border-secondary bg-background p-3.5">
+                    <span className="block font-display text-2xl">—</span>
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                  </div>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-semibold text-foreground">Company</h4>
-              <ul className="mt-4 space-y-2.5 text-xs">
-                <li><Link href="/welcome" className="hover:text-primary">Home</Link></li>
-                <li><a href="#services" className="hover:text-primary">Services</a></li>
-                <li><a href="#about" className="hover:text-primary">About Us</a></li>
-                <li><Link href="/login" className="hover:text-primary">Sign In</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-semibold text-foreground">Our Services</h4>
-              <ul className="mt-4 space-y-2.5 text-xs">
-                {services.slice(0, 4).map((s) => <li key={s.title}>{s.title}</li>)}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-semibold text-foreground">Contact Us</h4>
-              <ul className="mt-4 space-y-3 text-xs">
-                <li className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-primary" /> +92 800 987 654</li>
-                <li className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-primary" /> support@medisight.ai</li>
-                <li className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-primary" /> 24/7 Clinical Support</li>
-              </ul>
+              <p className="mt-3.5 text-[13px] text-muted-foreground">
+                Counts load live from the database — the preview leaves them blank rather than inventing numbers.
+              </p>
             </div>
           </div>
+        </section>
+      </main>
 
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs sm:flex-row">
-            <span>© 2026 MediSight AI. All rights reserved.</span>
-            <div className="flex gap-6">
-              <span className="hover:text-primary cursor-pointer">Terms &amp; Conditions</span>
-              <span className="hover:text-primary cursor-pointer">Privacy Policy</span>
-              <Link href="/admin" className="text-muted-foreground/50 hover:text-primary">Admin</Link>
-            </div>
-          </div>
+      {/* Footer */}
+      <footer className="mt-14 bg-foreground py-[30px] text-[#C8D6DA]">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3.5 px-5">
+          <span className="font-display text-lg uppercase tracking-wide text-white">MediSight</span>
+          <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
+            MediSight is an experimental clinical decision-support and research tool. It is not a certified medical
+            device and does not replace professional diagnosis. Built during a machine-learning internship at Ezitech
+            Institute, Islamabad.
+          </p>
         </div>
       </footer>
     </div>
