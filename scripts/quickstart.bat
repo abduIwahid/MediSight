@@ -1,12 +1,12 @@
 @echo off
-REM MediSight AI - Quick Start Setup Script for Windows
+REM WhyRisk - Quick Start Setup Script for Windows
 REM This script automates the setup of all three services
 
 setlocal enabledelayedexpansion
 
 echo.
 echo ============================================
-echo MediSight AI - Local Development Setup
+echo WhyRisk - Local Development Setup
 echo ============================================
 echo.
 

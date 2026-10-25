@@ -1,12 +1,12 @@
 #!/usr/bin/env pwsh
-# MediSight AI - Quick Start Setup Script (PowerShell)
+# WhyRisk - Quick Start Setup Script (PowerShell)
 # Usage: .\quickstart.ps1
 
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "MediSight AI - Local Development Setup" -ForegroundColor Cyan
+Write-Host "WhyRisk - Local Development Setup" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
