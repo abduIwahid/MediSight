@@ -38,7 +38,7 @@ const FACTS: { label: string; value: string; note: string }[] = [
   {
     label: "Explanations",
     value: "SHAP",
-    note: "Every prediction ships with SHAP feature attributions, so the factors behind a score can be inspected instead of trusted blindly.",
+    note: "Predictions ship with SHAP feature attributions, so the factors behind a score can be inspected instead of trusted blindly.",
   },
 ]
 
@@ -157,7 +157,7 @@ export default function ModelCardPage() {
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">What is real today</p>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
               <li>One trained model: diabetes risk prediction from the 21 BRFSS health indicators.</li>
-              <li>SHAP explanations stored with every prediction.</li>
+              <li>SHAP explanations are stored per prediction.</li>
               <li>A separate symptom checker that is a rule-based heuristic — not a trained model, and labelled as such in the product.</li>
             </ul>
           </div>

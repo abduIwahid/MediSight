@@ -155,6 +155,9 @@ export function PatientChatPanel() {
             Book an Appointment
           </Button>
         </Link>
+        <p className="w-full text-center text-xs text-muted-foreground">
+          Your messages are sent to Google Gemini to generate answers. Please verify anything important with a doctor.
+        </p>
       </CardFooter>
     </Card>
   )

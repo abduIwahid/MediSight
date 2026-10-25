@@ -7,7 +7,7 @@ import BrandMark from "@/components/shared/BrandMark"
 /*  WhyRisk public landing page.                                     */
 /*  Every number on this page is a verified project fact (see the      */
 /*  README): one trained diabetes model, its held-out AUC-ROC, the     */
-/*  BRFSS 2015 dataset, and a SHAP explanation on every prediction.    */
+/*  BRFSS 2015 dataset, and a SHAP explanation stored per prediction. */
 /*  Nothing else is claimed.                                           */
 /* ------------------------------------------------------------------ */
 
@@ -25,8 +25,8 @@ const FACTS = [
     text: "Health indicators per assessment, from the CDC BRFSS 2015 dataset (253,680 records)",
   },
   {
-    value: "100%",
-    text: "Of predictions ship with a SHAP explanation — every score shows its reasons",
+    value: "SHAP",
+    text: "Predictions ship with a SHAP explanation — each score shows the factors behind it",
   },
 ]
 
@@ -219,8 +219,8 @@ export default function WelcomePage() {
               <h3 className="font-mono text-xs font-semibold uppercase tracking-[1.6px] text-[#1E7A46]">Available now</h3>
               <ul className="mt-2 text-[14.5px]">
                 {[
-                  ["Diabetes risk model (LightGBM)", "Trained · live", "bg-[#E2F0E6] text-[#1E7A46]"],
-                  ["SHAP explanation for every prediction", "Live", "bg-[#E2F0E6] text-[#1E7A46]"],
+                  ["Diabetes risk model (LightGBM)", "Trained", "bg-[#E2F0E6] text-[#1E7A46]"],
+                  ["SHAP explanations", "Stored per prediction", "bg-[#E2F0E6] text-[#1E7A46]"],
                   ["Symptom screening", "Rule-based · labelled", "bg-[#FDF0DC] text-[#B45309]"],
                   ["Patient / doctor portals & appointments", "Live", "bg-[#E2F0E6] text-[#1E7A46]"],
                 ].map(([label, tag, tagClass]) => (
