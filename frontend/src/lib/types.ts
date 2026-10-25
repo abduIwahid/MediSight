@@ -18,6 +18,13 @@ export interface PatientDemographics {
   dob?: string
   phone?: string
   email?: string
+  /** Intake risk factors (0/1), persisted by the New Patient flow and
+   *  read back by buildMLPayload — see INTAKE_RISK_FACTOR_KEYS. */
+  high_chol?: number | boolean
+  smoker?: number | boolean
+  phys_activity?: number | boolean
+  /** Self-rated general health, BRFSS 1 (excellent) – 5 (poor). */
+  gen_hlth?: number
   [key: string]: unknown
 }
 
@@ -31,6 +38,10 @@ export interface PredictionRow {
   model_version?: string | null
   created_at: string
   shap_values?: Record<string, number> | null
+  /** The exact feature payload this score was computed from, snapshotted
+   *  by the run flows (predictions.features, migration 20261025200000).
+   *  Null on legacy rows scored before the snapshot existed. */
+  features?: Record<string, number> | null
   [key: string]: unknown
 }
 

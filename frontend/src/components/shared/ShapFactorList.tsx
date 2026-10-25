@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { formatShapFactorLabel } from "@/lib/feature-labels"
 
 export interface ShapFeature {
   feature: string
@@ -17,22 +18,35 @@ interface ShapFactorListProps {
  * diverging from a centre zero line — amber pushes the risk up, green pulls
  * it down — with the exact SHAP value in mono on the right. Matches the
  * landing page's "Why this score" card language.
+ *
+ * Factor names and values render through lib/feature-labels: clinicians
+ * see "Age group (65–69)", never the raw BRFSS code "Age (10)".
+ *
+ * The payload comes from a jsonb column whose schema default is an
+ * object ({}), so a non-array value must degrade to the "not recorded"
+ * state — spreading a plain object here used to crash the whole detail
+ * page and print report (QA Round 2, cluster 9).
  */
 export function ShapFactorList({ data }: ShapFactorListProps) {
   const rows = useMemo(() => {
-    const sorted = [...data]
-      .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+    if (!Array.isArray(data)) return []
+    const valid = data.filter(
+      (item) => item && typeof item.feature === "string" && Number.isFinite(Number(item.impact))
+    )
+    const sorted = [...valid]
+      .sort((a, b) => Math.abs(Number(b.impact)) - Math.abs(Number(a.impact)))
       .slice(0, 10)
-    const maxAbs = Math.max(...sorted.map((d) => Math.abs(d.impact)), 0.0001)
+    const maxAbs = Math.max(...sorted.map((d) => Math.abs(Number(d.impact))), 0.0001)
     return sorted.map((item) => ({
       ...item,
-      label: `${item.feature} (${item.value})`,
-      pct: (Math.abs(item.impact) / maxAbs) * 50,
+      impact: Number(item.impact),
+      label: formatShapFactorLabel(item.feature, item.value),
+      pct: (Math.abs(Number(item.impact)) / maxAbs) * 50,
     }))
   }, [data])
 
   if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">No factor contributions were returned for this prediction.</p>
+    return <p className="text-sm text-muted-foreground">No factor contributions were recorded for this prediction.</p>
   }
 
   return (
@@ -40,7 +54,7 @@ export function ShapFactorList({ data }: ShapFactorListProps) {
       <div className="space-y-2.5">
         {rows.map((row) => (
           <div key={row.label} className="flex items-center gap-3 text-[13px]">
-            <span className="w-44 shrink-0 truncate text-[#33454F]" title={row.label}>
+            <span className="w-52 shrink-0 truncate text-[#33454F]" title={row.label}>
               {row.label}
             </span>
             <span className="relative h-[9px] flex-1 overflow-hidden rounded-full bg-secondary">
