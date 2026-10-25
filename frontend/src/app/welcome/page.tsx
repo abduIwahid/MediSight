@@ -292,6 +292,9 @@ export default function WelcomePage() {
       <footer className="mt-14 bg-foreground py-[30px] text-[#C8D6DA]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3.5 px-5">
           <span className="font-display text-lg uppercase tracking-wide text-white">MediSight</span>
+          <a href="/model-card" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
+            Model card
+          </a>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
             MediSight is an experimental clinical decision-support and research tool. It is not a certified medical
             device and does not replace professional diagnosis. Built during a machine-learning internship at Ezitech

@@ -52,7 +52,9 @@ export async function middleware(request: NextRequest) {
   // Public marketing page - accessible whether logged in or not.
   // "/" always renders the Welcome page (it redirects there), so it must stay public too.
   const isPublicRoute = request.nextUrl.pathname.startsWith('/welcome') ||
-                        request.nextUrl.pathname === '/'
+                        request.nextUrl.pathname === '/' ||
+                        request.nextUrl.pathname === '/model-card' ||
+                        request.nextUrl.pathname === '/api/ml/model-card'
 
   const isOnboardingRoute = request.nextUrl.pathname.startsWith('/onboarding')
 
