@@ -34,7 +34,6 @@ export interface DoctorDetailRow {
   specialty?: string | null
   bio?: string | null
   email?: string | null
-  phone?: string | null
   contact_number?: string | null
   consultation_fee?: number | null
   available?: boolean | null
@@ -99,9 +98,9 @@ export function DoctorDetailView({ doctor }: DoctorDetailViewProps) {
               <div className="flex items-center gap-2 text-muted-foreground">
                 <MapPin className="h-4 w-4" /> {doctor.hospitals?.name || "No hospital on file"}
               </div>
-              {(doctor.contact_number || doctor.phone) && (
+              {doctor.contact_number && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4" /> {doctor.contact_number || doctor.phone}
+                  <Phone className="h-4 w-4" /> {doctor.contact_number}
                 </div>
               )}
               {doctor.email && (

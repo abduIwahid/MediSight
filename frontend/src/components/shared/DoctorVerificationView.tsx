@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, XCircle, Stethoscope } from "lucide-react"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { fmtDateTime } from "@/lib/dates"
 
 export interface DoctorRow {
   user_id: string
@@ -16,6 +17,12 @@ export interface DoctorRow {
   status: "pending" | "approved" | "rejected"
   created_at: string
   profile: { full_name: string; email: string } | null
+  /** Decision stamp (migration 20261025200000) — who decided, when.
+   *  Fetched separately by the page so the queue still renders on a
+   *  database where that migration has not been applied yet. */
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  reviewer?: { full_name: string } | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -24,13 +31,22 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
 }
 
-export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
+export function DoctorVerificationView({ doctors, viewerName }: {
+  doctors: DoctorRow[]
+  /** The reviewing admin's display name — used to show the decision
+   *  stamp immediately after a decision, before the page reloads. */
+  viewerName?: string | null
+}) {
   const [rows, setRows] = useState(doctors)
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  // Rejection is confirmed before it is written (QA Round 1, item 26).
+  // BOTH decisions are confirmed before they are written: rejection
+  // got its dialog in QA Round 1 (item 26), but approval — the
+  // access-granting direction, and the easier misclick — fired on a
+  // single click until QA Round 2 (cluster 20d).
   const [pendingRejection, setPendingRejection] = useState<{ userId: string; name: string } | null>(null)
+  const [pendingApproval, setPendingApproval] = useState<{ userId: string; name: string } | null>(null)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -38,6 +54,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
 
   const handleDecision = async (userId: string, status: "approved" | "rejected") => {
     setPendingRejection(null)
+    setPendingApproval(null)
     setUpdatingId(userId)
     setActionError(null)
     const { data: { user } } = await supabase.auth.getUser()
@@ -52,7 +69,14 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
     if (error || !data || data.length === 0) {
       setActionError("The decision could not be saved. You may not have permission to review doctor applications.")
     } else {
-      setRows((prev) => prev.map((r) => (r.user_id === userId ? { ...r, status } : r)))
+      const decidedAt = new Date().toISOString()
+      setRows((prev) => prev.map((r) => (r.user_id === userId ? {
+        ...r,
+        status,
+        reviewed_by: user?.id ?? r.reviewed_by ?? null,
+        reviewed_at: decidedAt,
+        reviewer: viewerName ? { full_name: viewerName } : r.reviewer ?? null,
+      } : r)))
       // Best-effort audit stamp (doctors.reviewed_by / reviewed_at,
       // migration 20261025200000): kept separate from the decision
       // write so the decision itself never depends on the stamp
@@ -61,7 +85,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
         .from("doctors")
         .update({
           reviewed_by: user?.id ?? null,
-          reviewed_at: new Date().toISOString(),
+          reviewed_at: decidedAt,
         })
         .eq("user_id", userId)
       if (stampError) console.warn("Reviewer stamp not saved:", stampError.message)
@@ -77,6 +101,29 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
       {actionError && (
         <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {actionError}
+        </div>
+      )}
+      {pendingApproval && (
+        <div role="alertdialog" aria-label="Confirm approval" className="flex flex-wrap items-center gap-3 rounded-xl border border-[#1E7A46]/30 bg-[#E2F0E6] px-4 py-3 text-sm">
+          <p className="text-[#1E7A46]">
+            Approve <strong>{pendingApproval.name}</strong> as a doctor? They will gain access to the Doctor Portal and can be booked by patients. This decision is recorded with your name.
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleDecision(pendingApproval.userId, "approved")}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Confirm approval
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingApproval(null)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       {pendingRejection && (
@@ -150,6 +197,12 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
                     <div><span className="text-muted-foreground">Specialization:</span> {d.specialization || "—"}</div>
                     <div><span className="text-muted-foreground">Experience:</span> {d.experience != null ? `${d.experience} yrs` : "—"}</div>
                   </div>
+                  {d.status !== "pending" && d.reviewed_at && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {d.status === "approved" ? "Approved" : "Rejected"}
+                      {d.reviewer?.full_name ? ` by ${d.reviewer.full_name}` : ""} · {fmtDateTime(d.reviewed_at)}
+                    </p>
+                  )}
                 </div>
 
                 {d.status === "pending" && (
@@ -158,7 +211,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
                       size="sm"
                       className="gap-1.5"
                       disabled={updatingId === d.user_id}
-                      onClick={() => handleDecision(d.user_id, "approved")}
+                      onClick={() => setPendingApproval({ userId: d.user_id, name: d.profile?.full_name || "this doctor" })}
                     >
                       <CheckCircle2 className="h-4 w-4" />
                       Approve

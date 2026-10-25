@@ -12,6 +12,7 @@ import { PulseLoader } from "@/components/shared/PulseLoader"
 export default function OnboardingPage() {
   const [fullName, setFullName] = useState("")
   const [hospitalId, setHospitalId] = useState("")
+  const [profileRole, setProfileRole] = useState<string | null>(null)
   const [hospitals, setHospitals] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -23,6 +24,12 @@ export default function OnboardingPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
+  // See handleSubmit for the reasoning: only the self-signup roles may
+  // pick a hospital here; provisioned staff roles get theirs from an
+  // administrator.
+  const canSelfSelectHospital =
+    !profileRole || profileRole === 'patient' || profileRole === 'doctor'
+
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -33,6 +40,7 @@ export default function OnboardingPage() {
 
       // Check if profile is already complete
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (profile?.role) setProfileRole(profile.role)
       if (profile && profile.full_name) {
         router.push(profile.role === 'patient' ? '/patient/dashboard' : '/dashboard')
         return
@@ -62,12 +70,25 @@ export default function OnboardingPage() {
     // Role is intentionally NOT set here — it's assigned once at signup
     // (from the Patient/Doctor choice) and can only be changed by an
     // admin from then on. This form only completes the profile's name
-    // and hospital.
-    const { error: upsertError } = await supabase.from('profiles').upsert({
+    // and (for self-signup roles) hospital.
+    //
+    // Hospital self-selection is honoured ONLY for the two self-signup
+    // roles: a patient picking their care hospital, and a doctor
+    // applicant declaring their affiliation — which stays inert for
+    // clinical access until an admin approves the application
+    // (migration 20261025230000 makes approval a condition of the
+    // clinical RLS policies). Accounts with provisioned staff roles
+    // (nurse, hospital_admin, super_admin, data_scientist) never write
+    // hospital_id here: their assignment comes from an administrator
+    // in User Management (QA Round 2, cluster 12).
+    const upsertPayload: { id: string; full_name: string; hospital_id?: string | null } = {
       id: user.id,
       full_name: fullName,
-      hospital_id: hospitalId || null
-    })
+    }
+    if (canSelfSelectHospital) {
+      upsertPayload.hospital_id = hospitalId || null
+    }
+    const { error: upsertError } = await supabase.from('profiles').upsert(upsertPayload)
 
     if (upsertError) {
       // A failed save must NOT look like success — previously the page
@@ -103,19 +124,30 @@ export default function OnboardingPage() {
             <Label>Full Name</Label>
             <Input value={fullName} onChange={e => setFullName(e.target.value)} autoComplete="name" required />
           </div>
-          <div className="space-y-2">
-            <Label>Hospital (Optional)</Label>
-            <Select value={hospitalId} onValueChange={setHospitalId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a hospital" />
-              </SelectTrigger>
-              <SelectContent>
-                {hospitals.map(h => (
-                  <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {canSelfSelectHospital ? (
+            <div className="space-y-2">
+              <Label>Hospital (Optional)</Label>
+              <Select value={hospitalId} onValueChange={setHospitalId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a hospital" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hospitals.map(h => (
+                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {profileRole === 'doctor' && (
+                <p className="text-xs text-muted-foreground">
+                  This is the hospital you are applying to join. An administrator confirms your assignment when they approve your application.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              Your hospital is assigned by an administrator — it will appear in your profile once set.
+            </div>
+          )}
 
           {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 

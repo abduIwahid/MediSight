@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ALL_SYMPTOMS, DISEASE_PROFILES } from "@/lib/symptoms"
 
+const STAFF_ROLES = ["doctor", "nurse", "hospital_admin", "super_admin", "data_scientist"]
+
 /**
  * Lightweight rule-based symptom screening engine.
  *
@@ -17,15 +19,38 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  // Session check: the symptom wizard is an in-app tool for signed-in
-  // users (its only UI consumer is the staff prediction page); the route
-  // must not be callable anonymously.
+  // Staff-only gate, mirroring /api/predict: the symptom wizard's only
+  // UI consumer is the staff prediction page. A bare session check let
+  // any signed-in PATIENT call this engine directly and receive disease
+  // names and risk labels — exactly the class of output the patient
+  // portal is designed never to give them (QA Round 2, security M3).
   const supabase = createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (!profile || !STAFF_ROLES.includes(profile.role)) {
+    return NextResponse.json({ error: "Clinical staff access required." }, { status: 403 })
+  }
+
+  if (profile.role === "doctor") {
+    const { data: doctor } = await supabase
+      .from("doctors")
+      .select("status")
+      .eq("user_id", user.id)
+      .single()
+    if (doctor?.status !== "approved") {
+      return NextResponse.json({ error: "Doctor account is not approved yet." }, { status: 403 })
+    }
   }
 
   try {
@@ -89,6 +114,12 @@ export async function POST(request: Request) {
       })),
     })
   } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unexpected server error." }, { status: 500 })
+    // Raw error text can carry internals — log it server-side and give
+    // the caller a generic message, like the rest of the ML API family.
+    console.error("[api/predict-symptoms] Unexpected error:", error)
+    return NextResponse.json(
+      { error: "The symptom check could not be completed. Please try again." },
+      { status: 500 }
+    )
   }
 }

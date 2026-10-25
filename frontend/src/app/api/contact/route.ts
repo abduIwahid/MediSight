@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 import { isEmailConfigured, sendContactInquiryEmail } from "@/lib/email"
 
 const LIMITS = {
@@ -24,11 +23,13 @@ function cleanField(value: unknown, max: number): string | null {
  * Accepts a Contact-page inquiry, emails it to the maintainer via
  * Resend, and stores a copy in contact_inquiries.
  *
- * Like every dashboard API route, this sits behind the app's
- * middleware, so callers are signed in. The archive insert goes
- * through the caller's session client; the table's RLS policy
- * ("ContactInquiries: allow anonymous insert") accepts the insert
- * while reads stay admin-only.
+ * The handler checks the caller's session itself (below) — middleware
+ * deliberately lets API requests reach their own handlers, so "the
+ * page is gated" does NOT make this route authenticated. Without the
+ * check, anyone on the internet could submit inquiries through the
+ * project's Resend account and write rows into contact_inquiries
+ * (QA Round 2, security M1). The archive insert goes through the
+ * caller's session client; reads on the table stay admin-only.
  *
  * The email is the delivery of record — if it cannot be sent, the
  * request fails honestly. The database copy is best-effort: if the
@@ -39,6 +40,16 @@ function cleanField(value: unknown, max: number): string | null {
  * deployment), the route answers 503 and nothing is stored.
  */
 export async function POST(request: Request) {
+  // Signed-in users only — the contact page lives inside the staff
+  // dashboard, so there is no anonymous use case for this endpoint.
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 })
+  }
+
   let payload: {
     name?: unknown
     email?: unknown
@@ -105,14 +116,9 @@ export async function POST(request: Request) {
   }
 
   // Best-effort archive copy — the email above is the delivery of
-  // record, so a failed insert is logged, never surfaced.
+  // record, so a failed insert is logged, never surfaced. (Same session
+  // client as the auth check above.)
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-    )
     const { error: insertError } = await supabase.from("contact_inquiries").insert({
       full_name: name,
       email,

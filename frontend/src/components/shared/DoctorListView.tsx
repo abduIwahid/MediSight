@@ -24,7 +24,6 @@ interface DoctorListRow {
   full_name?: string | null
   specialty?: string | null
   email?: string | null
-  phone?: string | null
   contact_number?: string | null
   consultation_fee?: number | null
   available?: boolean | null
@@ -101,8 +100,8 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
           {doctor.email && (
             <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{doctor.email}</span>
           )}
-          {(doctor.contact_number || doctor.phone) && (
-            <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{doctor.contact_number || doctor.phone}</span>
+          {doctor.contact_number && (
+            <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{doctor.contact_number}</span>
           )}
         </div>
       )

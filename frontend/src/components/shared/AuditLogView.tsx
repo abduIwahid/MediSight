@@ -29,7 +29,7 @@ function formatValues(values?: Record<string, unknown> | null): string {
     .join(" · ")
 }
 
-export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
+export function AuditLogView({ logs, loadError = false }: { logs: AuditLogRow[]; loadError?: boolean }) {
   const [query, setQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [tableFilter, setTableFilter] = useState("all")
@@ -54,6 +54,11 @@ export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
 
   return (
     <div className="space-y-4">
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          The audit trail could not be loaded, so entries below may be missing. Refresh the page to try again — an empty list here does not mean nothing happened.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -93,7 +98,10 @@ export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
         <div className="p-4 border-b flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           <span className="font-semibold">PHI Audit Trail</span>
-          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {logs.length} entries</span>
+          <span className="text-xs text-muted-foreground ml-auto">
+            {filtered.length} of {logs.length} entries
+            {logs.length >= 200 ? " · most recent 200 shown" : ""}
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
