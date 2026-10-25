@@ -13,6 +13,18 @@ interface DashboardClientViewProps {
   totalDoctors: number
   criticalAlerts: number
   totalPredictions: number
+  /** True when any of the stat queries failed — the cards then say so
+   *  instead of presenting a failed count as a real zero. */
+  statsError?: boolean
+}
+
+function alertWhen(iso: string): string {
+  const d = new Date(iso)
+  const today = new Date()
+  const sameDay = d.toDateString() === today.toDateString()
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: "Asia/Karachi" })
+  if (sameDay) return time
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Karachi" })}, ${time}`
 }
 
 const containerVariants: Variants = {
@@ -26,7 +38,7 @@ const itemVariants: Variants = {
 }
 
 export function DashboardClientView({
-  recentAlerts, totalPatients, totalAlerts, totalDoctors, criticalAlerts, totalPredictions
+  recentAlerts, totalPatients, totalAlerts, totalDoctors, criticalAlerts, totalPredictions, statsError = false
 }: DashboardClientViewProps) {
   return (
     <motion.div
@@ -46,9 +58,9 @@ export function DashboardClientView({
           >
             <Sparkles className="h-4 w-4" /> WhyRisk — Clinical Intelligence Platform
           </motion.p>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Hospital Command Centre</h1>
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Your patients, scored and explained</h1>
           <p className="text-sm sm:text-base text-white/75 leading-relaxed max-w-2xl">
-            Real-time monitoring of patient risk levels, critical alerts, and clinical AI predictions across your entire facility.
+            Patient risk scores, critical alerts, and model predictions for your facility — each score with the factors behind it.
           </p>
           <div className="flex flex-wrap items-center gap-4 pt-4">
             <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand/90">
@@ -60,6 +72,12 @@ export function DashboardClientView({
           </div>
         </div>
       </motion.div>
+
+      {statsError && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Some dashboard numbers could not be loaded, so the figures below may be incomplete. Reload the page to try again.
+        </div>
+      )}
 
       {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -97,8 +115,8 @@ export function DashboardClientView({
               { label: "Patient Registry", desc: "Browse all patient records", href: "/patients", icon: Activity, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
               { label: "Doctor Directory", desc: "View available specialists", href: "/doctors", icon: Stethoscope, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
               { label: "Analytics", desc: "Population-level insights", href: "/analytics", icon: TrendingUp, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
-              { label: "AI Assistant", desc: "Clinical copilot chat", href: "/assistant", icon: Sparkles, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
-              { label: "Alerts Centre", desc: "Critical & high risk alerts", href: "/alerts", icon: Bell, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "AI Assistant", desc: "Chat with the AI Assistant", href: "/assistant", icon: Sparkles, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "Alerts Center", desc: "Critical & high risk alerts", href: "/alerts", icon: Bell, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
             ].map((action, i) => (
               <Link key={i} href={action.href}>
                 <div className="group flex items-start gap-3 p-3 rounded-xl border bg-background hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer h-full">
@@ -119,8 +137,8 @@ export function DashboardClientView({
         <div className="bg-card border rounded-2xl p-6 shadow-sm flex flex-col transition-shadow hover:shadow-md">
           <div className="flex items-center justify-between border-b pb-4 mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/10 rounded-lg">
-                <Bell className="h-4 w-4 text-red-500" />
+              <div className="p-2 bg-[#FAE9E7] rounded-lg">
+                <Bell className="h-4 w-4 text-[#C0392B]" />
               </div>
               <h2 className="text-lg font-bold tracking-tight">Live Alerts</h2>
             </div>
@@ -143,26 +161,22 @@ export function DashboardClientView({
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className={`group flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer ${
-                    alert.severity === 'Critical'
-                      ? 'border-red-500/20 bg-red-500/5 hover:bg-red-500/10'
-                      : 'border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10'
-                  }`}
+                  className="group flex items-center justify-between p-3.5 rounded-xl border border-[#C0392B]/20 bg-[#FAE9E7]/50 transition-all cursor-pointer hover:bg-[#FAE9E7]"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full flex-shrink-0 ${alert.severity === 'Critical' ? 'bg-red-100 dark:bg-red-500/20' : 'bg-amber-100 dark:bg-amber-500/20'}`}>
-                      <AlertTriangle className={`h-3.5 w-3.5 ${alert.severity === 'Critical' ? 'text-red-600' : 'text-amber-600'}`} />
+                    <div className="p-2 rounded-full flex-shrink-0 bg-[#FAE9E7]">
+                      <AlertTriangle className="h-3.5 w-3.5 text-[#C0392B]" />
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{alert.type}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         MRN: <span className="font-mono">{alert.patients?.mrn || alert.patient_id?.slice(0, 8)}</span>
                         {" "}&bull;{" "}
-                        {new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {alertWhen(alert.created_at)}
                       </p>
                     </div>
                   </div>
-                  <RiskBadge severity={alert.severity ?? "Low"} />
+                  <RiskBadge severity={alert.severity ?? "Unknown"} />
                 </motion.div>
               ))}
             </div>

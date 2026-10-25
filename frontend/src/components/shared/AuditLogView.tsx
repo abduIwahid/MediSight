@@ -1,22 +1,40 @@
 "use client"
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Search, ShieldCheck } from "lucide-react"
 import type { AuditLogRow } from "@/lib/types"
+import { roleLabel } from "@/lib/roles"
+import { fmtDateTime } from "@/lib/dates"
 
 const ACTION_COLORS: Record<string, string> = {
-  SELECT: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  INSERT: "bg-green-500/10 text-green-600 border-green-500/20",
-  UPDATE: "bg-amber-500/10 text-amber-700 border-amber-500/20",
-  DELETE: "bg-red-500/10 text-red-600 border-red-500/20",
+  INSERT: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
+  UPDATE: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
+  DELETE: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
+}
+
+// The database triggers log writes only — a SELECT filter could never
+// match anything, so it is not offered (QA Round 1, item 58).
+const ACTIONS = ["INSERT", "UPDATE", "DELETE"]
+const PAGE_SIZE = 25
+
+function formatValues(values?: Record<string, unknown> | null): string {
+  if (!values) return "—"
+  const entries = Object.entries(values).filter(([, v]) => v !== undefined)
+  if (entries.length === 0) return "—"
+  return entries
+    .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+    .join(" · ")
 }
 
 export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
   const [query, setQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [tableFilter, setTableFilter] = useState("all")
+  const [page, setPage] = useState(0)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const uniqueTables = [...new Set(logs.map(l => l.table_name))].sort()
 
@@ -29,6 +47,11 @@ export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
     return matchesQuery && matchesAction && matchesTable
   })
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount - 1)
+  const pageLogs = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  const resetPage = () => setPage(0)
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-3">
@@ -37,23 +60,24 @@ export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
           <Input
             placeholder="Search by actor, table, or row ID..."
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); resetPage() }}
             className="pl-9"
+            aria-label="Search audit logs"
           />
         </div>
-        <Select value={actionFilter} onValueChange={setActionFilter}>
-          <SelectTrigger className="w-40">
+        <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); resetPage() }}>
+          <SelectTrigger className="w-40" aria-label="Filter by action">
             <SelectValue placeholder="Action" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Actions</SelectItem>
-            {['SELECT', 'INSERT', 'UPDATE', 'DELETE'].map(a => (
+            {ACTIONS.map(a => (
               <SelectItem key={a} value={a}>{a}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={tableFilter} onValueChange={setTableFilter}>
-          <SelectTrigger className="w-48">
+        <Select value={tableFilter} onValueChange={(v) => { setTableFilter(v); resetPage() }}>
+          <SelectTrigger className="w-48" aria-label="Filter by table">
             <SelectValue placeholder="Table" />
           </SelectTrigger>
           <SelectContent>
@@ -80,36 +104,74 @@ export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
                 <th className="text-left p-3 font-medium text-muted-foreground">Action</th>
                 <th className="text-left p-3 font-medium text-muted-foreground">Table</th>
                 <th className="text-left p-3 font-medium text-muted-foreground">Row ID</th>
+                <th className="text-left p-3 font-medium text-muted-foreground">Values</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
                     No audit entries match the current filter.
                   </td>
                 </tr>
-              ) : filtered.map((log) => (
-                <tr key={log.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(log.created_at).toLocaleString()}
-                  </td>
-                  <td className="p-3">
-                    <div>
-                      <p className="font-medium">{log.profiles?.full_name || "System"}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{log.profiles?.role || ""}</p>
-                    </div>
-                  </td>
-                  <td className="p-3">
-                    <Badge className={`border ${ACTION_COLORS[log.action] || ""}`}>{log.action}</Badge>
-                  </td>
-                  <td className="p-3 font-mono text-xs">{log.table_name}</td>
-                  <td className="p-3 font-mono text-xs text-muted-foreground">{log.row_id?.slice(0, 8)}…</td>
-                </tr>
-              ))}
+              ) : pageLogs.map((log) => {
+                const hasValues = Boolean(log.old_values || log.new_values)
+                const expanded = expandedId === log.id
+                return (
+                  <Fragment key={log.id}>
+                    <tr className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                      <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {fmtDateTime(log.created_at)}
+                      </td>
+                      <td className="p-3">
+                        <div>
+                          <p className="font-medium">{log.profiles?.full_name || "System"}</p>
+                          <p className="text-xs text-muted-foreground">{log.profiles?.role ? roleLabel(log.profiles.role) : ""}</p>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <Badge className={`border ${ACTION_COLORS[log.action] || "bg-muted text-muted-foreground border-border"}`}>{log.action}</Badge>
+                      </td>
+                      <td className="p-3 font-mono text-xs">{log.table_name}</td>
+                      <td className="p-3 font-mono text-xs text-muted-foreground">{log.row_id?.slice(0, 8)}…</td>
+                      <td className="p-3">
+                        {hasValues ? (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(expanded ? null : log.id)}
+                            aria-expanded={expanded}
+                            className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                          >
+                            {expanded ? "Hide" : "Show"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                    {expanded && hasValues && (
+                      <tr className="border-b bg-muted/10">
+                        <td colSpan={6} className="p-3 text-xs leading-relaxed text-muted-foreground">
+                          <p><span className="font-semibold text-foreground">Before:</span> {formatValues(log.old_values)}</p>
+                          <p className="mt-1"><span className="font-semibold text-foreground">After:</span> {formatValues(log.new_values)}</p>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <p className="text-xs text-muted-foreground">Page {safePage + 1} of {pageCount}</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Previous</Button>
+              <Button size="sm" variant="outline" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

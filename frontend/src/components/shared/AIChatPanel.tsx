@@ -121,13 +121,15 @@ function buildContextMessage(patient: PatientRow): string {
 
   msg += `\n`
   if (vitals.length > 0) {
-    msg += `**Recent Vitals (${vitals.length} records):**\n`
+    // The header counts what is actually listed below it (QA Round 1,
+    // item 80): "showing 4 of N" when there are more than four.
+    msg += `**Recent Vitals (showing ${Math.min(4, vitals.length)} of ${vitals.length}):**\n`
     vitals.slice(0, 4).forEach((v) => {
       msg += `• ${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}\n`
     })
   }
   if (labs.length > 0) {
-    msg += `\n**Lab Results (${labs.length} records):**\n`
+    msg += `\n**Lab Results (showing ${Math.min(4, labs.length)} of ${labs.length}):**\n`
     labs.slice(0, 4).forEach((l) => {
       msg += `• ${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}\n`
     })
@@ -148,7 +150,7 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
       return `**Key Risk Drivers**\n\nThe WhyRisk model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor a detailed SHAP waterfall chart, navigate to the patient's prediction detail page.`
     }
     if (q.includes("discharge") || q.includes("draft")) {
-      return `**Discharge Risk Summary (AI Draft)**\n\n${patientContext}\n\n**Recommendations:**\n• Review current medications for contraindications\n• Schedule follow-up within 2 weeks if High/Critical risk\n• Consider HbA1c and comprehensive metabolic panel if not recent\n• Dietitian referral for lifestyle intervention if BMI is elevated\n\n---\nNote: This is an AI-generated draft — review and edit before official use.`
+      return `**Discharge Risk Summary (AI Draft)**\n\n${patientContext}\n\n**Next steps to confirm with the treating team:**\n• Review the discharge plan with the treating physician before it is finalised\n• Arrange follow-up and any further tests according to your facility's protocol for this risk band\n• Make sure the patient understands their follow-up plan before they leave\n\n---\nNote: This is an AI-generated draft — review and edit before official use.`
     }
     if (q.includes("change") || q.includes("last visit") || q.includes("since") || q.includes("trend")) {
       return `**Trend Analysis**\n\n${patientContext}\n\nComparing historical predictions shows the trajectory of risk over time. If risk has increased since the last visit, consider re-evaluating:\n• Medication adherence\n• Weight and BMI changes\n• Blood pressure management\n• Physical activity levels\n\n---\nFull trend data is visible in the Prediction History on the patient detail page.`
@@ -171,10 +173,13 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
     return `**How I Can Help**\n\n1. **Patient risk summaries** — Select a patient and ask me to summarize their risk\n2. **Risk driver analysis** — Find out which clinical factors are influencing the prediction\n3. **Discharge drafts** — Generate a draft risk summary for discharge planning\n4. **Trend analysis** — Understand how a patient's risk has changed over time\n5. **Model performance** — Ask about the model's accuracy and metrics\n\nSelect a patient from the dropdown above to get started!`
   }
   if (q.includes("high risk") || q.includes("critical") || q.includes("alert")) {
-    return `**High-Risk Clinical Protocol**\n\nFor patients flagged as **High** or **Critical** risk:\n\n1. Immediate physician notification\n2. Order comprehensive metabolic panel (CMP) and HbA1c if not recent\n3. Review current medications for contraindications\n4. Schedule follow-up within 2 weeks\n5. Consider dietitian referral and lifestyle intervention program\n\nCheck the **Alerts Center** in the sidebar for active risk alerts across your patient panel.`
+    // General guidance only. The previous canned answer listed specific
+    // clinical orders (named lab panels, a fixed follow-up interval)
+    // with no source — removed in QA Round 1, item 87.
+    return `**High and Critical risk — general guidance**\n\nFor patients flagged as **High** or **Critical** risk:\n\n1. Notify the treating physician promptly\n2. Follow your facility's escalation protocol for high-risk results\n3. Review the factors behind the score on the patient's prediction detail page\n4. Arrange follow-up and any further assessment as the treating team decides\n\nCheck the **Alerts Center** in the sidebar for active risk alerts across your patient panel.`
   }
 
-  return `**I'm WhyRisk**, your clinical decision support assistant.\n\nI can answer questions about:\n• Patient risk summaries and clinical factors\n• Model performance and predictions\n• High-risk protocols and clinical guidance\n\nTo get patient-specific insights: **Select a patient from the dropdown above**, then ask about their risk, lab drivers, or request a discharge summary.\n\nWhat would you like to know?`
+  return `**I'm the WhyRisk AI Assistant**, your clinical decision support assistant.\n\nI can answer questions about:\n• Patient risk summaries and clinical factors\n• Model performance and predictions\n• High-risk protocols and clinical guidance\n\nTo get patient-specific insights: **Select a patient from the dropdown above**, then ask about their risk, lab drivers, or request a discharge summary.\n\nWhat would you like to know?`
 }
 
 export function AIChatPanel({ patientId }: AIChatPanelProps) {
@@ -182,7 +187,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     {
       id: "welcome",
       role: "assistant",
-      content: "**I'm WhyRisk**, your clinical decision support assistant.\n\nSelect a patient from the dropdown above to load their clinical context, or ask me a general question about risk protocols, model performance, and clinical guidance."
+      content: "**I'm the WhyRisk AI Assistant**, your clinical decision support assistant.\n\nSelect a patient from the dropdown above to load their clinical context, or ask me a general question about risk protocols, model performance, and clinical guidance."
     }
   ])
   const [input, setInput] = useState("")
@@ -285,10 +290,11 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error: unknown) {
+      console.error("Chat send failed:", error)
       setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         role: "assistant",
-        content: `Error generating response: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`
+        content: "Something went wrong while generating a response. Please check your connection and try again."
       }])
     } finally {
       setIsLoading(false)
@@ -312,11 +318,11 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
   }
 
   return (
-    <Card className="flex flex-col h-[700px] border shadow-sm">
+    <Card className="flex flex-col h-[calc(100dvh-12rem)] border shadow-sm">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <CardTitle>WhyRisk Clinical Copilot</CardTitle>
+          <CardTitle>AI Assistant</CardTitle>
           {isLoadingContext && (
             <div className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -334,7 +340,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
                 : "Loading patient context..."}
         </CardDescription>
         {patientId && contextStatus === "error" && (
-          <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <p role="alert" className="mt-2 rounded-lg border border-[#D97706]/30 bg-[#FDF0DC] px-3 py-2 text-xs text-[#A85008]">
             Could not load this patient&apos;s data. Please check your connection and re-select the patient to try again.
           </p>
         )}
@@ -361,7 +367,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
               }`}
             >
               {msg.fallback && (
-                <span className="mb-2 inline-block rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                <span className="mb-2 inline-block rounded-full border border-[#D97706]/30 bg-[#FDF0DC] px-2 py-0.5 text-[11px] font-semibold text-[#A85008]">
                   Built-in template response — the AI service is unavailable
                 </span>
               )}
@@ -423,7 +429,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
           </Button>
         </form>
         <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground w-full">
-          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+          <AlertTriangle className="h-3.5 w-3.5 text-[#A85008]" />
           <span>AI-generated insights. Please verify with clinical judgment.</span>
         </div>
         <p className="w-full text-center text-xs text-muted-foreground">

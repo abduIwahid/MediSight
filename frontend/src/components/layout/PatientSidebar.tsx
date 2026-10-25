@@ -1,11 +1,12 @@
 "use client"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, CalendarPlus, CalendarClock, Bot, User, LogOut } from "lucide-react"
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import { motion } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
+import { roleLabel } from "@/lib/roles"
 
 interface PatientSidebarProps {
   onClose?: () => void
@@ -14,14 +15,14 @@ interface PatientSidebarProps {
 
 export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
   const pathname = usePathname()
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const router = useRouter()
+  const supabase = createClient()
 
+  // Same sign-out implementation as the staff shell: shared client,
+  // then route to /login.
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    router.push("/login")
   }
 
   const navItems = [
@@ -43,7 +44,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
     <motion.div
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className={cn("flex h-full w-full flex-col border-r bg-card/95 backdrop-blur-xl shadow-lg", className)}
+      className={cn("flex h-full w-full flex-col border-r bg-card shadow-lg", className)}
     >
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/patient/dashboard" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
@@ -54,9 +55,9 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
 
       <div className="border-b px-6 py-3.5 bg-muted/20">
         <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+          <div className="h-2 w-2 rounded-full bg-[#1E7A46] animate-pulse"></div>
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            Patient Portal
+            {roleLabel("patient")}
           </span>
         </div>
       </div>
@@ -71,7 +72,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
                 href={item.href}
                 onClick={() => onClose?.()}
                 className={cn(
-                  "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
+                  "group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                     : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
@@ -90,8 +91,8 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
           onClick={handleLogout}
           className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive hover:shadow-sm"
         >
-          <LogOut className="h-4.5 w-4.5 transition-transform group-hover:-translate-x-1" />
-          <span>Secure Logout</span>
+          <LogOut className="h-[18px] w-[18px] transition-transform group-hover:-translate-x-1" />
+          <span>Sign out</span>
         </button>
       </div>
     </motion.div>

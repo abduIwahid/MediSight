@@ -41,13 +41,23 @@ export function DataTable<TData>({ columns, data, onRowClick }: DataTableProps<T
             </TableRow>
           ) : (
             data.map((row, i) => (
-              <TableRow 
-                key={i} 
+              <TableRow
+                key={i}
                 className={cn(
                   "transition-all duration-200",
                   onRowClick ? "cursor-pointer hover:bg-muted hover:shadow-[inset_0px_0px_0px_1px_rgba(0,0,0,0.05)] dark:hover:shadow-[inset_0px_0px_0px_1px_rgba(255,255,255,0.05)]" : "hover:bg-muted/50"
                 )}
                 onClick={() => onRowClick && onRowClick(row)}
+                // Clickable rows are keyboard-operable too (QA Round 1,
+                // item 56): focusable, Enter/Space activates.
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? "button" : undefined}
+                onKeyDown={onRowClick ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    onRowClick(row)
+                  }
+                } : undefined}
               >
                 {columns.map((col, j) => (
                   <TableCell key={j}>

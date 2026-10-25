@@ -6,18 +6,31 @@ import {
   AreaChart, Area,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts"
-import { TrendingUp, Users, AlertTriangle, Activity } from "lucide-react"
+import { TrendingUp, Users, AlertTriangle, Activity, BarChart3 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { PredictionRow } from "@/lib/types"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { dayKey } from "@/lib/dates"
 
+// Severity colours are the canonical RiskBadge data colours — the same
+// four hues everywhere in the product, never a local rainbow.
 const SEVERITY_COLORS: Record<string, string> = {
-  Low: "#22c55e",
-  Moderate: "#f59e0b",
-  High: "#f97316",
-  Critical: "#ef4444",
+  Low: "#1E7A46",
+  Moderate: "#D97706",
+  High: "#C0392B",
+  Critical: "#C0392B",
+  Unknown: "#5A6B73",
 }
 
-const DISEASE_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#f97316", "#ec4899", "#8b5cf6"]
+// Disease series use a single-hue ramp from the Midnight Clinical
+// palette (navy → steel blue → grey) instead of rainbow chart colours.
+const DISEASE_COLORS = ["#0D2B3E", "#2E7FA8", "#1F6E96", "#5EA8C9", "#3D5A6B", "#7FB3CC", "#123043", "#9FB3B8"]
+
+const ALERT_STATUS_COLORS: Record<string, string> = {
+  New: "#C0392B",
+  Acknowledged: "#D97706",
+  Resolved: "#1E7A46",
+}
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string | number; sub?: string }) {
   return (
@@ -43,11 +56,36 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
   )
 }
 
-export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats, recentPredictions }: {
+/**
+ * Screen-reader data equivalent for a chart (QA Round 1, item 73):
+ * the same numbers as a plain table, visually hidden.
+ */
+function SrOnlyTable({ caption, columns, rows }: { caption: string; columns: string[]; rows: (string | number)[][] }) {
+  return (
+    <table className="sr-only">
+      <caption>{caption}</caption>
+      <thead>
+        <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function ChartEmpty({ title, description }: { title: string; description: string }) {
+  return <EmptyState icon={BarChart3} title={title} description={description} className="py-8" />
+}
+
+export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats, recentPredictions, loadError = false }: {
   predictions: PredictionRow[]
   patientsByHospital: { hospitals?: { name: string } | null }[]
   alertStats: { severity?: string | null; status?: string | null; created_at?: string }[]
   recentPredictions: PredictionRow[]
+  loadError?: boolean
 }) {
   // 1. Severity distribution
   const severityData = useMemo(() => {
@@ -82,11 +120,13 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
     return Object.values(counts).sort((a, b) => b.count - a.count)
   }, [patientsByHospital])
 
-  // 4. 30-day risk score trend (daily avg probability)
+  // 4. 30-day risk score trend (daily avg probability). Days are bucketed
+  // in the app timezone (Asia/Karachi) — the same convention the report
+  // and queue use — not by UTC slice.
   const riskTrend = useMemo(() => {
     const map: Record<string, { date: string; avgRisk: number; sum: number; count: number }> = {}
     for (const p of recentPredictions) {
-      const day = p.created_at?.slice(0, 10)
+      const day = dayKey(p.created_at)
       if (!day) continue
       if (!map[day]) map[day] = { date: day, avgRisk: 0, sum: 0, count: 0 }
       map[day].sum += p.probability || 0
@@ -95,7 +135,7 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
     return Object.values(map)
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(d => ({
-        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: new Date(`${d.date}T12:00:00+05:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Karachi' }),
         avgRisk: +(d.sum / d.count).toFixed(3),
       }))
   }, [recentPredictions])
@@ -126,32 +166,42 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
   const diseaseKeys = [...new Set(predictions.map(p => p.disease).filter((d): d is string => Boolean(d)))].slice(0, 5)
 
   const criticalCount = alertStats.filter(a => a.severity === 'Critical').length
+  // The average is over PREDICTIONS, not patients — frequently assessed
+  // patients count more than once, and the label says so.
   const avgRisk = predictions.length > 0
     ? (predictions.reduce((s, p) => s + (p.probability || 0), 0) / predictions.length * 100).toFixed(1)
-    : "0"
+    : null
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Clinical Analytics</h1>
         <p className="text-sm text-muted-foreground mt-1">Population-level risk insights across all patients and hospitals.</p>
+        {(predictions.length >= 2000 || alertStats.length >= 2000) && (
+          <p className="text-xs text-muted-foreground mt-1">Based on the most recent 2,000 records.</p>
+        )}
       </div>
 
-      {predictions.length === 0 && (
-        <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
-          <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary/40" />
-          <p className="font-medium text-sm">No prediction data yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Analytics populate automatically as you add patients and run AI predictions.
-            Go to <span className="text-primary font-medium">Patients → Add Patient &amp; Predict</span> to get started.
-          </p>
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Some analytics data could not be loaded, so the figures below may be incomplete. Reload the page to try again.
         </div>
+      )}
+
+      {predictions.length === 0 && !loadError && (
+        <EmptyState
+          icon={TrendingUp}
+          title="No prediction data yet"
+          description="Analytics populate as patients are registered and assessed. Run a first assessment to get started."
+          actionLabel="New Assessment"
+          actionHref="/patients/new"
+        />
       )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total Predictions" value={predictions.length.toLocaleString()} sub="All time" />
-        <StatCard icon={TrendingUp} label="Avg Risk Score" value={`${avgRisk}%`} sub="Across all patients" />
+        <StatCard icon={Users} label="Total Predictions" value={predictions.length.toLocaleString()} sub={predictions.length >= 2000 ? "Most recent 2,000" : "All time"} />
+        <StatCard icon={TrendingUp} label="Avg Risk Score (per prediction)" value={avgRisk !== null ? `${avgRisk}%` : "—"} sub="Averaged across predictions, not patients" />
         <StatCard icon={AlertTriangle} label="Critical Alerts" value={criticalCount} sub="Total generated" />
         <StatCard icon={Activity} label="Hospitals Tracked" value={hospitalData.length} sub="Active facilities" />
       </div>
@@ -160,80 +210,86 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
         {/* Severity Distribution Pie */}
         <ChartCard title="Risk Severity Distribution">
           {severityData.length === 0 ? (
-            <div className="h-56 flex items-center justify-center text-muted-foreground text-sm border rounded-lg border-dashed">No data yet.</div>
+            <ChartEmpty title="No severity data yet" description="Severity distribution appears once predictions have been run." />
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={severityData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" nameKey="name">
-                  {severityData.map((entry) => (
-                    <Cell key={entry.name} fill={SEVERITY_COLORS[entry.name] || "#94a3b8"} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={severityData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" nameKey="name">
+                    {severityData.map((entry) => (
+                      <Cell key={entry.name} fill={SEVERITY_COLORS[entry.name] || "#5A6B73"} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <SrOnlyTable caption="Predictions by severity" columns={["Severity", "Predictions"]} rows={severityData.map((d) => [d.name, d.value])} />
+            </>
           )}
         </ChartCard>
 
         {/* Disease Distribution Bar */}
         <ChartCard title="Disease Distribution">
           {diseaseData.length === 0 ? (
-            <div className="h-56 flex items-center justify-center text-muted-foreground text-sm border rounded-lg border-dashed">No data yet.</div>
+            <ChartEmpty title="No disease data yet" description="Disease distribution appears once predictions have been run." />
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={diseaseData} layout="vertical" margin={{ top: 0, right: 20, left: 60, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={60} className="fill-muted-foreground" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                <Bar dataKey="value" name="Predictions" radius={[0, 4, 4, 0]}>
-                  {diseaseData.map((_, i) => (
-                    <Cell key={i} fill={DISEASE_COLORS[i % DISEASE_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={diseaseData} layout="vertical" margin={{ top: 0, right: 20, left: 60, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={60} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                  <Bar dataKey="value" name="Predictions" radius={[0, 4, 4, 0]}>
+                    {diseaseData.map((_, i) => (
+                      <Cell key={i} fill={DISEASE_COLORS[i % DISEASE_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <SrOnlyTable caption="Predictions by disease" columns={["Disease", "Predictions"]} rows={diseaseData.map((d) => [d.name, d.value])} />
+            </>
           )}
         </ChartCard>
 
-        {/* 30-Day Risk Trend Area Chart */}
+        {/* 30-Day Risk Trend Area Chart — solid low-opacity fill, no gradient */}
         <ChartCard title="30-Day Average Risk Score Trend">
           {riskTrend.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm border rounded-lg border-dashed">No data in last 30 days.</div>
+            <ChartEmpty title="No data in the last 30 days" description="The trend appears once predictions exist in this window." />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={riskTrend} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="riskGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v) => [(Number(v ?? 0) * 100).toFixed(1) + '%', 'Avg Risk']} />
-                <Area type="monotone" dataKey="avgRisk" stroke="#ef4444" fill="url(#riskGradient)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={riskTrend} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v) => [(Number(v ?? 0) * 100).toFixed(1) + '%', 'Avg Risk']} />
+                  <Area type="monotone" dataKey="avgRisk" stroke="#2E7FA8" fill="#2E7FA8" fillOpacity={0.12} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+              <SrOnlyTable caption="Average risk score per day, last 30 days" columns={["Day", "Average risk"]} rows={riskTrend.map((d) => [d.date, `${(d.avgRisk * 100).toFixed(1)}%`])} />
+            </>
           )}
         </ChartCard>
 
         {/* Patients per Hospital Bar */}
         <ChartCard title="Patient Volume by Hospital">
           {hospitalData.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm border rounded-lg border-dashed">No hospital data yet.</div>
+            <ChartEmpty title="No hospital data yet" description="Hospital volumes appear once patients are registered." />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={hospitalData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                <Bar dataKey="count" name="Patients" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={hospitalData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                  <Bar dataKey="count" name="Patients" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <SrOnlyTable caption="Patients by hospital" columns={["Hospital", "Patients"]} rows={hospitalData.map((d) => [d.name, d.count])} />
+            </>
           )}
         </ChartCard>
       </div>
@@ -242,37 +298,47 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
       <div className="grid md:grid-cols-2 gap-6">
         <ChartCard title="Alert Status Breakdown">
           {alertStatusData.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm border rounded-lg border-dashed">No alerts generated yet.</div>
+            <ChartEmpty title="No alerts generated yet" description="Alert statuses appear once alerts have been raised." />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={alertStatusData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
-                  {alertStatusData.map((_, i) => (
-                    <Cell key={i} fill={["#22c55e", "#f59e0b", "#94a3b8"][i % 3]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-              </PieChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={alertStatusData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                    {alertStatusData.map((entry) => (
+                      <Cell key={entry.name} fill={ALERT_STATUS_COLORS[entry.name] || "#5A6B73"} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <SrOnlyTable caption="Alerts by status" columns={["Status", "Alerts"]} rows={alertStatusData.map((d) => [d.name, d.value])} />
+            </>
           )}
         </ChartCard>
 
         <ChartCard title="Severity Radar by Disease">
           {radarData.length === 0 || diseaseKeys.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm border rounded-lg border-dashed">Insufficient data for radar chart.</div>
+            <ChartEmpty title="Not enough data for the radar" description="The radar needs predictions across more than one disease." />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <RadarChart data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="severity" tick={{ fontSize: 11 }} />
-                <PolarRadiusAxis angle={30} tick={{ fontSize: 9 }} />
-                {diseaseKeys.map((d, i) => (
-                  <Radar key={d} name={d} dataKey={d} stroke={DISEASE_COLORS[i % DISEASE_COLORS.length]} fill={DISEASE_COLORS[i % DISEASE_COLORS.length]} fillOpacity={0.2} />
-                ))}
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <RadarChart data={radarData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="severity" tick={{ fontSize: 11 }} />
+                  <PolarRadiusAxis angle={30} tick={{ fontSize: 9 }} />
+                  {diseaseKeys.map((d, i) => (
+                    <Radar key={d} name={d} dataKey={d} stroke={DISEASE_COLORS[i % DISEASE_COLORS.length]} fill={DISEASE_COLORS[i % DISEASE_COLORS.length]} fillOpacity={0.2} />
+                  ))}
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                  <Legend />
+                </RadarChart>
+              </ResponsiveContainer>
+              <SrOnlyTable
+                caption="Predictions by severity and disease"
+                columns={["Severity", ...diseaseKeys]}
+                rows={radarData.map((r) => [String(r.severity), ...diseaseKeys.map((d) => Number(r[d] ?? 0))])}
+              />
+            </>
           )}
         </ChartCard>
       </div>
