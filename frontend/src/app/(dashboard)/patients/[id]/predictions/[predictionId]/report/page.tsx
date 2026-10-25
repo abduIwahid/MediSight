@@ -169,14 +169,14 @@ export default async function PredictionReportPage({ params }: { params: { id: s
 
         <section className="border-b border-border py-5">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical explanation</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 max-w-[70ch] text-sm leading-relaxed text-muted-foreground">
             {explanation?.clinical_explanation ||
               "No clinical explanation was stored for this prediction."}
           </p>
         </section>
 
         <footer className="pt-5">
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="max-w-[70ch] text-xs leading-relaxed text-muted-foreground">
             MediSight is an experimental clinical decision-support and research tool. It is not a certified
             medical device and does not replace professional diagnosis. This report summarises a model
             estimate and its explanation; clinical decisions must be made by a qualified healthcare

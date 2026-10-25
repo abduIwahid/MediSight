@@ -18,7 +18,7 @@ export interface DoctorRow {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  pending: "bg-amber-500/10 text-amber-700 border-amber-500/20",
   approved: "bg-green-500/10 text-green-600 border-green-500/20",
   rejected: "bg-red-500/10 text-red-600 border-red-500/20",
 }
@@ -51,7 +51,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
           <Stethoscope className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">Doctor Verification</h2>
           {pendingCount > 0 && (
-            <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">{pendingCount} pending</Badge>
+            <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20">{pendingCount} pending</Badge>
           )}
         </div>
         <div className="inline-flex rounded-xl border bg-muted/40 p-1">

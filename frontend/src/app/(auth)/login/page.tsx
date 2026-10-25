@@ -247,7 +247,7 @@ function LoginPageInner() {
                 <span className="text-sm text-muted-foreground">Secure session</span>
               </div>
 
-              {callbackError && <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">⚠️ {callbackError}</div>}
+              {callbackError && <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">⚠️ {callbackError}</div>}
               {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
               <Button type="submit" className="w-full py-3" disabled={loading}>

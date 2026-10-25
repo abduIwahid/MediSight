@@ -49,7 +49,7 @@ export default async function AdminOverviewPage() {
 
       {(pendingDoctors ?? 0) > 0 && (
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
-          <p className="text-sm font-semibold text-amber-600">
+          <p className="text-sm font-semibold text-amber-700">
             {pendingDoctors} doctor{pendingDoctors === 1 ? "" : "s"} waiting for approval —{" "}
             <Link href="/admin/doctors" className="underline">review now</Link>
           </p>

@@ -142,7 +142,7 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
                   <td className="p-4">
                     <Badge className={m.stage === 'Production' 
                       ? "bg-green-500/10 text-green-600 border-green-500/20 border" 
-                      : "bg-amber-500/10 text-amber-600 border-amber-500/20 border"
+                      : "bg-amber-500/10 text-amber-700 border-amber-500/20 border"
                     }>
                       {m.stage}
                     </Badge>

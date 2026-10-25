@@ -172,7 +172,7 @@ export default function ModelCardPage() {
 
         <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Limitations</p>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
+          <ul className="mt-3 max-w-[70ch] list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>The model was trained on United States survey data (BRFSS 2015); performance on other populations has not been validated.</li>
             <li>A score is a screening estimate, not a diagnosis. False positives and false negatives occur.</li>
             <li>MediSight is an experimental clinical decision-support and research tool. It is not a certified medical device and does not replace professional diagnosis.</li>
