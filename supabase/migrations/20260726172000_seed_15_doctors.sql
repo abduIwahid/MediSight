@@ -1,3 +1,0 @@
--- This migration was disabled because inserting directly into auth.users is not allowed via Supabase migrations.
--- The necessary doctor profiles are already seeded by 20260730000000_seed_doctors_profiles.sql.
--- No operation needed.
