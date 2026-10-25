@@ -48,10 +48,15 @@ export default function SignupPage() {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+    // No top-level `phone` argument: the project's phone auth provider
+    // is disabled, and the number is profile metadata only (collected
+    // below in options.data, where handle_new_user reads it for the
+    // patient_profiles / doctors rows). Passing it as a credential
+    // made the auth user phone-keyed against a disabled provider
+    // (QA Round 2, security L2 / edge-cases).
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      phone,
       options: {
         emailRedirectTo: `${siteUrl}/auth/callback`,
         data: {

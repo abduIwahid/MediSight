@@ -49,8 +49,15 @@ export default function UpdatePasswordPage() {
       setError("Passwords do not match.")
       return
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.")
+    // 6 is the server-side truth: nothing in the project raises the
+    // Supabase minimum above its default, and signup accepts 6. This
+    // page used to demand 8, contradicting the rule users signed up
+    // under (QA Round 2, F3). Raising the real policy to 8+ is a
+    // one-line change in Supabase Auth config (Minimum password
+    // length) — if that is ever done, raise this check and the
+    // signup hint to match in the same change.
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.")
       return
     }
 
@@ -132,7 +139,7 @@ export default function UpdatePasswordPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Min. 8 characters"
+                    placeholder="Min. 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

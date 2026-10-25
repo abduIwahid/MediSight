@@ -37,6 +37,14 @@ function LoginPageInner() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Resend-confirmation flow: shown when sign-in fails because the
+  // email was never confirmed (or the callback link expired). Without
+  // it, a lost/expired confirmation email was a permanent lockout —
+  // there was no resend path anywhere in the product (QA Round 2,
+  // new-signup F1).
+  const [showResend, setShowResend] = useState(false)
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendMsg, setResendMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<"google" | null>(null)
   const router = useRouter()
@@ -60,15 +68,27 @@ function LoginPageInner() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setShowResend(false)
+    setResendMsg(null)
 
-    const credentials = identifier.includes("@")
-      ? { email: identifier, password }
-      : { phone: identifier, password }
-
-    const { data, error } = await supabase.auth.signInWithPassword(credentials)
+    // Email only. A phone-credential branch lived here for two rounds
+    // while phone sign-in was never enabled for email-signed-up
+    // accounts (the number is profile metadata, not a credential) —
+    // it only ever produced a raw provider error (QA Round 2, F2).
+    const { data, error } = await supabase.auth.signInWithPassword({ email: identifier, password })
 
     if (error) {
-      setError(error.message)
+      // Provider messages are mapped to the app's own sentences; the
+      // not-confirmed case additionally offers the resend action.
+      if (/email not confirmed/i.test(error.message)) {
+        setError("Your email address hasn't been confirmed yet. Use the link in the confirmation email we sent you — or resend it below.")
+        setShowResend(true)
+      } else if (/invalid login credentials/i.test(error.message)) {
+        setError("That email and password don't match our records. Please check them and try again.")
+      } else {
+        console.error("Sign-in failed:", error.message)
+        setError("Sign-in failed. Please try again.")
+      }
       setLoading(false)
       return
     }
@@ -132,6 +152,28 @@ function LoginPageInner() {
     router.push(actualRole === "patient" ? "/patient/dashboard" : "/dashboard")
     router.refresh()
     setLoading(false)
+  }
+
+  const handleResendConfirmation = async () => {
+    if (!identifier.includes("@")) {
+      setResendMsg("Enter your account email above first, then resend the confirmation.")
+      return
+    }
+    setResendBusy(true)
+    setResendMsg(null)
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: identifier,
+      options: { emailRedirectTo: `${siteUrl}/auth/callback` },
+    })
+    if (error) {
+      console.error("Resend confirmation failed:", error.message)
+      setResendMsg("The confirmation email could not be resent. Please wait a minute and try again.")
+    } else {
+      setResendMsg("Confirmation email sent. Check your inbox (and spam folder) for a fresh link.")
+    }
+    setResendBusy(false)
   }
 
   const handleOAuth = async (provider: "google") => {
@@ -217,16 +259,16 @@ function LoginPageInner() {
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="identifier">Email or Phone</Label>
+                <Label htmlFor="identifier">Email</Label>
                 <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <AtSign className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <Input
                     id="identifier"
-                    type="text"
+                    type="email"
                     autoComplete="email"
                     value={identifier}
                     onChange={e => setIdentifier(e.target.value)}
-                    placeholder="Enter your email or phone number"
+                    placeholder="Enter your email"
                     required
                     className="border-0 bg-transparent px-0 text-sm placeholder:text-muted-foreground focus-visible:ring-0 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
@@ -270,6 +312,20 @@ function LoginPageInner() {
                   <Link href="/forgot-password" className="shrink-0 font-medium underline underline-offset-2">
                     Forgot password?
                   </Link>
+                </div>
+              )}
+              {(showResend || callbackError === "Could not confirm your account. Please try again.") && (
+                <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm">
+                  <p className="text-muted-foreground">Didn&apos;t get the confirmation email, or has the link expired?</p>
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={resendBusy}
+                    className="mt-1 font-medium text-primary hover:underline disabled:opacity-60"
+                  >
+                    {resendBusy ? "Sending..." : "Resend confirmation email"}
+                  </button>
+                  {resendMsg && <p className="mt-1 text-muted-foreground">{resendMsg}</p>}
                 </div>
               )}
 
