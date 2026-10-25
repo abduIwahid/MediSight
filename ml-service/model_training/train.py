@@ -1,3 +1,10 @@
+"""Train and benchmark the MediSight diabetes model (BRFSS 2015).
+
+Dataset: run `python model_training/fetch_dataset.py` first -- it
+downloads the canonical UCI file (dataset 891, CDC Diabetes Health
+Indicators) and derives the balanced 50/50 training CSV this script
+expects. data/ is gitignored; the dataset is never committed.
+"""
 import os
 import joblib
 import pandas as pd
@@ -26,13 +33,19 @@ DATA_PATH = os.path.join(
 MODEL_DIR = os.path.join(BASE_DIR, "..", "models", "production")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
+# MLflow 3 put the local file store (./mlruns) behind an explicit opt-in.
+os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+
 # Set MLflow experiment
 mlflow.set_experiment("MediSight_Diabetes_Prediction")
 
 def train_and_evaluate():
     print(f"Loading dataset from: {DATA_PATH}")
     if not os.path.exists(DATA_PATH):
-        raise FileNotFoundError(f"Dataset not found at {DATA_PATH}")
+        raise FileNotFoundError(
+            f"Dataset not found at {DATA_PATH}. "
+            "Run `python model_training/fetch_dataset.py` to download and derive it."
+        )
         
     df = pd.read_csv(DATA_PATH)
     
@@ -83,11 +96,14 @@ def train_and_evaluate():
             if name == "LogisticRegression":
                 mlflow.log_param("C", model.C)
                 mlflow.log_param("max_iter", model.max_iter)
-                mlflow.sklearn.log_model(model, "model")
+                # cloudpickle: MLflow 3's default skops format refuses
+                # tree ensembles without a trust list; these models are
+                # trained locally in this same script.
+                mlflow.sklearn.log_model(model, "model", serialization_format="cloudpickle")
             elif name == "RandomForest":
                 mlflow.log_param("n_estimators", model.n_estimators)
                 mlflow.log_param("max_depth", model.max_depth)
-                mlflow.sklearn.log_model(model, "model")
+                mlflow.sklearn.log_model(model, "model", serialization_format="cloudpickle")
             elif name == "XGBoost":
                 mlflow.log_param("n_estimators", model.n_estimators)
                 mlflow.log_param("max_depth", model.max_depth)
