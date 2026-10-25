@@ -1,4 +1,13 @@
 -- =============================================================================
+-- *** STAGING / LOCAL DEVELOPMENT ONLY — NEVER RUN AGAINST PRODUCTION ***
+--
+-- This script creates REAL auth accounts with shared, well-known passwords
+-- (TempPass1!, TempPass2!, ... — visible in plain text below). Anyone who
+-- has read this file can sign in as any of these doctors. Running it
+-- against the production Supabase project would hand out working clinical
+-- accounts to the world. Only ever run it against a throwaway local or
+-- staging project, and delete the seeded accounts when you are done.
+-- =============================================================================
 -- DOCTOR SEED SCRIPT — RUN THIS IN THE SUPABASE SQL EDITOR (NOT via CLI migrations)
 -- This inserts 15 doctors into auth.users (which triggers the handle_new_user
 -- function to auto-create their public.profiles rows).
