@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { DoctorVerificationView, type DoctorRow } from "@/components/shared/DoctorVerificationView"
+import { getCurrentProfile } from "@/lib/current-profile"
 
 export const dynamic = 'force-dynamic'
 
@@ -12,16 +13,15 @@ export default async function AdminDoctorsPage() {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: viewer } = user
-    ? await supabase.from('profiles').select('role').eq('id', user.id).single()
-    : { data: null }
+  // The viewer's own profile — shared with the admin layout's read for
+  // this request via React cache (see lib/current-profile).
+  const viewer = await getCurrentProfile()
 
   // Verification decisions are super/hospital-admin writes at the
   // database level. Other admin-area roles (data_scientist) would see
   // Approve/Reject buttons whose writes silently match zero RLS rows —
   // show an honest permission state instead of fake controls.
-  if (!viewer || !['super_admin', 'hospital_admin'].includes(viewer.role)) {
+  if (!viewer || !viewer.role || !['super_admin', 'hospital_admin'].includes(viewer.role)) {
     return (
       <div className="rounded-xl border bg-card p-8 text-center">
         <h2 className="text-lg font-semibold">You don&apos;t have permission to verify doctors</h2>

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { PatientListView } from "@/components/shared/PatientListView"
+import { getCurrentProfile } from "@/lib/current-profile"
 import type { PatientRow } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
@@ -44,16 +45,14 @@ export default async function PatientListPage({
     patientsQuery = patientsQuery.limit(25)
   }
 
-  const [{ data: patients, error }, { data: userResult }] = await Promise.all([
+  // The viewer's profile (for the isAdmin flag) loads in parallel with
+  // the patient list, through the shared per-request helper.
+  const [{ data: patients, error }, profile] = await Promise.all([
     patientsQuery,
-    supabase.auth.getUser()
+    getCurrentProfile()
   ])
 
-  const profile = userResult?.user
-    ? await supabase.from('profiles').select('role').eq('id', userResult.user.id).single()
-    : { data: null }
-
-  const isAdmin = Boolean(profile.data && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.data.role))
+  const isAdmin = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.role))
 
   if (error) {
     console.error("Supabase Error fetching patients:", error)

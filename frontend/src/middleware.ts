@@ -107,9 +107,18 @@ export async function middleware(request: NextRequest) {
   // Role-based access control: patients get their own portal under /patient/*,
   // clinical staff (doctor/nurse/hospital_admin/super_admin/data_scientist) use
   // the existing /dashboard/* clinical workspace. Neither can reach the other's area.
+  //
+  // The profile read (and, for doctors, the approval-status read) only
+  // happens when a routing decision below actually consumes it: the
+  // auth-route bounce, the patient↔clinical area gates, the
+  // unapproved-doctor gate and the null-profile onboarding gate. Public
+  // pages, session-flow routes, onboarding, pending-approval and every
+  // /api/* route pass through on the session refresh above alone — no
+  // database work for requests that never branch on a role.
+  const needsRoleRouting = Boolean(user) && (isAuthRoute || isClinicalArea || isPatientArea)
   let role: string | null = null
   let doctorStatus: string | null = null
-  if (user) {
+  if (needsRoleRouting && user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -117,7 +126,9 @@ export async function middleware(request: NextRequest) {
       .single()
     role = profile?.role ?? null
 
-    if (role === 'doctor') {
+    // Doctor status feeds only the auth-route home redirect and the
+    // unapproved-doctor clinical gate — not the patient-area gate.
+    if (role === 'doctor' && (isAuthRoute || isClinicalArea)) {
       const { data: doctor } = await supabase
         .from('doctors')
         .select('status')
