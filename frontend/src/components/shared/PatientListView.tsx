@@ -112,12 +112,8 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
 
   const columns = [
     {
-      header: "MRN",
-      cell: (p: PatientRow) => (
-        <span className="font-mono text-xs text-muted-foreground">{p.mrn}</span>
-      )
-    },
-    {
+      // Name leads: in a scanning (Markings) pattern the fixated first
+      // column must carry the key identifier, with MRN as the reference.
       header: "Patient Name",
       cell: (p: PatientRow) => {
         const name = getPatientName(p)
@@ -132,6 +128,12 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
           </div>
         )
       }
+    },
+    {
+      header: "MRN",
+      cell: (p: PatientRow) => (
+        <span className="font-mono text-xs text-muted-foreground">{p.mrn}</span>
+      )
     },
     {
       header: "Age",
@@ -165,7 +167,7 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
         }
         return (
           <Link href={`/patients/new`} className="text-xs text-primary hover:underline">
-            Run Prediction
+            Run AI Prediction
           </Link>
         )
       }
