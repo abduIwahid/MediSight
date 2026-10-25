@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 /**
  * Lightweight rule-based symptom screening engine.
@@ -117,6 +118,17 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Session check: the symptom wizard is an in-app tool for signed-in
+  // users (its only UI consumer is the staff prediction page); the route
+  // must not be callable anonymously.
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 })
+  }
+
   try {
     const { symptoms } = await request.json()
 

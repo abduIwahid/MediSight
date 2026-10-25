@@ -8,7 +8,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const body = await request.json().catch(() => ({}))
-  const { email, full_name, phone, specialty, hospital_id, department, role, ...rest } = body
+  const { email, full_name, phone, contact_number, hospital_id, department, role } = body
 
   const admin = createAdminClient()
 
@@ -21,11 +21,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
-  const profileUpdates: Record<string, unknown> = { ...rest }
+  // Explicit column allowlist — this update runs with the service-role
+  // client (RLS bypassed), so the request body must never be spread into
+  // it. Only the fields named here can ever be written; anything else in
+  // the body is ignored. (Profiles has no `phone`/`specialty` column —
+  // the phone number lives in `contact_number`; both body spellings are
+  // accepted and mapped to it.)
+  const profileUpdates: Record<string, unknown> = {}
   if (email !== undefined) profileUpdates.email = email
   if (full_name !== undefined) profileUpdates.full_name = full_name
-  if (phone !== undefined) profileUpdates.phone = phone
-  if (specialty !== undefined) profileUpdates.specialty = specialty
+  if (contact_number !== undefined) profileUpdates.contact_number = contact_number
+  else if (phone !== undefined) profileUpdates.contact_number = phone
   if (hospital_id !== undefined) profileUpdates.hospital_id = hospital_id
   if (department !== undefined) profileUpdates.department = department
   // Role changes go through the same admin client so the

@@ -43,11 +43,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Check if route is related to auth
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || 
-                      request.nextUrl.pathname.startsWith('/signup') || 
-                      request.nextUrl.pathname.startsWith('/forgot-password') ||
-                      request.nextUrl.pathname.startsWith('/update-password') ||
-                      request.nextUrl.pathname.startsWith('/auth/callback')
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
+                      request.nextUrl.pathname.startsWith('/signup') ||
+                      request.nextUrl.pathname.startsWith('/forgot-password')
+
+  // Session-flow routes must run their handler even when a session
+  // already exists: an email confirmation or password-recovery link
+  // opened in a browser that is still signed in has to reach the
+  // callback / the set-new-password form. Bouncing those to the role
+  // home (the isAuthRoute rule below) silently breaks recovery links.
+  const isSessionFlowRoute = request.nextUrl.pathname.startsWith('/auth/callback') ||
+                             request.nextUrl.pathname.startsWith('/update-password')
 
   // Public marketing page - accessible whether logged in or not.
   // "/" always renders the Welcome page (it redirects there), so it must stay public too.
@@ -68,7 +74,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute && !isSessionFlowRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

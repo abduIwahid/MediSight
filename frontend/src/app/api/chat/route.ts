@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 const GEMINI_MODEL = "gemini-flash-latest"
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -24,27 +25,75 @@ Rules you must always follow:
 - Always make clear, near the end of substantive answers, that you do not replace professional medical advice and a doctor should confirm anything important.
 - Be warm, plain-spoken, and brief. Use markdown-style **bold** sparingly for key points.`
 
+// Input caps — the chat panels are the only legitimate callers and stay
+// far below these; anything larger is abuse or a bug, and is truncated
+// rather than forwarded to the model at full size.
+const MAX_MESSAGE_CHARS = 2000
+const MAX_CONTEXT_CHARS = 8000
+const MAX_HISTORY_ITEMS = 10
+const MAX_HISTORY_ITEM_CHARS = 2000
+
 export async function POST(request: Request) {
   try {
-    const { message, patientContext, history, mode } = await request.json()
+    // Authenticated users only — this route spends real Gemini quota and
+    // its doctor mode is a clinical tool. Middleware gates pages, not this
+    // route, so the check lives here.
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Not signed in.", fallback: true }, { status: 401 })
+    }
 
-    if (!message || typeof message !== "string") {
+    // The instruction set follows the CALLER's actual role, never a
+    // client-supplied flag: a patient must not be able to invoke doctor
+    // mode (or attach a fabricated "patient context") by editing the
+    // request body. Missing profile → least-privilege patient mode.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+    const isPatient = !profile || profile.role === "patient"
+    const SYSTEM_INSTRUCTION = isPatient ? PATIENT_SYSTEM_INSTRUCTION : DOCTOR_SYSTEM_INSTRUCTION
+
+    const body = await request.json().catch(() => null)
+    const rawMessage = body?.message
+    const rawContext = typeof body?.patientContext === "string" ? body.patientContext : ""
+    const rawHistory = Array.isArray(body?.history) ? body.history : []
+
+    if (!rawMessage || typeof rawMessage !== "string") {
       return NextResponse.json({ error: "Missing 'message' in request body." }, { status: 400 })
     }
 
-    const SYSTEM_INSTRUCTION = mode === "patient" ? PATIENT_SYSTEM_INSTRUCTION : DOCTOR_SYSTEM_INSTRUCTION
+    const message = rawMessage.slice(0, MAX_MESSAGE_CHARS)
+    const patientContext = isPatient ? "" : rawContext.slice(0, MAX_CONTEXT_CHARS)
+    const history = rawHistory
+      .filter(
+        (m: { role?: unknown; content?: unknown }) =>
+          (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string"
+      )
+      .slice(-MAX_HISTORY_ITEMS)
+      .map((m: { role: string; content: string }) => ({
+        role: m.role,
+        content: m.content.slice(0, MAX_HISTORY_ITEM_CHARS),
+      }))
 
     const apiKey = process.env.GEMINI_API_KEY
 
     if (!apiKey) {
+      // Deliberately generic: configuration details are server business,
+      // and the panels key their honest "template mode" label off
+      // `fallback: true`, not off this string.
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured on the server.", fallback: true },
+        { error: "The AI assistant is unavailable right now.", fallback: true },
         { status: 503 }
       )
     }
 
     const contents = [
-      ...(Array.isArray(history) ? history : []).map((m: { role: string; content: string }) => ({
+      ...history.map((m: { role: string; content: string }) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
       })),
@@ -77,9 +126,11 @@ export async function POST(request: Request) {
     })
 
     if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text().catch(() => "")
+      // Upstream error bodies can contain provider internals — log the
+      // status server-side, return a generic message to the client.
+      console.error(`[api/chat] Gemini responded with ${geminiResponse.status}.`)
       return NextResponse.json(
-        { error: `Gemini API error (${geminiResponse.status}): ${errText}`, fallback: true },
+        { error: "The AI assistant could not respond. Please try again.", fallback: true },
         { status: 502 }
       )
     }
@@ -91,8 +142,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ reply })
   } catch (error: unknown) {
+    console.error("[api/chat] Unexpected error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error.", fallback: true },
+      { error: "The AI assistant could not respond. Please try again.", fallback: true },
       { status: 500 }
     )
   }

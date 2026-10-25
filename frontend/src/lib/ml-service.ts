@@ -35,15 +35,21 @@ export function getMlServiceApiKey(): string | null {
  * fetch() against the ML service with the API key attached.
  * Returns null when the service is not configured (no URL or no key), so
  * callers can degrade honestly instead of calling unauthenticated.
+ *
+ * Every call is time-bounded: `timeoutMs` (default 60s — the free-tier
+ * Hugging Face Space this talks to can take most of that to wake from
+ * sleep on a cold start). Callers that only need a quick liveness answer
+ * (status checks) should pass a much shorter timeout. A caller-supplied
+ * AbortSignal wins over the timeout.
  */
 export async function mlServiceFetch(
   path: string,
-  init: RequestInit & { requireAuth?: boolean } = {}
+  init: RequestInit & { requireAuth?: boolean; timeoutMs?: number } = {}
 ): Promise<Response | null> {
   const baseUrl = getMlServiceUrl()
   if (!baseUrl) return null
 
-  const { requireAuth = true, headers, ...rest } = init
+  const { requireAuth = true, timeoutMs = 60_000, headers, signal, ...rest } = init
   const finalHeaders = new Headers(headers)
 
   if (requireAuth) {
@@ -52,5 +58,9 @@ export async function mlServiceFetch(
     finalHeaders.set("X-API-Key", key)
   }
 
-  return fetch(`${baseUrl}${path}`, { ...rest, headers: finalHeaders })
+  return fetch(`${baseUrl}${path}`, {
+    ...rest,
+    headers: finalHeaders,
+    signal: signal ?? AbortSignal.timeout(timeoutMs),
+  })
 }

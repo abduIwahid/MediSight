@@ -10,6 +10,19 @@ export async function GET(request: NextRequest) {
   const type = requestUrl.searchParams.get("type")
   const explicitNext = requestUrl.searchParams.get("next")
 
+  // `next` is an allowlist, not a suggestion: only same-site absolute
+  // paths are honoured. Anything else (absolute URLs, protocol-relative
+  // "//host", backslash tricks) is dropped and the role-based destination
+  // below is used instead — otherwise this endpoint is an open redirect
+  // that fires right after a successful sign-in.
+  const safeNext =
+    explicitNext &&
+    explicitNext.startsWith("/") &&
+    !explicitNext.startsWith("//") &&
+    !explicitNext.includes("\\")
+      ? explicitNext
+      : null
+
   const cookieStore = cookies()
 
   const supabase = createServerClient(
@@ -35,7 +48,12 @@ export async function GET(request: NextRequest) {
   // new OAuth signup) wins; otherwise route by role/status so a patient
   // never briefly lands on the doctor dashboard shell or vice versa.
   const resolveDestination = async () => {
-    if (explicitNext) return explicitNext
+    if (safeNext) return safeNext
+
+    // Password-recovery links carry type=recovery but usually no explicit
+    // next — without this branch they landed on the role dashboard and
+    // the user never reached the set-a-new-password form.
+    if (type === "recovery") return "/update-password"
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return "/login"
