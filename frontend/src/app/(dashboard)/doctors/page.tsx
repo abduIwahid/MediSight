@@ -19,7 +19,7 @@ export default async function DoctorsPage() {
   // source of truth, profiles.availability_status.
   const { data: doctors, error } = await supabase
     .from('profiles')
-    .select('id, full_name, specialty, phone, email, department, hospital_id, hospitals(name), avatar_url, bio, availability_status, consultation_fee, services, doctors!inner(status)')
+    .select('id, full_name, specialty, contact_number, email, department, hospital_id, hospitals(name), avatar_url, bio, availability_status, consultation_fee, services, doctors!inner(status)')
     .eq('role', 'doctor')
     .eq('doctors.status', 'approved')
     .order('full_name', { ascending: true })

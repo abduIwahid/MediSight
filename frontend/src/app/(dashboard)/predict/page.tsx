@@ -63,7 +63,7 @@ type Doctor = {
   bio?: string | null
   consultation_fee?: number | null
   availability_status?: string | null
-  phone?: string | null
+  contact_number?: string | null
   hospitals?: { name: string } | null
 }
 
@@ -150,7 +150,7 @@ export default function PredictPage() {
     // availability from the one source, availability_status.
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, specialty, avatar_url, bio, consultation_fee, availability_status, phone, hospitals(name), doctors!inner(status)")
+      .select("id, full_name, specialty, avatar_url, bio, consultation_fee, availability_status, contact_number, hospitals(name), doctors!inner(status)")
       .eq("role", "doctor")
       .eq("doctors.status", "approved")
       .ilike("specialty", `%${specialty.split(" ")[0]}%`)

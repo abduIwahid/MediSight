@@ -55,6 +55,25 @@ export async function POST(request: Request) {
       .select("role")
       .eq("id", user.id)
       .single()
+    // A doctor whose application is pending or rejected does NOT get
+    // the clinical assistant: /api/predict and /api/explain refuse the
+    // same accounts with this exact 403, and deriving doctor mode from
+    // the profile role alone left this route as the one door still
+    // open to unapproved doctors (QA Round 2, cluster 13).
+    if (profile?.role === "doctor") {
+      const { data: doctor } = await supabase
+        .from("doctors")
+        .select("status")
+        .eq("user_id", user.id)
+        .single()
+      if (doctor?.status !== "approved") {
+        return NextResponse.json(
+          { error: "Doctor account is not approved yet.", fallback: true },
+          { status: 403 }
+        )
+      }
+    }
+
     const isPatient = !profile || profile.role === "patient"
     const SYSTEM_INSTRUCTION = isPatient ? PATIENT_SYSTEM_INSTRUCTION : DOCTOR_SYSTEM_INSTRUCTION
 

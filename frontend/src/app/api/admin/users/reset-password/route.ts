@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireSuperAdmin, createAdminClient } from "@/lib/supabase/admin"
+import { requireSuperAdmin, createAdminClient, logAdminAction } from "@/lib/supabase/admin"
 
 export async function POST(request: Request) {
   const auth = await requireSuperAdmin()
@@ -19,8 +19,24 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword })
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    console.error("[api/admin/users/reset-password] Password reset failed:", error.message)
+    return NextResponse.json(
+      { error: "The password could not be reset. Please try again." },
+      { status: 400 }
+    )
   }
+
+  // Attributed audit row (QA Round 2, SA-3): a password reset is one of
+  // the most sensitive admin actions, and auth.users writes fire no DB
+  // trigger — without this insert the trail would never name the admin
+  // who performed it. (The new password itself is never logged.)
+  await logAdminAction({
+    actorId: auth.userId,
+    action: "UPDATE",
+    tableName: "profiles",
+    rowId: userId,
+    newValues: { event: "password_reset_by_admin" },
+  })
 
   return NextResponse.json({ success: true })
 }

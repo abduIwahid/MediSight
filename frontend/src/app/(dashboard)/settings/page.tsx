@@ -22,6 +22,13 @@ export default async function SettingsPage() {
     supabase.from('hospitals').select('id, name').order('name')
   ])
 
+  // Only the assigned hospital's NAME crosses into the form — the form
+  // no longer offers a hospital picker (assignment is admin-only, QA
+  // Round 2, cluster 12), it just displays where the user belongs.
+  const hospitalName = profile?.hospital_id
+    ? hospitals?.find((h) => h.id === profile.hospital_id)?.name ?? null
+    : null
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
@@ -31,7 +38,7 @@ export default async function SettingsPage() {
         </p>
       </div>
       <div className="bg-card border rounded-xl p-6 shadow-sm">
-        <ProfileForm user={user} profile={profile} hospitals={hospitals || []} />
+        <ProfileForm user={user} profile={profile} hospitalName={hospitalName} />
       </div>
     </div>
   )
