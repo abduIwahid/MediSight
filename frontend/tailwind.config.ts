@@ -25,6 +25,7 @@ const config: Config = {
         },
         brand: {
           DEFAULT: "var(--brand)",
+          text: "var(--brand-text)",
           foreground: "var(--brand-foreground)",
         },
         secondary: {

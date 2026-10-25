@@ -66,7 +66,7 @@ export default function WelcomePage() {
             </span>
             <span className="font-display text-[21px] uppercase leading-none tracking-wide">
               MediSight
-              <span className="mt-1 block font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand">
+              <span className="mt-1 block font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand-text">
                 Risk, explained
               </span>
             </span>
@@ -159,7 +159,7 @@ export default function WelcomePage() {
               <span>HIGH</span>
             </div>
             <div className="mt-[18px] border-t border-secondary pt-3.5">
-              <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[1.6px] text-brand">
+              <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[1.6px] text-brand-text">
                 Why this score — top factors
               </h3>
               <div className="mt-1">

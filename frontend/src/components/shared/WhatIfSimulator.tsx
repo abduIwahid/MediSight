@@ -196,7 +196,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
               <button
                 type="button"
                 onClick={reset}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-text hover:underline"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Reset to recorded values
               </button>

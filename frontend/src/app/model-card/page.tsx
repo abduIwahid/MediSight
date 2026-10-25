@@ -83,7 +83,7 @@ export default function ModelCardPage() {
 
       <main className="mx-auto max-w-4xl px-5 py-12">
         <p className="eyebrow">Model card</p>
-        <h1 className="mt-2 font-display text-4xl uppercase leading-tight tracking-wide sm:text-5xl">
+        <h1 className="mt-2 font-display text-4xl uppercase leading-tight sm:text-5xl">
           One trained model.
           <br />
           Documented honestly.
@@ -180,7 +180,7 @@ export default function ModelCardPage() {
         </section>
       </main>
 
-      <footer className="bg-foreground py-[30px] text-[#C8D6DA]">
+      <footer className="bg-foreground py-8 text-[#C8D6DA]">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3.5 px-5">
           <span className="font-display text-lg uppercase tracking-wide text-white">MediSight</span>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">

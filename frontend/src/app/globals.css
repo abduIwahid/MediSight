@@ -23,6 +23,11 @@
     --primary-foreground: #FFFFFF;
 
     --brand: #2E7FA8;
+    /* Text-safe deepening of the brand blue: #2E7FA8 measures 4.10:1 on
+       paper and 3.76:1 on card — below the 4.5:1 small-text floor.
+       #1F6E96 passes on paper (5.19:1), card (4.75:1) and white (5.63:1).
+       Graphics, bars and large display text keep --brand. */
+    --brand-text: #1F6E96;
     --brand-foreground: #FFFFFF;
 
     --secondary: #E7EDEC;
@@ -50,6 +55,8 @@
     --primary-foreground: #FFFFFF;
 
     --brand: #5EA8C9;
+    /* On the ink background the light brand already passes (7.05:1). */
+    --brand-text: #5EA8C9;
     --brand-foreground: #06141B;
 
     --secondary: #123043;
@@ -67,6 +74,8 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    /* Deliberate body leading inside the 1.4–1.6 reading range. */
+    line-height: 1.55;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -82,7 +91,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    color: var(--brand);
+    color: var(--brand-text);
   }
 
   /* Staggered reveal — choreographed timing (varied delays via --d,
