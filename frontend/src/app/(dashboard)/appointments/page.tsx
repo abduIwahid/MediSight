@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, Clock, CheckCircle2, XCircle, CheckCheck, Loader2 } from "lucide-react"
+import { Calendar, Clock, CheckCircle2, XCircle, CheckCheck, Loader2, CalendarX2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
+import { EmptyState } from "@/components/shared/EmptyState"
 
 type Appointment = {
   id: string
@@ -77,9 +78,13 @@ export default function AppointmentsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-          No {filter !== "All" ? filter.toLowerCase() : ""} appointments.
-        </div>
+        <EmptyState
+          icon={CalendarX2}
+          title={filter === "All" ? "No appointments yet" : `No ${filter.toLowerCase()} appointments`}
+          description="Appointments booked by patients will appear here. Open the patient registry to review records in the meantime."
+          actionLabel="Open patient registry"
+          actionHref="/patients"
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map((a) => (

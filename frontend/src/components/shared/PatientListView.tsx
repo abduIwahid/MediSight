@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
 import { DataTable } from "@/components/shared/DataTable"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import Link from "next/link"
 import { Plus, Search, Trash2, UserSearch } from "lucide-react"
@@ -241,7 +242,7 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
               className="pl-9 h-11 w-full sm:w-64 rounded-xl border-border/50 bg-card shadow-sm transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary"
             />
           </div>
-          <Link href="/patients/new" prefetch={true} className="uiverse-btn h-11 px-6 whitespace-nowrap">
+          <Link href="/patients/new" prefetch={true} className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" />
             New Assessment
           </Link>
@@ -251,18 +252,20 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
       <motion.div variants={itemVariants} className="overflow-hidden rounded-2xl border bg-card shadow-sm hover:shadow-md transition-shadow duration-300">
         <AnimatePresence mode="wait">
           {filtered.length === 0 ? (
-            <motion.div 
+            <motion.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-24 text-muted-foreground bg-muted/10"
+              className="p-4"
             >
-              <div className="p-4 rounded-full bg-background border border-dashed mb-4">
-                <UserSearch className="h-8 w-8 opacity-40 text-primary" />
-              </div>
-              <p className="text-base font-semibold text-foreground">No patients found</p>
-              <p className="text-xs mt-1 max-w-[250px] text-center">Try adjusting your search query or add a new patient assessment.</p>
+              <EmptyState
+                icon={UserSearch}
+                title="No patients found"
+                description="No records match the current view. Clear the search, or register a patient and run their first assessment."
+                actionLabel="Add patient"
+                actionHref="/patients/new"
+              />
             </motion.div>
           ) : (
             <motion.div 

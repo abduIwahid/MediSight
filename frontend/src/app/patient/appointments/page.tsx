@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { CalendarPlus } from "lucide-react"
+import { CalendarPlus, CalendarX2 } from "lucide-react"
+import { EmptyState } from "@/components/shared/EmptyState"
 
 interface Appointment {
   id: string
@@ -83,9 +84,17 @@ export default function MyAppointmentsPage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
       ) : appointments.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-          No {tab} appointments.
-        </div>
+        <EmptyState
+          icon={CalendarX2}
+          title={`No ${tab} appointments`}
+          description={
+            tab === "upcoming"
+              ? "You have nothing booked right now. Book a visit with an available doctor to get started."
+              : "Appointments you have completed or missed will appear here."
+          }
+          actionLabel="Book an appointment"
+          actionHref="/patient/appointments/book"
+        />
       ) : (
         <div className="space-y-3">
           {appointments.map((a) => (

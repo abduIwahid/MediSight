@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { DataTable } from "@/components/shared/DataTable"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { Stethoscope, MapPin, Phone, Mail } from "lucide-react"
 
 interface DoctorListRow {
@@ -112,11 +113,21 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
           </p>
         </div>
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm overflow-x-auto">
-        <div className="min-w-[800px]">
-          <DataTable columns={columns} data={doctors} />
+      {doctors.length === 0 ? (
+        <EmptyState
+          icon={Stethoscope}
+          title="No doctors in the directory yet"
+          description="Approved doctor profiles will appear here. New sign-ups wait for admin approval before they are listed."
+          actionLabel="Review doctor approvals"
+          actionHref="/admin/doctors"
+        />
+      ) : (
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm overflow-x-auto">
+          <div className="min-w-[800px]">
+            <DataTable columns={columns} data={doctors} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
