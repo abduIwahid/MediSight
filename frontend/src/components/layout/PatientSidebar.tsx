@@ -56,7 +56,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
 
       <div className="border-b px-6 py-3.5 bg-muted/20">
         <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
+          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
             Patient Portal
           </span>

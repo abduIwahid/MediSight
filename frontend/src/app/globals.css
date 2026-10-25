@@ -72,14 +72,30 @@
     --ring: #2E7FA8;
   }
 
+  html, body {
+    /* Clip (not hidden): prevents horizontal scroll without creating a
+       scroll container, so sticky and fixed layouts keep working. */
+    overflow-x: clip;
+    scrollbar-color: var(--border) transparent;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     /* Deliberate body leading inside the 1.4–1.6 reading range. */
     line-height: 1.55;
+    caret-color: var(--brand);
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
+    /* A long word in a display head wraps instead of blowing out the layout. */
+    overflow-wrap: break-word;
+    min-width: 0;
+  }
+
+  ::selection {
+    background: var(--brand);
+    color: #FFFFFF;
   }
 }
 
