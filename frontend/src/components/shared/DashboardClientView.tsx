@@ -93,7 +93,7 @@ export function DashboardClientView({
           </h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Add Patient", desc: "Register & run AI prediction", href: "/patients/new", icon: Users, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "New Assessment", desc: "Register & run AI prediction", href: "/patients/new", icon: Users, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
               { label: "Patient Registry", desc: "Browse all patient records", href: "/patients", icon: Activity, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
               { label: "Doctor Directory", desc: "View available specialists", href: "/doctors", icon: Stethoscope, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
               { label: "Analytics", desc: "Population-level insights", href: "/analytics", icon: TrendingUp, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },

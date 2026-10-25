@@ -60,7 +60,7 @@ export default function PatientDashboardPage() {
               <CalendarPlus className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-semibold">Book Appointment</p>
+              <p className="font-semibold">Book an Appointment</p>
               <p className="text-sm text-muted-foreground">Find a doctor and schedule a visit</p>
             </div>
           </div>
