@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { DoctorVerificationView } from "@/components/shared/DoctorVerificationView"
+import { DoctorVerificationView, type DoctorRow } from "@/components/shared/DoctorVerificationView"
 
 export const dynamic = 'force-dynamic'
 
@@ -17,5 +17,5 @@ export default async function AdminDoctorsPage() {
     .select('user_id, license_number, hospital, specialization, experience, phone, status, created_at, profile:user_id(full_name, email)')
     .order('created_at', { ascending: false })
 
-  return <DoctorVerificationView doctors={(doctors as any) || []} />
+  return <DoctorVerificationView doctors={(doctors as unknown as DoctorRow[]) || []} />
 }

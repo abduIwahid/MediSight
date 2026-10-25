@@ -86,13 +86,13 @@ export async function POST(request: Request) {
 
     const data = await geminiResponse.json()
     const reply =
-      data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") ||
+      data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text).join("") ||
       "I couldn't generate a response for that. Could you rephrase your question?"
 
     return NextResponse.json({ reply })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || "Unexpected server error.", fallback: true },
+      { error: error instanceof Error ? error.message : "Unexpected server error.", fallback: true },
       { status: 500 }
     )
   }

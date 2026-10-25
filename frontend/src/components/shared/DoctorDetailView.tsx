@@ -5,8 +5,27 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ArrowLeft, MapPin, Phone, Mail, CheckCircle2 } from "lucide-react"
 
+export interface DoctorDetailRow {
+  id?: string
+  name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+  avatar_url?: string | null
+  specialty?: string | null
+  bio?: string | null
+  email?: string | null
+  phone?: string | null
+  contact_number?: string | null
+  consultation_fee?: number | null
+  available?: boolean | null
+  availability_status?: string | null
+  services?: string[] | null
+  hospitals?: { name: string } | null
+}
+
 interface DoctorDetailViewProps {
-  doctor: any
+  doctor: DoctorDetailRow
 }
 
 export function DoctorDetailView({ doctor }: DoctorDetailViewProps) {

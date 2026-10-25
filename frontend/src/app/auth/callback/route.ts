@@ -1,4 +1,5 @@
-import { createServerClient } from "@supabase/ssr"
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import type { EmailOtpType } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
 
@@ -19,10 +20,10 @@ export async function GET(request: NextRequest) {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options: CookieOptions) {
           cookieStore.set({ name, value, ...options })
         },
-        remove(name: string, options: any) {
+        remove(name: string, options: CookieOptions) {
           cookieStore.set({ name, value: "", ...options })
         },
       },
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
 
   // Handle token_hash (email confirmation OTP flow)
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as any })
+    const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as EmailOtpType })
     if (!error) {
       const dest = await resolveDestination()
       return NextResponse.redirect(new URL(dest, requestUrl.origin))

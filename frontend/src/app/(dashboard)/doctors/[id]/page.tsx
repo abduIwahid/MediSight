@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
-import { DoctorDetailView } from "@/components/shared/DoctorDetailView"
+import { DoctorDetailView, type DoctorDetailRow } from "@/components/shared/DoctorDetailView"
 
 export const dynamic = 'force-dynamic'
 
@@ -70,5 +70,5 @@ export default async function DoctorDetailPage({ params }: { params: { id: strin
   const selectedDoctor = doctor || sampleDoctors.find((item) => item.id === params.id)
   if (!selectedDoctor) return notFound()
 
-  return <DoctorDetailView doctor={{ ...selectedDoctor, name: selectedDoctor.full_name }} />
+  return <DoctorDetailView doctor={{ ...selectedDoctor, name: selectedDoctor.full_name } as DoctorDetailRow} />
 }

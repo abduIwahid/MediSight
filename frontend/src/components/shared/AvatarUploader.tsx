@@ -40,8 +40,8 @@ export function AvatarUploader({
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
       setAvatarUrl(data.publicUrl)
       onUpload(data.publicUrl)
-    } catch (error: any) {
-      alert(error.message)
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Upload failed. Please try again.")
     } finally {
       setUploading(false)
     }

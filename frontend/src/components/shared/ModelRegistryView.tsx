@@ -1,6 +1,6 @@
 "use client"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, Cpu } from "lucide-react"
+import { CheckCircle2, AlertCircle, TrendingUp, Cpu } from "lucide-react"
 
 const METRIC_LABELS: Record<string, string> = {
   auc_roc: "AUC-ROC",
@@ -26,7 +26,25 @@ function MetricBar({ label, value }: { label: string; value: number }) {
   )
 }
 
-export function ModelRegistryView({ models, liveStatus }: { models: any[]; liveStatus: any }) {
+export interface LiveModelStatus {
+  model_loaded?: boolean
+  model_name?: string
+  version?: string
+  status?: string
+  last_trained?: string
+  metrics?: Record<string, number>
+}
+
+interface ModelVersionRow {
+  id: string
+  name?: string
+  version: string
+  stage?: string
+  metrics?: { auc_roc?: number; f1_score?: number } | null
+  created_at: string
+}
+
+export function ModelRegistryView({ models, liveStatus }: { models: ModelVersionRow[]; liveStatus: LiveModelStatus | null }) {
   return (
     <div className="space-y-6">
       {/* Live Production Model Card */}

@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { MLOpsView } from "@/components/shared/MLOpsView"
+import { MLOpsView, type DriftData, type MlModelStatus } from "@/components/shared/MLOpsView"
 import { getMlServiceUrl, mlServiceFetch } from "@/lib/ml-service"
 
 export const dynamic = 'force-dynamic'
@@ -14,8 +14,8 @@ export default async function AdminMLOpsPage() {
   )
 
   // Attempt to connect to FastAPI ML service
-  let driftData: any = null
-  let modelStatus: any = null
+  let driftData: DriftData | null = null
+  let modelStatus: MlModelStatus | null = null
   let serviceConnected = false
   const ML_URL = getMlServiceUrl() || 'not configured'
 
@@ -34,7 +34,7 @@ export default async function AdminMLOpsPage() {
       modelStatus = await statusRes.value.json()
       serviceConnected = true
     }
-  } catch (e) {
+  } catch {
     // FastAPI not running — provide demo fallback so page is still informative
   }
 

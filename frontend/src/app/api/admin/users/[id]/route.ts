@@ -21,7 +21,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
-  const profileUpdates: Record<string, any> = { ...rest }
+  const profileUpdates: Record<string, unknown> = { ...rest }
   if (email !== undefined) profileUpdates.email = email
   if (full_name !== undefined) profileUpdates.full_name = full_name
   if (phone !== undefined) profileUpdates.phone = phone

@@ -1,23 +1,14 @@
 "use client"
 import { useState } from "react"
 import { createBrowserClient } from "@supabase/ssr"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, UserCheck, RefreshCw } from "lucide-react"
-
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: "bg-red-500/10 text-red-600 border-red-500/20",
-  hospital_admin: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  doctor: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  nurse: "bg-green-500/10 text-green-600 border-green-500/20",
-  data_scientist: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-}
+import type { ProfileRow } from "@/lib/types"
 
 const ALL_ROLES = ['super_admin', 'hospital_admin', 'doctor', 'nurse', 'data_scientist']
 
-export function UserManagementView({ profiles, hospitals }: { profiles: any[], hospitals: any[] }) {
+export function UserManagementView({ profiles, hospitals }: { profiles: ProfileRow[], hospitals: { id: string; name: string }[] }) {
   const [query, setQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -125,7 +116,7 @@ export function UserManagementView({ profiles, hospitals }: { profiles: any[], h
                   </td>
                   <td className="p-4">
                     <Select
-                      value={profile.role}
+                      value={profile.role ?? undefined}
                       onValueChange={(val) => handleRoleChange(profile.id, val)}
                       disabled={updatingId === profile.id}
                     >

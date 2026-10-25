@@ -2,11 +2,12 @@
 
 import Link from "next/link"
 import { RiskBadge } from "@/components/shared/RiskBadge"
-import { Bell, AlertTriangle, Sparkles, Stethoscope, ArrowRight, ShieldCheck, Clock, Users, Activity, TrendingUp } from "lucide-react"
-import { motion } from "framer-motion"
+import { Bell, AlertTriangle, Sparkles, Stethoscope, ArrowRight, ShieldCheck, Users, Activity, TrendingUp } from "lucide-react"
+import { motion, type Variants } from "framer-motion"
+import type { AlertRow } from "@/lib/types"
 
 interface DashboardClientViewProps {
-  recentAlerts: any[]
+  recentAlerts: AlertRow[]
   totalPatients: number
   totalAlerts: number
   totalDoctors: number
@@ -14,12 +15,12 @@ interface DashboardClientViewProps {
   totalPredictions: number
 }
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1 } }
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
 }
@@ -139,7 +140,7 @@ export function DashboardClientView({
             </div>
           ) : (
             <div className="space-y-3 overflow-y-auto custom-scrollbar max-h-[340px] pr-1">
-              {recentAlerts.map((alert: any, i) => (
+              {recentAlerts.map((alert, i) => (
                 <motion.div
                   key={alert.id}
                   initial={{ opacity: 0, x: 20 }}
@@ -164,7 +165,7 @@ export function DashboardClientView({
                       </p>
                     </div>
                   </div>
-                  <RiskBadge severity={alert.severity} />
+                  <RiskBadge severity={alert.severity ?? "Low"} />
                 </motion.div>
               ))}
             </div>

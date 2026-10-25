@@ -29,7 +29,7 @@ export default async function AnalyticsPage() {
   if (hospErr) console.error("Analytics hospital error:", hospErr)
 
   // Flatten hospitals relation (may be object or array depending on Supabase version)
-  const flatPatients = (patientsByHospital || []).map((p: any) => ({
+  const flatPatients = (patientsByHospital || []).map((p: { hospital_id?: string | null; hospitals?: { name: string } | { name: string }[] | null }) => ({
     hospital_id: p.hospital_id,
     hospitals: Array.isArray(p.hospitals) ? p.hospitals[0] : p.hospitals
   }))

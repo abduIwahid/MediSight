@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { PatientListView } from "@/components/shared/PatientListView"
+import type { PatientRow } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,6 @@ export default async function PatientListPage({
     )
   }
 
-  return <PatientListView patients={patients || []} initialSearch={searchParams?.search || ""} isAdmin={isAdmin} />
+  return <PatientListView patients={(patients || []) as unknown as PatientRow[]} initialSearch={searchParams?.search || ""} isAdmin={isAdmin} />
 }
 

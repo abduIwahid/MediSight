@@ -78,7 +78,7 @@ export default function DoctorOnboardingPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Complete Doctor Registration</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            You're signed in — just a few more details to submit your application for administrator approval.
+            You&apos;re signed in — just a few more details to submit your application for administrator approval.
           </p>
         </div>
 

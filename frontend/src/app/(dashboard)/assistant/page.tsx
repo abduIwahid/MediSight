@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { AIChatPanel } from "@/components/shared/AIChatPanel"
 import { createClient } from "@/lib/supabase/client"
+import type { PatientRow } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-function getPatientDisplayName(p: any): string {
+function getPatientDisplayName(p: PatientRow): string {
   const d = p.demographics || {}
   if (d.full_name) return `${d.full_name} (MRN: ${p.mrn})`
   const first = d.first_name || d.firstName || ""
@@ -15,7 +16,7 @@ function getPatientDisplayName(p: any): string {
 }
 
 export default function AssistantPage() {
-  const [patients, setPatients] = useState<any[]>([])
+  const [patients, setPatients] = useState<PatientRow[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
   const supabase = createClient()
 

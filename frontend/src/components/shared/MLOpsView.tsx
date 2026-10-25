@@ -2,8 +2,24 @@
 import { useState, useMemo } from "react"
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { RefreshCw, Zap, AlertTriangle, CheckCircle2, Clock, TrendingDown } from "lucide-react"
+import type { PredictionRow } from "@/lib/types"
+
+export interface DriftData {
+  psi_history?: { date: string; psi: number }[]
+  current_psi?: number | null
+  drift_detected?: boolean
+}
+
+export interface MlModelStatus {
+  status?: string
+  version?: string
+  model_name?: string
+  last_trained?: string | null
+  accuracy?: number | null
+  _demo?: boolean
+  metrics?: { auc_roc?: number; f1_score?: number; accuracy?: number }
+}
 
 const DRIFT_THRESHOLD = 0.10 // 10% PSI threshold
 
@@ -18,13 +34,12 @@ export function MLOpsView({
   serviceConnected = false,
   mlServiceUrl = 'not configured',
 }: {
-  driftData: any
-  modelStatus: any
-  predictionTrend: any[]
+  driftData: DriftData | null
+  modelStatus: MlModelStatus | null
+  predictionTrend: PredictionRow[]
   serviceConnected?: boolean
   mlServiceUrl?: string
 }) {
-  const isDemo = modelStatus?._demo === true
   const [retraining, setRetraining] = useState(false)
   const [retrainMsg, setRetrainMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
@@ -62,8 +77,8 @@ export function MLOpsView({
         throw new Error(data?.error || 'Could not reach the ML service. Ensure FastAPI is running.')
       }
       setRetrainMsg({ type: 'success', text: data.status || 'Retraining triggered in background.' })
-    } catch (e: any) {
-      setRetrainMsg({ type: 'error', text: e?.message || 'Could not reach the ML service. Ensure FastAPI is running.' })
+    } catch (e: unknown) {
+      setRetrainMsg({ type: 'error', text: e instanceof Error && e.message ? e.message : 'Could not reach the ML service. Ensure FastAPI is running.' })
     } finally {
       setRetraining(false)
     }

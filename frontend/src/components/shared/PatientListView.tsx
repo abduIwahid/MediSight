@@ -6,21 +6,13 @@ import { createBrowserClient } from "@supabase/ssr"
 import { DataTable } from "@/components/shared/DataTable"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import Link from "next/link"
-import { Plus, Search, Users, Trash2, Pencil, UserSearch } from "lucide-react"
+import { Plus, Search, Trash2, UserSearch } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { motion, AnimatePresence } from "framer-motion"
-
-// Format vital/lab type names from snake_case to Title Case
-function formatName(str: string): string {
-  if (!str) return "—"
-  const abbreviations: Record<string, string> = {
-    bmi: "BMI", bp: "BP", mrn: "MRN", hdl: "HDL", ldl: "LDL"
-  }
-  return str.split(/[_\s]+/).map(w => abbreviations[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-}
+import { motion, AnimatePresence, type Variants } from "framer-motion"
+import type { PatientRow } from "@/lib/types"
 
 // Get patient display name from demographics JSONB — handles multiple field name conventions
-function getPatientName(p: any): string {
+function getPatientName(p: PatientRow): string {
   const d = p.demographics
   if (!d) return "—"
   // Handle full_name or name field
@@ -33,37 +25,38 @@ function getPatientName(p: any): string {
   return full || "—"
 }
 
-function getAge(p: any): string {
+function getAge(p: PatientRow): string {
   const d = p.demographics
   if (!d) return "—"
   if (d.age) return String(d.age)
   // Derive from birth_date if age missing
-  if (d.birth_date || d.dob) {
-    const dob = new Date(d.birth_date || d.dob)
+  const dobRaw = d.birth_date || d.dob
+  if (dobRaw) {
+    const dob = new Date(dobRaw)
     const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     return String(age)
   }
   return "—"
 }
 
-function getGender(p: any): string {
+function getGender(p: PatientRow): string {
   const d = p.demographics
   if (!d) return "—"
   const g = d.gender || ""
   return g ? g.charAt(0).toUpperCase() + g.slice(1).toLowerCase() : "—"
 }
 
-function getLatestSeverity(p: any): string | null {
+function getLatestSeverity(p: PatientRow): string | null {
   const preds = p.predictions || []
   if (preds.length === 0) return null
-  const sorted = [...preds].sort((a: any, b: any) =>
+  const sorted = [...preds].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   return sorted[0]?.severity || null
 }
 
 interface PatientListViewProps {
-  patients: any[]
+  patients: PatientRow[]
   initialSearch?: string
   isAdmin?: boolean
 }
@@ -119,13 +112,13 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
   const columns = [
     {
       header: "MRN",
-      cell: (p: any) => (
+      cell: (p: PatientRow) => (
         <span className="font-mono text-xs text-muted-foreground">{p.mrn}</span>
       )
     },
     {
       header: "Patient Name",
-      cell: (p: any) => {
+      cell: (p: PatientRow) => {
         const name = getPatientName(p)
         return (
           <div className="flex items-center gap-2">
@@ -141,24 +134,24 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
     },
     {
       header: "Age",
-      cell: (p: any) => <span className="text-sm">{getAge(p)}</span>
+      cell: (p: PatientRow) => <span className="text-sm">{getAge(p)}</span>
     },
     {
       header: "Gender",
-      cell: (p: any) => <span className="text-sm">{getGender(p)}</span>
+      cell: (p: PatientRow) => <span className="text-sm">{getGender(p)}</span>
     },
     {
       header: "Hospital",
-      cell: (p: any) => (
+      cell: (p: PatientRow) => (
         <span className="text-xs text-muted-foreground">{p.hospitals?.name || "—"}</span>
       )
     },
     {
       header: "Risk Status",
-      cell: (p: any) => {
+      cell: (p: PatientRow) => {
         const severity = getLatestSeverity(p)
         const preds = p.predictions || []
-        const latest = preds.length > 0 ? [...preds].sort((a: any, b: any) =>
+        const latest = preds.length > 0 ? [...preds].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0] : null
         if (severity) {
@@ -178,7 +171,7 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
     },
     {
       header: "Actions",
-      cell: (p: any) => (
+      cell: (p: PatientRow) => (
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/patients/${p.id}`} className="text-sm font-medium text-primary hover:underline">
             View
@@ -203,12 +196,12 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
     }
   ]
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   }
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   }

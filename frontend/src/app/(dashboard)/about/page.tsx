@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Shield, Brain, Stethoscope, HeartPulse, Activity, Sparkles, Award, ArrowRight, CheckCircle2, Phone, Mail, Clock, MapPin } from "lucide-react"
+import { Shield, Brain, Stethoscope, HeartPulse, Activity, Sparkles, ArrowRight, Clock } from "lucide-react"
 
 export default function AboutPage() {
   const departments = [

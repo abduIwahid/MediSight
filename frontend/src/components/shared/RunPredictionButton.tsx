@@ -4,29 +4,31 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, Zap } from "lucide-react"
+import type { PatientRow } from "@/lib/types"
 
 interface RunPredictionButtonProps {
-  patient: any
+  patient: PatientRow
 }
 
-function buildMLPayload(patient: any) {
+function buildMLPayload(patient: PatientRow) {
   const d = patient.demographics || {}
   const vitals = patient.vitals || []
   const diagnoses = patient.diagnoses || []
 
-  const bmiVital = vitals.find((v: any) => v.type?.toLowerCase().includes("bmi"))
-  const bpVital = vitals.find((v: any) => v.type?.toLowerCase().includes("systolic") || v.type?.toLowerCase().includes("blood pressure"))
+  const bmiVital = vitals.find((v) => v.type?.toLowerCase().includes("bmi"))
+  const bpVital = vitals.find((v) => v.type?.toLowerCase().includes("systolic") || v.type?.toLowerCase().includes("blood pressure"))
 
   const bmiNum = bmiVital ? parseFloat(bmiVital.value) || 25 : 25
   const bpNum = bpVital ? parseInt(bpVital.value) || 120 : 120
+  const dobRaw = d.birth_date || d.dob
   const ageNum = d.age || (
-    (d.birth_date || d.dob)
-      ? Math.floor((Date.now() - new Date(d.birth_date || d.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    dobRaw
+      ? Math.floor((Date.now() - new Date(dobRaw).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
       : 40
   )
   const ageGroup = Math.min(13, Math.max(1, Math.ceil(ageNum / 10)))
-  const hasHeart = diagnoses.some((dx: any) => dx.condition?.toLowerCase().includes("heart"))
-  const hasStroke = diagnoses.some((dx: any) => dx.condition?.toLowerCase().includes("stroke"))
+  const hasHeart = diagnoses.some((dx) => dx.condition?.toLowerCase().includes("heart"))
+  const hasStroke = diagnoses.some((dx) => dx.condition?.toLowerCase().includes("stroke"))
 
   return {
     HighBP: bpNum >= 130 ? 1.0 : 0.0,
@@ -101,8 +103,8 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
       }
 
       router.refresh()
-    } catch (err: any) {
-      setError(err.message || "Prediction failed. Please try again.")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Prediction failed. Please try again.")
       setLoading(false)
     }
   }

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, XCircle, Stethoscope } from "lucide-react"
 
-interface DoctorRow {
+export interface DoctorRow {
   user_id: string
   license_number: string
   hospital: string | null

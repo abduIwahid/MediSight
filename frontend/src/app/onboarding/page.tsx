@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export default function OnboardingPage() {
   const [fullName, setFullName] = useState("")
   const [hospitalId, setHospitalId] = useState("")
-  const [hospitals, setHospitals] = useState<any[]>([])
+  const [hospitals, setHospitals] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const router = useRouter()

@@ -3,10 +3,10 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, ChevronRight, Calendar } from "lucide-react"
+import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 
 interface DashboardSidebarProps {
   onClose?: () => void

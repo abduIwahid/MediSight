@@ -1,7 +1,6 @@
 "use client"
 
-import Link from "next/link"
-import { Phone, Mail, Clock, MapPin, Send, MessageSquare, ShieldCheck } from "lucide-react"
+import { Phone, Mail, MapPin, Send, MessageSquare, ShieldCheck } from "lucide-react"
 
 export default function ContactPage() {
   return (

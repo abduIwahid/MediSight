@@ -58,7 +58,7 @@ export default function PendingApprovalPage() {
             <h1 className="text-xl font-bold">Awaiting Administrator Approval</h1>
             <p className="text-sm text-muted-foreground">
               Your account has been created successfully. It is currently awaiting administrator approval before you can
-              access the Doctor Portal. We'll notify you once it's reviewed.
+              access the Doctor Portal. We&apos;ll notify you once it&apos;s reviewed.
             </p>
           </>
         )}

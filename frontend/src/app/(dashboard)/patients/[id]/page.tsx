@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 import { PatientDetailView } from "@/components/shared/PatientDetailView"
+import type { PredictionRow } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
   const isAdmin = Boolean(profile && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.role))
 
   // Get the latest prediction
-  const latestPrediction = patient.predictions?.sort((a:any, b:any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+  const latestPrediction = (patient.predictions?.sort((a: PredictionRow, b: PredictionRow) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]) ?? null
 
   return (
     <PatientDetailView 

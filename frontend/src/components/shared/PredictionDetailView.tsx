@@ -5,11 +5,12 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ShapWaterfallChart, ShapFeature } from "@/components/shared/ShapWaterfallChart"
 import { RiskBadge } from "@/components/shared/RiskBadge"
+import type { PatientRow, PredictionRow } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface PredictionDetailViewProps {
-  prediction: any
-  patient: any
+  prediction: PredictionRow
+  patient: PatientRow | null
   shapPayload: ShapFeature[]
   clinicalExplanation: string
   patientId: string
@@ -48,15 +49,15 @@ export function PredictionDetailView({
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Severity</span>
-                <RiskBadge severity={prediction.severity} />
+                <RiskBadge severity={prediction.severity ?? "Low"} />
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Probability</div>
-                <div className="text-3xl font-bold">{(prediction.probability * 100).toFixed(1)}%</div>
+                <div className="text-3xl font-bold">{((prediction.probability ?? 0) * 100).toFixed(1)}%</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Model Confidence</div>
-                <div className="text-xl font-medium">{(prediction.confidence * 100).toFixed(1)}%</div>
+                <div className="text-xl font-medium">{((prediction.confidence ?? 0) * 100).toFixed(1)}%</div>
               </div>
             </CardContent>
           </Card>

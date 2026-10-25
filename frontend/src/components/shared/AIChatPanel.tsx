@@ -1,11 +1,20 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Bot, Send, User, AlertTriangle, Loader2, RefreshCw } from "lucide-react"
+import { Bot, Send, User, AlertTriangle, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { PatientRow } from "@/lib/types"
+
+interface ModelStatusInfo {
+  status?: string
+  model_name?: string
+  version?: string
+  metrics?: { auc_roc: number; f1_score: number; accuracy: number }
+}
 
 interface Message {
   id: string
@@ -24,7 +33,7 @@ const SUGGESTED_PROMPTS = [
   "Draft a discharge risk summary."
 ]
 
-async function fetchPatientContext(patientId: string, supabase: any) {
+async function fetchPatientContext(patientId: string, supabase: SupabaseClient): Promise<PatientRow | null> {
   const { data } = await supabase
     .from("patients")
     .select(`
@@ -36,10 +45,10 @@ async function fetchPatientContext(patientId: string, supabase: any) {
     `)
     .eq("id", patientId)
     .single()
-  return data
+  return (data as unknown as PatientRow | null) ?? null
 }
 
-function buildPatientSummary(patient: any): string {
+function buildPatientSummary(patient: PatientRow | null): string {
   if (!patient) return ""
   const d = patient.demographics || {}
   const first = d.first_name || d.firstName || d.full_name?.split(" ")[0] || ""
@@ -47,25 +56,25 @@ function buildPatientSummary(patient: any): string {
   const name = `${first} ${last}`.trim() || "Unknown"
   const age = d.age ? `${d.age} years old` : ""
   const gender = d.gender || ""
-  const preds = (patient.predictions || []).sort((a: any, b: any) =>
+  const preds = (patient.predictions || []).sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const latest = preds[0]
   const vitals = (patient.vitals || [])
     .slice(0, 6)
-    .map((v: any) => `${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}`)
+    .map((v) => `${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}`)
     .join(", ")
   const labs = (patient.lab_results || [])
     .slice(0, 5)
-    .map((l: any) => `${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}`)
+    .map((l) => `${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}`)
     .join(", ")
   const diagnoses = (patient.diagnoses || [])
-    .map((dx: any) => dx.condition)
+    .map((dx) => dx.condition)
     .join(", ")
 
   let ctx = `Patient: ${name}${age ? `, ${age}` : ""}${gender ? `, ${gender}` : ""}. MRN: ${patient.mrn}.`
   if (latest) {
-    ctx += ` Latest risk assessment: **${latest.severity}** severity — ${(latest.probability * 100).toFixed(1)}% diabetes probability`
+    ctx += ` Latest risk assessment: **${latest.severity}** severity — ${((latest.probability ?? 0) * 100).toFixed(1)}% diabetes probability`
     if (latest.confidence) ctx += ` (confidence: ${(latest.confidence * 100).toFixed(0)}%)`
     ctx += `. Disease: ${latest.disease || "Diabetes"}.`
   } else {
@@ -78,14 +87,14 @@ function buildPatientSummary(patient: any): string {
   return ctx
 }
 
-function buildContextMessage(patient: any): string {
+function buildContextMessage(patient: PatientRow): string {
   if (!patient) return ""
   const d = patient.demographics || {}
   const first = d.first_name || d.firstName || d.full_name?.split(" ")[0] || ""
   const last = d.last_name || d.lastName || d.full_name?.split(" ").slice(1).join(" ") || ""
   const name = `${first} ${last}`.trim() || "Unknown Patient"
 
-  const preds = (patient.predictions || []).sort((a: any, b: any) =>
+  const preds = (patient.predictions || []).sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const latest = preds[0]
@@ -95,7 +104,7 @@ function buildContextMessage(patient: any): string {
   let msg = `📋 **Patient Context Loaded: ${name}** (MRN: ${patient.mrn})\n\n`
 
   if (latest) {
-    const prob = (latest.probability * 100).toFixed(1)
+    const prob = ((latest.probability ?? 0) * 100).toFixed(1)
     const sev = latest.severity
     const icon = sev === "Critical" ? "🔴" : sev === "High" ? "🟠" : sev === "Moderate" ? "🟡" : "🟢"
     msg += `${icon} **Risk Status:** ${sev} — ${prob}% Diabetes Probability\n`
@@ -110,13 +119,13 @@ function buildContextMessage(patient: any): string {
   msg += `\n`
   if (vitals.length > 0) {
     msg += `**Recent Vitals (${vitals.length} records):**\n`
-    vitals.slice(0, 4).forEach((v: any) => {
+    vitals.slice(0, 4).forEach((v) => {
       msg += `• ${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}\n`
     })
   }
   if (labs.length > 0) {
     msg += `\n**Lab Results (${labs.length} records):**\n`
-    labs.slice(0, 4).forEach((l: any) => {
+    labs.slice(0, 4).forEach((l) => {
       msg += `• ${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}\n`
     })
   }
@@ -125,7 +134,7 @@ function buildContextMessage(patient: any): string {
   return msg
 }
 
-function generateLocalResponse(message: string, patientContext: string, modelStatus: any): string {
+function generateLocalResponse(message: string, patientContext: string, modelStatus: ModelStatusInfo | null): string {
   const q = message.toLowerCase()
 
   if (patientContext) {
@@ -259,11 +268,11 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
         content: reply
       }
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         role: "assistant",
-        content: `⚠️ Error generating response: ${error?.message || "Unknown error"}. Please try again.`
+        content: `⚠️ Error generating response: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`
       }])
     } finally {
       setIsLoading(false)

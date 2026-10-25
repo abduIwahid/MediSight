@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Search, ShieldCheck } from "lucide-react"
+import type { AuditLogRow } from "@/lib/types"
 
 const ACTION_COLORS: Record<string, string> = {
   SELECT: "bg-blue-500/10 text-blue-600 border-blue-500/20",
@@ -12,7 +13,7 @@ const ACTION_COLORS: Record<string, string> = {
   DELETE: "bg-red-500/10 text-red-600 border-red-500/20",
 }
 
-export function AuditLogView({ logs }: { logs: any[] }) {
+export function AuditLogView({ logs }: { logs: AuditLogRow[] }) {
   const [query, setQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [tableFilter, setTableFilter] = useState("all")

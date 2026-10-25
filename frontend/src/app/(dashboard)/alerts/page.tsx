@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { RiskBadge, RiskSeverity } from "@/components/shared/RiskBadge"
+import type { PatientDemographics } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from "lucide-react"
@@ -17,7 +18,7 @@ interface Alert {
   created_at: string
   patients?: {
     mrn: string
-    demographics: any
+    demographics: PatientDemographics
   }
 }
 

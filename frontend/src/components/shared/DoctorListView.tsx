@@ -4,15 +4,31 @@ import Link from "next/link"
 import { DataTable } from "@/components/shared/DataTable"
 import { Stethoscope, MapPin, Phone, Mail } from "lucide-react"
 
+interface DoctorListRow {
+  id: string
+  avatar_url?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+  specialty?: string | null
+  email?: string | null
+  phone?: string | null
+  contact_number?: string | null
+  consultation_fee?: number | null
+  available?: boolean | null
+  availability_status?: string | null
+  hospitals?: { name: string } | null
+}
+
 interface DoctorListViewProps {
-  doctors: any[]
+  doctors: DoctorListRow[]
 }
 
 export function DoctorListView({ doctors }: DoctorListViewProps) {
   const columns = [
     {
       header: "Doctor",
-      cell: (doctor: any) => (
+      cell: (doctor: DoctorListRow) => (
         <div className="flex items-center gap-3">
           <img
             src={doctor.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent((doctor.first_name || doctor.full_name || 'D') + ' ' + (doctor.last_name || ''))}&background=1d4ed8&color=fff&size=64&rounded=true`}
@@ -34,7 +50,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     },
     {
       header: "Hospital",
-      cell: (doctor: any) => (
+      cell: (doctor: DoctorListRow) => (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" /> {doctor.hospitals?.name || "Independent"}
         </div>
@@ -42,7 +58,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     },
     {
       header: "Status",
-      cell: (doctor: any) => {
+      cell: (doctor: DoctorListRow) => {
         const status = doctor.availability_status || (doctor.available ? 'available' : 'busy')
         const map: Record<string, { label: string; className: string }> = {
           available: { label: 'Available', className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
@@ -59,13 +75,13 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     },
     {
       header: "Fee (PKR)",
-      cell: (doctor: any) => (
+      cell: (doctor: DoctorListRow) => (
         <span className="text-sm font-medium">{doctor.consultation_fee ? `Rs. ${Number(doctor.consultation_fee).toLocaleString()}` : "TBD"}</span>
       )
     },
     {
       header: "Contact",
-      cell: (doctor: any) => (
+      cell: (doctor: DoctorListRow) => (
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           {doctor.email && (
             <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{doctor.email}</span>
@@ -78,7 +94,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     },
     {
       header: "",
-      cell: (doctor: any) => (
+      cell: (doctor: DoctorListRow) => (
         <Link href={`/doctors/${doctor.id}`} className="text-sm font-medium text-primary hover:underline">
           View Profile
         </Link>

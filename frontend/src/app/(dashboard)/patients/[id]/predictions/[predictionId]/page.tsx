@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 import { PredictionDetailView } from "@/components/shared/PredictionDetailView"
+import type { PatientRow } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +31,8 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
 
   if (!prediction) return notFound()
 
-  const patient = prediction.patients as any
-  const explanation = prediction.explanations?.[0] as any
+  const patient = prediction.patients as unknown as PatientRow | null
+  const explanation = prediction.explanations?.[0] as { shap_payload?: unknown; clinical_explanation?: string } | undefined
 
   let shapPayload = []
   if (explanation?.shap_payload) {

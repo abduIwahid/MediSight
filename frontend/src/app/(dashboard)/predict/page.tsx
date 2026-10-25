@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Stethoscope,
   Star,
-  Phone,
   ShieldAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -111,7 +110,8 @@ export default function PredictPage() {
   const toggleSymptom = (id: string) => {
     setSelectedSymptoms((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
@@ -132,8 +132,8 @@ export default function PredictPage() {
       if (!res.ok) throw new Error(data.error || "Prediction failed.")
       setResult(data)
       goNext()
-    } catch (e: any) {
-      setError(e.message || "Something went wrong while predicting.")
+    } catch (e: unknown) {
+      setError(e instanceof Error && e.message ? e.message : "Something went wrong while predicting.")
     } finally {
       setIsPredicting(false)
     }
@@ -147,7 +147,7 @@ export default function PredictPage() {
       .eq("role", "doctor")
       .ilike("specialty", `%${specialty.split(" ")[0]}%`)
       .limit(6)
-    setDoctors((data as any) || [])
+    setDoctors((data as unknown as Doctor[]) || [])
     setIsLoadingDoctors(false)
   }
 
@@ -213,7 +213,7 @@ export default function PredictPage() {
         {step === 0 && (
           <motion.div key="symptoms" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <h2 className="font-heading text-lg font-bold">Select Symptoms</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Choose everything you're currently experiencing.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Choose everything you&apos;re currently experiencing.</p>
 
             <div className="relative mt-5">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

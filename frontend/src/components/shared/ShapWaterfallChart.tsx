@@ -46,10 +46,10 @@ export function ShapWaterfallChart({ data }: ShapWaterfallChartProps) {
             tickLine={false}
           />
           <Tooltip 
-            formatter={(value: number, name: string, props: any) => {
-              const impact = props.payload.impact
+            formatter={(_value, _name, item) => {
+              const impact = Number(item?.payload?.impact ?? 0)
               return [
-                `${impact > 0 ? '+' : ''}${impact.toFixed(3)}`, 
+                `${impact > 0 ? '+' : ''}${impact.toFixed(3)}`,
                 'Impact on Risk'
               ]
             }}

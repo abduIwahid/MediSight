@@ -35,7 +35,7 @@ export default function PatientDashboardPage() {
         .order("scheduled_at", { ascending: true })
         .limit(3)
 
-      setUpcoming((appts as any) || [])
+      setUpcoming((appts as unknown as Appointment[]) || [])
       setLoading(false)
     }
     load()

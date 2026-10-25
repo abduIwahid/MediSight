@@ -3,14 +3,13 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, ArrowLeft, HeartPulse, Stethoscope, TestTube2, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
-import { motion } from "framer-motion"
+import { motion, type Variants } from "framer-motion"
 
 export default function NewPatientPage() {
   const router = useRouter()
@@ -187,19 +186,19 @@ export default function NewPatientPage() {
 
       // 7. Navigate to patient detail page
       router.push(`/patients/${patient.id}`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      setError(err.message || "An unexpected error occurred while creating the patient and prediction.")
+      setError(err instanceof Error && err.message ? err.message : "An unexpected error occurred while creating the patient and prediction.")
       setLoading(false)
     }
   }
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   }
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   }

@@ -1,5 +1,7 @@
 "use client"
 import { useState } from "react"
+import type { User } from "@supabase/supabase-js"
+import type { ProfileRow } from "@/lib/types"
 import { AvatarUploader } from "./AvatarUploader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,9 +34,9 @@ const SPECIALTIES = [
 ]
 
 export function ProfileForm({ user, profile, hospitals }: {
-  user: any
-  profile: any
-  hospitals?: any[]
+  user: User
+  profile: ProfileRow | null
+  hospitals?: { id: string; name: string }[]
 }) {
   const [fullName, setFullName] = useState(profile?.full_name || "")
   const [department, setDepartment] = useState(profile?.department || "")
@@ -71,7 +73,7 @@ export function ProfileForm({ user, profile, hospitals }: {
           bio,
           available,
           consultation_fee: consultationFee ? Number(consultationFee) : null,
-          services: servicesString.split(',').map((item) => item.trim()).filter(Boolean),
+          services: servicesString.split(',').map((item: string) => item.trim()).filter(Boolean),
           hospital_id: (hospitalId && hospitalId !== 'none') ? hospitalId : null,
           avatar_url: avatarUrl,
         })
@@ -80,16 +82,12 @@ export function ProfileForm({ user, profile, hospitals }: {
       if (error) throw error
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unable to save profile.")
     } finally {
       setSaving(false)
     }
   }
-
-  const initials = fullName
-    ? fullName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : user.email?.[0]?.toUpperCase() || "?"
 
   return (
     <div className="space-y-8">
@@ -99,9 +97,9 @@ export function ProfileForm({ user, profile, hospitals }: {
         <div>
           <h2 className="text-xl font-bold">{fullName || "Your Name"}</h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <Badge className={`border text-xs ${ROLE_COLORS[profile?.role] || "bg-muted text-muted-foreground"}`}>
+            <Badge className={`border text-xs ${ROLE_COLORS[profile?.role ?? ""] || "bg-muted text-muted-foreground"}`}>
               <Shield className="h-2.5 w-2.5 mr-1" />
-              {ROLE_LABELS[profile?.role] || profile?.role || "No Role"}
+              {ROLE_LABELS[profile?.role ?? ""] || profile?.role || "No Role"}
             </Badge>
             {specialty && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -130,7 +128,7 @@ export function ProfileForm({ user, profile, hospitals }: {
             <Label className="text-xs text-muted-foreground">System Role</Label>
             <div className="flex items-center gap-2 h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
               <Shield className="h-3.5 w-3.5" />
-              {ROLE_LABELS[profile?.role] || profile?.role || "Unassigned"}
+              {ROLE_LABELS[profile?.role ?? ""] || profile?.role || "Unassigned"}
               <span className="text-xs text-muted-foreground/60 ml-1">(managed by admin)</span>
             </div>
           </div>

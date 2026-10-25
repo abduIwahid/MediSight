@@ -36,7 +36,7 @@ export default function MyAppointmentsPage() {
       : query.lt("scheduled_at", now).order("scheduled_at", { ascending: false })
 
     const { data } = await query
-    setAppointments((data as any) || [])
+    setAppointments((data as unknown as Appointment[]) || [])
     setLoading(false)
   }
 

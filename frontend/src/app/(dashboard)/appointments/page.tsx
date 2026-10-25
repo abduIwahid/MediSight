@@ -34,7 +34,7 @@ export default function AppointmentsPage() {
       .from("appointments")
       .select("id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, phone)")
       .order("scheduled_at", { ascending: true })
-    setAppointments((data as any) || [])
+    setAppointments((data as unknown as Appointment[]) || [])
     setLoading(false)
   }
 
@@ -95,7 +95,7 @@ export default function AppointmentsPage() {
                     <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {new Date(a.scheduled_at).toLocaleDateString()}</span>
                     <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {new Date(a.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
-                  {a.reason && <p className="text-sm text-muted-foreground">"{a.reason}"</p>}
+                  {a.reason && <p className="text-sm text-muted-foreground">&quot;{a.reason}&quot;</p>}
                 </div>
 
                 <div className="flex items-center gap-2">

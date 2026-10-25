@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { useRouter } from "next/navigation"
 import { PatientRiskCard } from "@/components/shared/PatientRiskCard"
@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, type Variants } from "framer-motion"
+import type { LabResultRow, PatientDemographics, PatientRow, PredictionRow, VitalRow } from "@/lib/types"
 
 // Format snake_case → Title Case, with medical abbreviations
 function fmtLabel(str: string): string {
@@ -25,12 +26,12 @@ function fmtLabel(str: string): string {
   return str.split(/[_\s]+/).map(w => abbr[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 }
 
-function fmtDate(iso: string): string {
+function fmtDate(iso?: string | null): string {
   if (!iso) return "—"
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
-function getPatientName(patient: any): string {
+function getPatientName(patient: PatientRow): string {
   const d = patient.demographics
   if (!d) return "Unknown Patient"
   if (d.full_name) return d.full_name
@@ -40,22 +41,9 @@ function getPatientName(patient: any): string {
   return `${first} ${last}`.trim() || "Unknown Patient"
 }
 
-function getDoctorRecommendation(disease: string, severity: string) {
-  if (disease?.toLowerCase().includes("diabetes")) {
-    if (severity === "Critical") return "Endocrinologist + Emergency Care"
-    if (severity === "High") return "Endocrinologist"
-    if (severity === "Moderate") return "Primary Care Physician"
-    return "General Practitioner"
-  }
-  if (severity === "Critical") return "Specialist Referral"
-  if (severity === "High") return "Internal Medicine"
-  if (severity === "Moderate") return "Primary Care Physician"
-  return "General Practitioner"
-}
-
 interface PatientDetailViewProps {
-  patient: any
-  latestPrediction: any
+  patient: PatientRow
+  latestPrediction: PredictionRow | null
   isAdmin?: boolean
 }
 
@@ -96,13 +84,14 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
 
   const name = getPatientName(patient)
   const d = patient.demographics || {}
+  const dobRaw = d.birth_date || d.dob
   const age = d.age || (
-    (d.birth_date || d.dob)
-      ? Math.floor((Date.now() - new Date(d.birth_date || d.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    dobRaw
+      ? Math.floor((Date.now() - new Date(dobRaw).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
       : null
   )
   const gender = d.gender ? d.gender.charAt(0).toUpperCase() + d.gender.slice(1).toLowerCase() : "—"
-  const dob = d.birth_date || d.dob ? fmtDate(d.birth_date || d.dob) : "—"
+  const dob = dobRaw ? fmtDate(dobRaw) : "—"
 
   const handleSaveUpdates = async () => {
     setSaving(true)
@@ -110,7 +99,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
     setStatusMessage(null)
 
     try {
-      const updatePayload: any = {
+      const updatePayload: { demographics: PatientDemographics } = {
         demographics: {
           ...patient.demographics,
           first_name: demographics.first_name,
@@ -142,8 +131,8 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
       setNewLab({ test_name: "", value: "", unit: "", recorded_at: new Date().toISOString().slice(0, 10) })
       setEditMode(false)
       router.refresh()
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Unable to save patient updates.')
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to save patient updates.')
     } finally {
       setSaving(false)
     }
@@ -166,28 +155,28 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
   }
 
   const vitalsColumns = [
-    { header: "Type", cell: (v: any) => <span className="font-medium">{fmtLabel(v.type)}</span> },
-    { header: "Value", cell: (v: any) => `${v.value} ${v.unit || ""}`.trim() },
-    { header: "Date", cell: (v: any) => fmtDate(v.recorded_at) }
+    { header: "Type", cell: (v: VitalRow) => <span className="font-medium">{fmtLabel(v.type)}</span> },
+    { header: "Value", cell: (v: VitalRow) => `${v.value} ${v.unit || ""}`.trim() },
+    { header: "Date", cell: (v: VitalRow) => fmtDate(v.recorded_at) }
   ]
 
   const labsColumns = [
-    { header: "Test", cell: (l: any) => <span className="font-medium">{fmtLabel(l.test_name)}</span> },
-    { header: "Value", cell: (l: any) => `${l.value} ${l.unit || ""}`.trim() },
-    { header: "Date", cell: (l: any) => fmtDate(l.recorded_at) }
+    { header: "Test", cell: (l: LabResultRow) => <span className="font-medium">{fmtLabel(l.test_name)}</span> },
+    { header: "Value", cell: (l: LabResultRow) => `${l.value} ${l.unit || ""}`.trim() },
+    { header: "Date", cell: (l: LabResultRow) => fmtDate(l.recorded_at) }
   ]
 
   const allPredictions = patient.predictions || []
-  const sortedPreds = [...allPredictions].sort((a: any, b: any) =>
+  const sortedPreds = [...allPredictions].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   }
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   }
@@ -217,7 +206,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
                 <h1 className="text-3xl font-extrabold tracking-tight">{name}</h1>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground mt-1.5">
                   <span className="font-mono text-xs bg-muted/80 px-2.5 py-1 rounded-md border text-foreground font-medium">{patient.mrn}</span>
-                  {age !== "—" && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Age {age}</span>}
+                  {age != null && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Age {age}</span>}
                   {gender !== "—" && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {gender}</span>}
                   {dob !== "—" && <span>DOB: {dob}</span>}
                 </div>
@@ -372,7 +361,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
       <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: "Gender", icon: User, value: gender },
-          { label: "Age", icon: Calendar, value: age !== "—" ? `${age} yrs` : "—" },
+          { label: "Age", icon: Calendar, value: age != null ? `${age} yrs` : "—" },
           { label: "Vitals Tracked", icon: Activity, value: `${patient.vitals?.length || 0} records` },
           { label: "Lab Results", icon: FlaskConical, value: `${patient.lab_results?.length || 0} results` },
         ].map((stat, i) => (
@@ -396,12 +385,12 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           {latestPrediction ? (
             <motion.div whileHover={{ scale: 1.01 }} className="transition-all">
               <PatientRiskCard
-                disease={latestPrediction.disease}
-                probability={latestPrediction.probability}
-                confidence={latestPrediction.confidence}
-                severity={latestPrediction.severity}
+                disease={latestPrediction.disease ?? "Diabetes"}
+                probability={latestPrediction.probability ?? 0}
+                confidence={latestPrediction.confidence ?? 0}
+                severity={latestPrediction.severity ?? "Low"}
                 patientId={patient.id}
-                predictionId={latestPrediction.id}
+                predictionId={latestPrediction.id ?? ""}
               />
             </motion.div>
           ) : (
@@ -430,12 +419,12 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
                 <Heart className="h-4 w-4 text-primary" /> Prediction History
               </h3>
               <div className="space-y-3">
-                {sortedPreds.slice(0, 5).map((pred: any) => (
+                {sortedPreds.slice(0, 5).map((pred) => (
                   <div key={pred.id} className="flex items-center justify-between text-sm p-3 rounded-xl border bg-background hover:bg-muted/50 transition-colors">
                     <span className="text-muted-foreground font-medium">{fmtDate(pred.created_at)}</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-bold">{(pred.probability * 100).toFixed(0)}%</span>
-                      <RiskBadge severity={pred.severity} />
+                      <span className="font-bold">{((pred.probability ?? 0) * 100).toFixed(0)}%</span>
+                      <RiskBadge severity={pred.severity ?? "Low"} />
                     </div>
                   </div>
                 ))}

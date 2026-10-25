@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"

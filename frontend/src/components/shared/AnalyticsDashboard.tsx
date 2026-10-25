@@ -7,6 +7,8 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts"
 import { TrendingUp, Users, AlertTriangle, Activity } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import type { PredictionRow } from "@/lib/types"
 
 const SEVERITY_COLORS: Record<string, string> = {
   Low: "#22c55e",
@@ -17,7 +19,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 const DISEASE_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#f97316", "#ec4899", "#8b5cf6"]
 
-function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string | number; sub?: string }) {
+function StatCard({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string | number; sub?: string }) {
   return (
     <div className="bg-card border rounded-xl p-5 shadow-sm">
       <div className="flex items-center gap-3 mb-3">
@@ -42,16 +44,17 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats, recentPredictions }: {
-  predictions: any[]
-  patientsByHospital: any[]
-  alertStats: any[]
-  recentPredictions: any[]
+  predictions: PredictionRow[]
+  patientsByHospital: { hospitals?: { name: string } | null }[]
+  alertStats: { severity?: string | null; status?: string | null; created_at?: string }[]
+  recentPredictions: PredictionRow[]
 }) {
   // 1. Severity distribution
   const severityData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const p of predictions) {
-      counts[p.severity] = (counts[p.severity] || 0) + 1
+      const sev = p.severity ?? "Unknown"
+      counts[sev] = (counts[sev] || 0) + 1
     }
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [predictions])
@@ -101,7 +104,8 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
   const alertStatusData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const a of alertStats) {
-      counts[a.status] = (counts[a.status] || 0) + 1
+      const st = a.status ?? "Unknown"
+      counts[st] = (counts[st] || 0) + 1
     }
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [alertStats])
@@ -109,9 +113,9 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
   // 6. Severity radar across diseases
   const radarData = useMemo(() => {
     const severities = ['Low', 'Moderate', 'High', 'Critical']
-    const diseases = [...new Set(predictions.map(p => p.disease).filter(Boolean))].slice(0, 5)
+    const diseases = [...new Set(predictions.map(p => p.disease).filter((d): d is string => Boolean(d)))].slice(0, 5)
     return severities.map(sev => {
-      const row: any = { severity: sev }
+      const row: Record<string, string | number> = { severity: sev }
       for (const d of diseases) {
         row[d] = predictions.filter(p => p.disease === d && p.severity === sev).length
       }
@@ -119,7 +123,7 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
     })
   }, [predictions])
 
-  const diseaseKeys = [...new Set(predictions.map(p => p.disease).filter(Boolean))].slice(0, 5)
+  const diseaseKeys = [...new Set(predictions.map(p => p.disease).filter((d): d is string => Boolean(d)))].slice(0, 5)
 
   const criticalCount = alertStats.filter(a => a.severity === 'Critical').length
   const avgRisk = predictions.length > 0
@@ -209,7 +213,7 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
                 <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v: any) => [(v * 100).toFixed(1) + '%', 'Avg Risk']} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v) => [(Number(v ?? 0) * 100).toFixed(1) + '%', 'Avg Risk']} />
                 <Area type="monotone" dataKey="avgRisk" stroke="#ef4444" fill="url(#riskGradient)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -242,7 +246,7 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={alertStatusData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={alertStatusData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                   {alertStatusData.map((_, i) => (
                     <Cell key={i} fill={["#22c55e", "#f59e0b", "#94a3b8"][i % 3]} />
                   ))}

@@ -2,7 +2,6 @@
 import { useState, type FormEvent } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 
@@ -111,7 +110,7 @@ export default function SignupPage() {
                   portal === "patient" ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                I'm a Patient
+                I&apos;m a Patient
               </button>
               <button
                 type="button"
@@ -120,7 +119,7 @@ export default function SignupPage() {
                   portal === "doctor" ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                I'm a Doctor
+                I&apos;m a Doctor
               </button>
             </div>
 
