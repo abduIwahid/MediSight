@@ -132,3 +132,33 @@
     background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
   }
 }
+
+/* Print: the patient risk report prints alone, on one page, with its
+   colours intact. Everything outside .print-report is hidden; elements
+   marked .print-hidden are removed entirely. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-report,
+  .print-report * {
+    visibility: visible;
+  }
+  .print-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
