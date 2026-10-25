@@ -82,7 +82,7 @@ Case Study #U2013 ML-003.pdf   the internship case study for this project
 | Candidates | Logistic Regression, Random Forest, XGBoost, LightGBM |
 | Selected | LightGBM - AUC-ROC 0.8307 (stratified 80/20 split, AUC on the test set) |
 | Tracking | MLflow (experiment `MediSight_Diabetes_Prediction`) |
-| Artifact | `ml-service/models/production/model.joblib` + `metadata.joblib` (gitignored, produced by training) |
+| Artifact | `ml-service/models/production/model.joblib` + `model_metadata.json` (gitignored, produced by training) |
 | Explanations | SHAP values per prediction, served by `/explain` |
 
 The 0.8307 AUC-ROC figure is for the diabetes task only. It does not
@@ -116,12 +116,15 @@ URL and keys, the ML service URL, the site URL used for auth redirects,
 and the Gemini API key used by the AI-assistant chat route (server-side
 only).
 
-ML service - the FastAPI app itself reads no environment variables. Only
-the seeding script does:
+ML service - copy the example and fill it in:
 
 ```bash
-cp ml-service/.env.example ml-service/.env    # sets DATABASE_URL
+cp ml-service/.env.example ml-service/.env
 ```
+
+The app reads `ML_SERVICE_API_KEY` (authentication, see the API
+contract below) and `ALLOWED_ORIGINS` (CORS). `DATABASE_URL` is only
+used by the seeding script (Setup step 5).
 
 ### 3. ML service
 
@@ -129,17 +132,29 @@ cp ml-service/.env.example ml-service/.env    # sets DATABASE_URL
 cd ml-service
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt        # inference only
 ```
 
-Download the dataset (Kaggle: "Diabetes Health Indicators Dataset",
-BRFSS 2015) and place the CSV at:
+Three requirements files, all exactly pinned: `requirements.txt`
+(inference), `requirements-train.txt` (adds MLflow and the seeder's
+database driver, for training), `requirements-dev.txt` (adds pytest,
+for the test suite).
 
-```text
-ml-service/data/diabetes-health-indicators-dataset/diabetes_binary_5050split_health_indicators_BRFSS2015.csv
+Download and derive the dataset (no account needed - the script pulls
+the canonical UCI file, dataset 891 "CDC Diabetes Health Indicators",
+and derives the balanced 50/50 BRFSS 2015 CSV with a fixed seed):
+
+```bash
+pip install -r requirements-train.txt
+python model_training/fetch_dataset.py
 ```
 
-Train (writes the artifact to `ml-service/models/production/`):
+Manual alternative: download "Diabetes Health Indicators Dataset"
+(Kaggle, BRFSS 2015) and place the CSV at
+`ml-service/data/diabetes-health-indicators-dataset/diabetes_binary_5050split_health_indicators_BRFSS2015.csv`.
+
+Train (benchmarks LR / Random Forest / XGBoost / LightGBM and writes
+the best artifact to `ml-service/models/production/`):
 
 ```bash
 python model_training/train.py
@@ -152,7 +167,16 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 Interactive docs: http://localhost:8000/docs - train first: until a
-model artifact exists, `/predict` and `/explain` have no model to serve.
+model artifact exists, `/predict` and `/explain` return 503.
+
+Docker: the image ships the trained artifact, so train first, then
+build (the build fails loudly if the artifact is missing):
+
+```bash
+cd ml-service
+docker build -t medisight-ml .
+docker run -p 8000:8000 -e ML_SERVICE_API_KEY=<your-key> medisight-ml
+```
 
 ### 4. Frontend
 
@@ -179,31 +203,60 @@ Demo doctor accounts are seeded by the later migrations and by
 
 ## API endpoints (ML service)
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/` | Health check |
-| POST | `/predict` | Diabetes risk prediction |
-| POST | `/explain` | SHAP explanation for a prediction |
-| GET | `/model-status` | Loaded model and metadata |
-| GET | `/drift-status` | Data-drift status |
-| POST | `/retrain` | Retrain the model |
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/` | no | Health check |
+| POST | `/predict` | API key | Diabetes risk prediction |
+| POST | `/explain` | API key | SHAP explanation for a prediction |
+| GET | `/model-status` | no | Loaded model and metadata |
+| GET | `/drift-status` | API key | Data-drift status (PSI) |
+| POST | `/retrain` | API key | Retrain the model (training environment only) |
+
+**Authentication.** Protected endpoints require an `X-API-Key` header
+matching the `ML_SERVICE_API_KEY` environment variable. If the variable
+is unset, the service runs in an explicitly logged **dev mode** with no
+authentication - never deploy it that way.
+
+**Response contract for `/predict`.** `probability` is the model's own
+`predict_proba` probability of diabetes - that probability is the risk
+score. `confidence` is the probability the model assigns to the class it
+predicted, `max(p, 1 - p)`, derived directly from `predict_proba`; it is
+not a calibrated accuracy estimate. `severity` bands the probability
+(Low < 0.2, Moderate < 0.5, High < 0.8, Critical otherwise).
+
+**Inputs and errors.** Request fields are the 21 BRFSS 2015 features,
+range-validated against their BRFSS coding (binary indicators 0/1,
+`GenHlth` 1-5, `MentHlth`/`PhysHlth` 0-30, `Age` 1-13, `Education` 1-6,
+`Income` 1-8, `BMI` 10-80); out-of-range input returns a clean 422.
+Missing or wrong API key: 401. No model artifact loaded: 503 on
+`/predict` and `/explain`. Unexpected failures return a generic 500 -
+internal exception details are logged server-side only, never sent to
+clients.
 
 ## Testing
 
 ```bash
-pytest ml-service/tests/
+cd ml-service
+pip install -r requirements-dev.txt
+pytest tests/
 ```
 
-The clinical-feature and RLS suites run standalone. The API tests need a
-trained model artifact (Setup step 3); on a fresh clone without one they
-fail, because the service has no model to load.
+The suite is self-contained: on a fresh clone (no model artifact - it
+is gitignored), a test fixture trains a tiny LightGBM model on synthetic
+BRFSS-shaped data so the API tests run green without the dataset or a
+production artifact. If a real artifact from `train.py` exists, it is
+used instead and never overwritten. The security tests cover the API-key
+contract, the input ranges, and the generic-500 rule.
 
 ## Deployment
 
 `render.yaml` at the repo root describes the ML service as a Docker web
-service built from `ml-service/`. The frontend deploys from `frontend/`
-to Vercel. Both hosting projects are currently removed, so there is no
-live deployment at the moment.
+service built from `ml-service/` (Dockerfile in `ml-service/`). The
+image contains the trained model, so run the training step before
+building, and set `ML_SERVICE_API_KEY` on the host - callers (the Next.js
+`/api/predict` route) must send it as the `X-API-Key` header. The
+frontend deploys from `frontend/` to Vercel. Both hosting projects are
+currently removed, so there is no live deployment at the moment.
 
 ## Further documentation
 
