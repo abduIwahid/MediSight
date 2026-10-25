@@ -1,745 +1,227 @@
 # MediSight AI
 
-Minimal project README — concise setup for instructor review.
+MediSight AI is a healthcare risk-prediction and clinical decision-support
+platform built during a machine-learning internship at Ezitech Institute
+(Eziline Software House), Islamabad (Jul-Sep 2026). It combines a Next.js
+web application, a FastAPI machine-learning service, and a Supabase
+(PostgreSQL) backend with row-level security.
 
-This repository contains a healthcare ML web platform split into:
+> **Disclaimer:** MediSight AI is an experimental clinical
+> decision-support and research tool. It is not a certified medical
+> device and is not a substitute for professional medical diagnosis,
+> treatment, or clinical judgment. Predictions must be reviewed by
+> qualified healthcare professionals.
 
-- `frontend/` — Next.js frontend
-- `supabase/` — database migrations and edge functions
-- `ml-service/` — FastAPI ML service and training scripts
+## Project status and honest scope
 
-Note: Additional documentation files were archived to branch `backup-md` to keep the repository compact for submission.
+What is actually implemented and served today:
 
-Quickstart (development)
+- **One trained model.** The ML service trains and serves a single model:
+  **diabetes risk** (LightGBM, **AUC-ROC 0.8307** on a held-out test
+  split) on the CDC BRFSS 2015 health-indicators dataset. Logistic
+  Regression, Random Forest, and XGBoost were benchmarked against it,
+  with MLflow experiment tracking.
+- **SHAP explanations** for that model's predictions, served by the ML
+  service (`/explain`), plus clinical feature indicators computed in
+  code: BMI classification, blood-pressure categorisation, eGFR staging,
+  and cholesterol ratios.
+- **A symptom checker** in the frontend that is a **rule-based
+  heuristic**, and is labelled as such in the UI. It is not a trained
+  model.
+- **Platform features:** patient and doctor records, appointments, and
+  role-based access (patient / doctor / admin) enforced by Next.js
+  middleware and Supabase RLS (72 policies across the migrations).
 
-1. Clone the repository:
+What is **not** implemented yet: trained models for heart disease,
+chronic kidney disease, stroke, liver disease, breast cancer, and
+hypertension. Those six are roadmap items. The data model and parts of
+the UI refer to them, but no model exists for them today.
 
-```bash
-git clone <your-repo-url>
-cd MediSight-Healthcare-Platform
-```
+The public demo is currently offline (the hosting projects were
+removed). This repository is the source of truth.
 
-2. Create local environment file ` .env.local` in the project root (do NOT commit secrets). Example keys required:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
-
-3. Start the ML service (recommended in a Python venv):
-
-```powershell
-cd ml-service
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-API available at `http://localhost:8000` (interactive docs at `/docs`).
-
-4. Start the frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend dev server at `http://localhost:3000` by default.
-
-Tests
-
-Run the ML service tests with:
-
-```bash
-pytest ml-service/tests/
-```
-
-Repository housekeeping performed
-
-- Removed development artifacts (virtualenvs, caches, compiled files).
-- Retained only `README.md` in repository root; removed other `.md` docs to reduce clutter. A full copy is available on branch `backup-md` if needed.
-
-If you want any of the archived docs restored into the main branch, tell me which file(s) or I can restore the full `backup-md` branch.
-
-— MediSight quick README
-# MediSight AI
-
-### Enterprise Healthcare Early Disease Risk Prediction & Clinical Decision Support Platform
-
-MediSight AI is an AI-powered healthcare platform designed to support **early disease risk prediction, clinical decision making, patient monitoring, and explainable machine learning**.
-
-The platform combines a modern healthcare web application, a secure Supabase backend, and a dedicated machine learning service to provide predictive insights across multiple clinical conditions.
-
-> **Disclaimer:** MediSight AI is a clinical decision support and research platform. It is **not a substitute for professional medical diagnosis, treatment, or clinical judgment**. Predictions should be reviewed and interpreted by qualified healthcare professionals.
-
----
-
-##  Key Features
-
-*  **Multi-Disease Risk Prediction**
-
-  * Diabetes
-  * Heart Disease
-  * Chronic Kidney Disease
-  * Stroke
-  * Liver Disease
-  * Breast Cancer
-  * Hypertension
-
-*
-*   **Clinical Risk Assessment**
-
-  * BMI classification
-  * Blood pressure categorization
-  * Kidney function / eGFR staging
-  * Cholesterol ratios
-  * Composite clinical risk indicators
-
-* 🔍 **Explainable AI**
-
-  * SHAP-based model explanations
-  * Feature importance
-  * Patient-specific prediction reasoning
-  * Clinical text explanations
-
-* 👨‍⚕️ **Clinical Decision Support**
-
-  * Patient risk profiles
-  * Patient vitals and laboratory results
-  * Diagnosis and medication information
-  * Risk monitoring
-
-* 📅 **Healthcare Management**
-
-  * Patient records
-  * Doctor information
-  * Appointment management
-  * Clinical observations
-
-* 🧪 **Machine Learning Pipeline**
-
-  * Logistic Regression
-  * Random Forest
-  * XGBoost
-  * LightGBM
-  * MLflow experiment tracking
-  * Model retraining
-
-* 🔐 **Secure Backend**
-
-  * Supabase PostgreSQL
-  * Row Level Security (RLS)
-  * Database migrations
-  * Supabase Edge Functions
-
----
-
-# 🏗️ System Architecture
-
-MediSight AI follows a modular monorepo architecture:
+## Architecture
 
 ```text
-MediSight AI
-│
-├── frontend/
-│   ├── Next.js 14
-│   ├── App Router
-│   ├── Tailwind CSS
-│   └── shadcn/ui
-│
-├── supabase/
-│   ├── Database Schema
-│   ├── Migrations
-│   ├── RLS Policies
-│   └── Edge Functions
-│
-└── ml-service/
-    ├── FastAPI
-    ├── Model Training
-    ├── Feature Engineering
-    ├── SHAP Explainability
-    ├── MLflow
-    └── Model Retraining
+frontend/    Next.js 14 (App Router) + Tailwind CSS + shadcn/ui
+             - browser UI, auth flows, server-side API routes (src/app/api/)
+             - calls the ML service server-side; uses Supabase with the
+               anon key (RLS enforced) and, in admin routes only, the
+               service-role key
+ml-service/  FastAPI + scikit-learn / LightGBM
+             - /predict, /explain, /model-status, /drift-status, /retrain
+             - loads its model artifact from models/production/
+supabase/    PostgreSQL schema via migrations, RLS policies, seed SQL,
+             and six Edge Functions. The Edge Functions are currently not
+             invoked by the frontend - the Next.js API routes do that work.
 ```
 
-### High-Level Data Flow
+## Repository layout
 
 ```text
-                    ┌──────────────────────┐
-                    │      Frontend        │
-                    │     Next.js 14       │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │      Supabase        │
-                    │ PostgreSQL + RLS     │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │     ML Service       │
-                    │      FastAPI         │
-                    └──────────┬───────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                ▼
-        ┌──────────┐     ┌──────────┐     ┌──────────┐
-        │ Prediction│     │  SHAP    │     │ MLflow   │
-        │  Models   │     │ Explain. │     │ Tracking │
-        └──────────┘     └──────────┘     └──────────┘
+frontend/                 Next.js app (see frontend/README.md)
+frontend/src/app/         routes: (auth), (dashboard), admin-portal, api/
+frontend/scripts/         build helper + dev/ data-seeding script
+ml-service/app/           FastAPI application (main.py)
+ml-service/model_training/  train.py, seed_db.py
+ml-service/tests/         pytest suite (clinical features, API, RLS)
+ml-service/data/          training dataset goes here (gitignored)
+ml-service/models/        trained artifacts land here (gitignored)
+supabase/migrations/      schema, RLS policies, seeds
+supabase/functions/       Edge Functions (not wired to the frontend yet)
+scripts/                  Windows quick-start launchers for local dev
+Case Study #U2013 ML-003.pdf   the internship case study for this project
 ```
 
----
+## The model
 
-# 📁 Project Structure
+| | |
+| --- | --- |
+| Task | Diabetes risk (binary classification) |
+| Dataset | CDC BRFSS 2015 - `diabetes_binary_5050split_health_indicators_BRFSS2015.csv` (50/50 split, 70,692 rows, 21 features, target `Diabetes_binary`) |
+| Candidates | Logistic Regression, Random Forest, XGBoost, LightGBM |
+| Selected | LightGBM - AUC-ROC 0.8307 (stratified 80/20 split, AUC on the test set) |
+| Tracking | MLflow (experiment `MediSight_Diabetes_Prediction`) |
+| Artifact | `ml-service/models/production/model.joblib` + `metadata.joblib` (gitignored, produced by training) |
+| Explanations | SHAP values per prediction, served by `/explain` |
 
-```text
-MediSight-AI/
-│
-├── frontend/
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   ├── public/
-│   ├── package.json
-│   └── ...
-│
-├── supabase/
-│   ├── migrations/
-│   ├── functions/
-│   └── config.toml
-│
-├── ml-service/
-│   ├── app/
-│   │   └── main.py
-│   │
-│   ├── model_training/
-│   │   ├── seed_db.py
-│   │   └── train.py
-│   │
-│   ├── tests/
-│   ├── models/
-│   ├── requirements.txt
-│   └── ...
-│
-├── .env.local
-├── README.md
-└── ...
-```
+The 0.8307 AUC-ROC figure is for the diabetes task only. It does not
+generalise to other conditions.
 
----
+## Setup
 
-# 🛠️ Technology Stack
+Prerequisites: Node.js 18+, Python 3.11, Git. Optional: the Supabase CLI
+and Docker, to run Supabase locally instead of using a hosted project.
 
-| Layer               | Technologies                    |
-| ------------------- | ------------------------------- |
-| Frontend            | Next.js 14, React, Tailwind CSS |
-| UI                  | shadcn/ui                       |
-| Backend             | Supabase, PostgreSQL            |
-| API                 | FastAPI                         |
-| Machine Learning    | Scikit-learn, XGBoost, LightGBM |
-| Explainability      | SHAP                            |
-| Experiment Tracking | MLflow                          |
-| Testing             | Pytest                          |
-| Database Security   | Supabase RLS                    |
-| Language            | Python, TypeScript              |
+### 1. Supabase
 
----
-
-# ⚙️ Installation & Setup
-
-## Prerequisites
-
-Make sure the following are installed:
-
-* **Node.js 18+**
-* **Python 3.10+**
-* **npm**
-* **Supabase CLI**
-* **Git**
-
----
-
-## 1. Clone the Repository
+Create a Supabase project (or run `supabase start` locally), then apply
+the migrations:
 
 ```bash
-git clone <your-repository-url>
-cd MediSight-AI
-```
-
----
-
-# 🗄️ 2. Configure Supabase
-
-Create a Supabase project and obtain your project credentials.
-
-Link the local project to your Supabase project:
-
-```bash
-supabase link --project-ref your-project-ref
-```
-
-Apply all database migrations:
-
-```bash
+supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-### Environment Variables
+### 2. Environment variables
 
-Create a `.env.local` file in the project root or frontend directory according to your application configuration.
+Frontend - copy the example and fill it in:
 
-Example:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```bash
+cp frontend/.env.example frontend/.env.local
 ```
 
-> **Security:** Never commit `.env.local`, service-role keys, API keys, passwords, or other secrets to GitHub.
+The example lists every variable the frontend code reads: the Supabase
+URL and keys, the ML service URL, the site URL used for auth redirects,
+and the Gemini API key used by the AI-assistant chat route (server-side
+only).
 
----
+ML service - the FastAPI app itself reads no environment variables. Only
+the seeding script does:
 
-# 🧠 3. Setup the ML Service
+```bash
+cp ml-service/.env.example ml-service/.env    # sets DATABASE_URL
+```
 
-Navigate to the machine learning service:
+### 3. ML service
 
 ```bash
 cd ml-service
-```
-
-Create a Python virtual environment:
-
-### Windows
-
-```bash
 python -m venv venv
-venv\Scripts\activate
-```
-
-### macOS / Linux
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
----
+Download the dataset (Kaggle: "Diabetes Health Indicators Dataset",
+BRFSS 2015) and place the CSV at:
 
-# 🌱 4. Seed Demo Data
-
-MediSight AI includes a database seeding pipeline for demonstration and development.
-
-The following command creates demo patient records and associated clinical information:
-
-```bash
-python model_training/seed_db.py
+```text
+ml-service/data/diabetes-health-indicators-dataset/diabetes_binary_5050split_health_indicators_BRFSS2015.csv
 ```
 
-The demo dataset includes:
-
-* Patient profiles
-* Vital signs
-* Laboratory results
-* Diagnoses
-* Medication information
-* Clinical compliance data
-
-> **Development Note:** Run database seeding only in a development/demo environment unless you have verified the script's behavior for your production database.
-
----
-
-# 🤖 5. Train Machine Learning Models
-
-Train and evaluate the predictive models using:
+Train (writes the artifact to `ml-service/models/production/`):
 
 ```bash
 python model_training/train.py
 ```
 
-The training pipeline supports:
-
-* Logistic Regression baseline
-* Random Forest
-* XGBoost
-* LightGBM
-
-The pipeline also provides:
-
-* Model evaluation
-* Experiment tracking
-* MLflow logging
-* Best-model selection
-* Model persistence
-
----
-
-# 🚀 6. Start the FastAPI Service
-
-From the `ml-service` directory:
+Run the API:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8000
 ```
 
-The API will be available locally at:
+Interactive docs: http://localhost:8000/docs - train first: until a
+model artifact exists, `/predict` and `/explain` have no model to serve.
 
-```text
-http://localhost:8000
-```
-
-FastAPI automatically provides interactive API documentation at:
-
-```text
-http://localhost:8000/docs
-```
-
----
-
-# 💻 7. Start the Frontend
-
-Open a new terminal and navigate to the frontend:
+### 4. Frontend
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-The frontend will normally be available at:
+Dev server: http://localhost:3000 - on Windows, `scripts/quickstart.bat`
+and `scripts/quickstart.ps1` automate starting Supabase, the ML service,
+and the frontend together.
 
-```text
-http://localhost:3000
+### 5. Seed demo data (optional, development only)
+
+With `DATABASE_URL` set (see `ml-service/.env.example`):
+
+```bash
+python ml-service/model_training/seed_db.py
 ```
 
----
+Demo doctor accounts are seeded by the later migrations and by
+`supabase/seed_doctors_via_sql_editor.sql`.
 
-# 🔌 API Endpoints
+## API endpoints (ML service)
 
-The FastAPI service provides endpoints for model monitoring, prediction, explainability, and retraining.
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/` | Health check |
+| POST | `/predict` | Diabetes risk prediction |
+| POST | `/explain` | SHAP explanation for a prediction |
+| GET | `/model-status` | Loaded model and metadata |
+| GET | `/drift-status` | Data-drift status |
+| POST | `/retrain` | Retrain the model |
 
-| Endpoint        | Method | Description                                 |
-| --------------- | ------ | ------------------------------------------- |
-| `/model-status` | GET    | Returns current model status                |
-| `/predict`      | POST   | Generates disease-risk predictions          |
-| `/explain`      | POST   | Provides SHAP-based prediction explanations |
-| `/retrain`      | POST   | Triggers model retraining                   |
-
-Interactive API documentation:
-
-```text
-http://localhost:8000/docs
-```
-
----
-
-# 🧪 Testing
-
-MediSight AI includes automated tests for the clinical feature engineering pipeline and FastAPI endpoints.
-
-Run the complete test suite:
+## Testing
 
 ```bash
 pytest ml-service/tests/
 ```
 
-### Feature Engineering Tests
+The clinical-feature and RLS suites run standalone. The API tests need a
+trained model artifact (Setup step 3); on a fresh clone without one they
+fail, because the service has no model to load.
 
-Tests include:
+## Deployment
 
-* BMI staging
-* Blood pressure AHA categories
-* Kidney eGFR stages
-* Cholesterol ratios
-* Composite clinical risk indexes
+`render.yaml` at the repo root describes the ML service as a Docker web
+service built from `ml-service/`. The frontend deploys from `frontend/`
+to Vercel. Both hosting projects are currently removed, so there is no
+live deployment at the moment.
 
-### API Tests
+## Further documentation
 
-The FastAPI test suite verifies:
+Additional project documents (PRD, viva notes) are archived on the
+`backup-md` branch to keep `main` compact. The internship case study is
+`Case Study #U2013 ML-003.pdf` in the repo root.
 
-* `/model-status`
-* `/predict`
-* `/explain`
-* `/retrain`
+## License
 
-It also validates SHAP explanations and clinical text-generation behavior.
+MIT - see [LICENSE](LICENSE).
 
----
+## Medical disclaimer
 
-# 📊 Clinical Datasets
-
-MediSight AI uses de-identified clinical and health-indicator datasets for research, development, model training, and demonstration purposes.
-
-### 1. Diabetes Health Indicators
-
-CDC BRFSS 2015 dataset containing approximately **253,680 survey responses** and health-related indicators associated with diabetes.
-
-### 2. Heart Disease Health Indicators
-
-CDC BRFSS health indicators used for cardiovascular disease risk modeling.
-
-### 3. Chronic Kidney Disease
-
-Clinical measurements including:
-
-* GFR
-* Creatinine
-* Electrolytes
-* HbA1c
-* Other laboratory indicators
-
-### 4. Stroke Prediction Dataset
-
-Structured clinical risk factors including:
-
-* Hypertension
-* Heart disease
-* Average glucose level
-* BMI
-* Demographic and lifestyle indicators
-
-### 5. Liver Patient Dataset
-
-Clinical laboratory measurements including:
-
-* Bilirubin
-* SGPT
-* SGOT
-* Albumin
-* Other liver-related indicators
-
-### 6. Breast Cancer Wisconsin Dataset
-
-Nuclear feature measurements obtained from fine-needle aspirate samples.
-
-### 7. Hypertension Health Indicators
-
-BRFSS-based indicators associated with blood pressure and hypertension risk.
-
----
-
-# 🔐 Data Privacy & Security
-
-MediSight AI is designed with healthcare data security considerations in mind.
-
-The platform uses:
-
-* Supabase PostgreSQL
-* Row Level Security (RLS)
-* Environment-based secret management
-* De-identified datasets
-* Controlled database access
-* Separate frontend and ML-service layers
-
-> **Important:** The included datasets are intended for research, development, and demonstration. Production deployment with real patient information requires appropriate security controls, privacy protections, access management, auditing, regulatory compliance, and clinical validation.
-
----
-
-# 🧠 Explainable AI
-
-A key component of MediSight AI is **model interpretability**.
-
-Instead of providing only a prediction, the platform can provide an explanation of which clinical features contributed to the model's output.
-
-Example:
-
-```text
-Prediction:
-High Diabetes Risk
-
-Important Contributing Factors:
-• Elevated glucose level
-• Increased BMI
-• High blood pressure
-• Age-related risk
-```
-
-SHAP is used to calculate feature contributions and improve model transparency.
-
----
-
-# 📈 Machine Learning Pipeline
-
-```text
-Clinical Dataset
-       │
-       ▼
-Data Preprocessing
-       │
-       ▼
-Feature Engineering
-       │
-       ▼
-Train / Validation Split
-       │
-       ▼
-┌──────────────────────────────┐
-│     Model Training           │
-│                              │
-│ Logistic Regression          │
-│ Random Forest                │
-│ XGBoost                      │
-│ LightGBM                     │
-└──────────────┬───────────────┘
-               │
-               ▼
-        Model Evaluation
-               │
-               ▼
-       MLflow Experiment
-          Tracking
-               │
-               ▼
-        Best Model Selection
-               │
-               ▼
-       FastAPI Inference API
-               │
-               ▼
-        SHAP Explainability
-               │
-               ▼
-       Clinical Risk Output
-```
-
----
-
-# 🩺 Clinical Decision Support
-
-MediSight AI is designed to assist healthcare professionals by transforming patient information into structured risk insights.
-
-The platform can combine:
-
-```text
-Patient Information
-       +
-Vital Signs
-       +
-Laboratory Results
-       +
-Medical History
-       +
-Existing Diagnoses
-       ↓
-Clinical Feature Engineering
-       ↓
-Machine Learning Models
-       ↓
-Risk Prediction
-       ↓
-Explainable AI
-       ↓
-Clinical Decision Support
-```
-
-The system is intended to **support**, not replace, professional clinical judgment.
-
----
-
-# 🗺️ Future Improvements
-
-Planned enhancements may include:
-
-* [ ] Real-time patient monitoring
-* [ ] Advanced doctor dashboard
-* [ ] Appointment scheduling
-* [ ] Patient notification system
-* [ ] PDF clinical reports
-* [ ] Additional disease prediction models
-* [ ] Model version management
-* [ ] Advanced MLflow model registry
-* [ ] Automated model retraining pipeline
-* [ ] Production-grade authentication and authorization
-* [ ] Comprehensive audit logging
-* [ ] Cloud deployment
-* [ ] FHIR-compliant healthcare data integration
-
----
-
-# 🤝 Contributing
-
-Contributions are welcome.
-
-### Development Workflow
-
-1. Fork the repository.
-2. Create a feature branch.
-
-```bash
-git checkout -b feature/your-feature
-```
-
-3. Make your changes.
-4. Run the test suite.
-
-```bash
-pytest ml-service/tests/
-```
-
-5. Commit your changes.
-
-```bash
-git commit -m "Add: your feature"
-```
-
-6. Push the branch.
-
-```bash
-git push origin feature/your-feature
-```
-
-7. Open a Pull Request.
-
----
-
-# 📄 License
-
-Add your project's license information here.
-
-For example:
-
-```text
-MIT License
-```
-
----
-
-# ⚠️ Medical Disclaimer
-
-MediSight AI is an **experimental clinical decision-support and research platform**.
-
-The predictions, risk scores, explanations, and recommendations generated by this system should **not be considered medical advice or a definitive diagnosis**.
-
-Healthcare professionals should independently evaluate patient information and use appropriate clinical judgment before making medical decisions.
-
-The developers and contributors are not responsible for medical decisions, treatment outcomes, or patient harm resulting from the use or misuse of this software.
-
----
-
-# 👨‍💻 Project
-
-**MediSight AI**
-Enterprise Healthcare Early Disease Risk Prediction & Clinical Decision Support Platform
-
-Built with **Next.js, Supabase, FastAPI, Scikit-learn, XGBoost, LightGBM, SHAP, and MLflow**.
+MediSight AI is an experimental clinical decision-support and research
+platform. The predictions, risk scores, explanations, and recommendations
+generated by this system should not be considered medical advice or a
+definitive diagnosis. Healthcare professionals should independently
+evaluate patient information and use appropriate clinical judgment before
+making medical decisions. The developers and contributors are not
+responsible for medical decisions, treatment outcomes, or patient harm
+resulting from the use or misuse of this software.
