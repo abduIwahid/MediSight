@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ShapWaterfallChart, ShapFeature } from "@/components/shared/ShapWaterfallChart"
+import { ShapFactorList, ShapFeature } from "@/components/shared/ShapFactorList"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import type { PatientRow, PredictionRow } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +16,13 @@ interface PredictionDetailViewProps {
   patientId: string
 }
 
+const SEVERITY_GAUGE_COLOR: Record<string, string> = {
+  Low: "#1E7A46",
+  Moderate: "#D97706",
+  High: "#C0392B",
+  Critical: "#C0392B",
+}
+
 export function PredictionDetailView({
   prediction,
   patient,
@@ -23,6 +30,10 @@ export function PredictionDetailView({
   clinicalExplanation,
   patientId
 }: PredictionDetailViewProps) {
+  const probability = prediction.probability ?? 0
+  const severity = prediction.severity ?? "Low"
+  const gaugeColor = SEVERITY_GAUGE_COLOR[severity] ?? "#2E7FA8"
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
@@ -32,7 +43,8 @@ export function PredictionDetailView({
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Risk Explainability (SHAP)</h1>
+          <p className="eyebrow">Prediction detail</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Why this score</h1>
           <p className="text-muted-foreground">
             Patient: {patient?.demographics?.first_name} {patient?.demographics?.last_name} | MRN: {patient?.mrn}
           </p>
@@ -47,17 +59,34 @@ export function PredictionDetailView({
               <CardDescription>{prediction.disease} Risk</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div>
+                <div className="text-sm text-muted-foreground mb-1">Risk probability</div>
+                <div className="font-display text-5xl leading-none">
+                  {(probability * 100).toFixed(1)}
+                  <span className="font-sans text-base font-semibold text-muted-foreground">%</span>
+                </div>
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${Math.min(100, Math.max(0, probability * 100))}%`, background: gaugeColor }}
+                  />
+                </div>
+                <div className="mt-1 flex justify-between font-mono text-[11px] text-muted-foreground">
+                  <span>LOW</span>
+                  <span>MODERATE</span>
+                  <span>HIGH</span>
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Severity</span>
-                <RiskBadge severity={prediction.severity ?? "Low"} />
+                <RiskBadge severity={severity} />
               </div>
               <div>
-                <div className="text-sm text-muted-foreground mb-1">Probability</div>
-                <div className="text-3xl font-bold">{((prediction.probability ?? 0) * 100).toFixed(1)}%</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground mb-1">Model Confidence</div>
+                <div className="text-sm text-muted-foreground mb-1">Model confidence</div>
                 <div className="text-xl font-medium">{((prediction.confidence ?? 0) * 100).toFixed(1)}%</div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  The probability the model assigns to the class it predicted — not a calibrated accuracy estimate.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -73,17 +102,21 @@ export function PredictionDetailView({
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="md:col-span-2">
           <Card className="h-full">
             <CardHeader>
-              <CardTitle>Top Contributing Factors</CardTitle>
+              <CardTitle>Why this score — top factors</CardTitle>
               <CardDescription>
-                SHAP values indicating how much each feature increased or decreased the predicted risk relative to the baseline.
+                SHAP values showing how much each factor pushed this patient&apos;s predicted risk up or down,
+                relative to the average patient.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ShapWaterfallChart data={shapPayload} />
+              <ShapFactorList data={shapPayload} />
+              <p className="mt-6 border-t border-secondary pt-3 text-xs leading-relaxed text-muted-foreground">
+                Explanation generated with SHAP from the patient&apos;s own inputs. A screening aid — not a diagnosis.
+              </p>
             </CardContent>
           </Card>
         </div>
