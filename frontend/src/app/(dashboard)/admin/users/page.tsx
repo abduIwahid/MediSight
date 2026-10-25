@@ -27,7 +27,7 @@ export default async function AdminUsersPage() {
       <div className="rounded-xl border bg-card p-8 text-center">
         <h2 className="text-lg font-semibold">You don&apos;t have permission to manage users</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          User management is limited to super admins and hospital admins. Your role can use the other admin views, such as model registry, MLOps, and audit logs.
+          User management is limited to super admins and hospital admins. Your role can use the other admin views, such as model registry and MLOps.
         </p>
       </div>
     )
@@ -44,5 +44,13 @@ export default async function AdminUsersPage() {
     .select('id, name')
     .order('name')
 
-  return <UserManagementView profiles={profiles || []} hospitals={hospitals || []} viewerRole={viewer.role} />
+  return (
+    <UserManagementView
+      profiles={profiles || []}
+      hospitals={hospitals || []}
+      viewerRole={viewer.role}
+      viewerId={viewer.id}
+      viewerHospitalId={viewer.hospital_id}
+    />
+  )
 }

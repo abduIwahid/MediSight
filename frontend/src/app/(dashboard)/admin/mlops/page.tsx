@@ -4,6 +4,7 @@ import nextDynamic from "next/dynamic"
 import { PulseLoader } from "@/components/shared/PulseLoader"
 import type { DriftData, MlModelStatus } from "@/components/shared/MLOpsView"
 import { getMlServiceUrl, mlServiceFetch } from "@/lib/ml-service"
+import { getCurrentProfile } from "@/lib/current-profile"
 
 // Recharts is heavy — load the MLOps view (and its charts) on demand.
 // (Aliased import: a bare `dynamic` collides with this route's
@@ -59,6 +60,10 @@ export default async function AdminMLOpsPage() {
     .gte('created_at', twoWeeksAgo)
     .order('created_at', { ascending: true })
 
+  // The viewer's role decides whether the Retrain control is offered
+  // (super admins only — the API route enforces the same rule).
+  const viewer = await getCurrentProfile()
+
   return (
     <MLOpsView
       driftData={driftData}
@@ -66,6 +71,7 @@ export default async function AdminMLOpsPage() {
       predictionTrend={predictionTrend || []}
       serviceConnected={serviceConnected}
       mlServiceUrl={ML_URL}
+      viewerRole={viewer?.role ?? undefined}
     />
   )
 }

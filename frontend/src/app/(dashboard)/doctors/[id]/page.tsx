@@ -19,7 +19,7 @@ export default async function DoctorDetailPage({ params }: { params: { id: strin
 
   const { data: doctor, error } = await supabase
     .from('profiles')
-    .select('id, full_name, specialty, phone, email, department, hospital_id, hospitals(name), avatar_url, bio, availability_status, consultation_fee, services')
+    .select('id, full_name, specialty, contact_number, email, department, hospital_id, hospitals(name), avatar_url, bio, availability_status, consultation_fee, services')
     .eq('id', params.id)
     .eq('role', 'doctor')
     .single()

@@ -15,7 +15,7 @@ type Appointment = {
   status: "Requested" | "Confirmed" | "Completed" | "Cancelled"
   reason: string | null
   notes: string | null
-  patient: { full_name: string; email: string; phone: string | null } | null
+  patient: { full_name: string; email: string; contact_number: string | null } | null
 }
 
 export default function AppointmentsPage() {
@@ -32,7 +32,7 @@ export default function AppointmentsPage() {
     setLoadError(false)
     const { data, error } = await supabase
       .from("appointments")
-      .select("id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, phone)")
+      .select("id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, contact_number)")
       .order("scheduled_at", { ascending: true })
     if (error) {
       setLoadError(true)
@@ -116,7 +116,7 @@ export default function AppointmentsPage() {
                     <p className="font-semibold">{a.patient?.full_name || "Unknown patient"}</p>
                     <Badge className={appointmentStatusClass(a.status)} variant="outline">{a.status}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">{a.patient?.email}{a.patient?.phone ? ` · ${a.patient.phone}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{a.patient?.email}{a.patient?.contact_number ? ` · ${a.patient.contact_number}` : ""}</p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {new Date(a.scheduled_at).toLocaleDateString()}</span>
                     <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {new Date(a.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
