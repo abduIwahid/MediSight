@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 import { PatientDetailView } from "@/components/shared/PatientDetailView"
+import { getCurrentProfile } from "@/lib/current-profile"
 import type { PredictionRow } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
@@ -30,12 +31,9 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
 
   if (!patient) return notFound()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = user
-    ? await supabase.from('profiles').select('role').eq('id', user.id).single()
-    : { data: null }
+  const profile = await getCurrentProfile()
 
-  const isAdmin = Boolean(profile && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.role))
+  const isAdmin = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.role))
 
   // Get the latest prediction
   const latestPrediction = (patient.predictions?.sort((a: PredictionRow, b: PredictionRow) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]) ?? null

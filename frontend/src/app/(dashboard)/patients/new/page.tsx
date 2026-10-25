@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { brfssAgeBand } from "@/lib/prediction-features"
+import { useStagedLoadingLabel } from "@/lib/use-staged-loading-label"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
@@ -19,6 +20,7 @@ export default function NewPatientPage() {
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [createdPatientId, setCreatedPatientId] = useState<string | null>(null)
+  const submitLabel = useStagedLoadingLabel(loading, "Generating AI Prediction...")
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -620,7 +622,7 @@ export default function NewPatientPage() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                    Generating AI Prediction...
+                    {submitLabel}
                   </>
                 ) : (
                   "Save Patient & Run AI Prediction"

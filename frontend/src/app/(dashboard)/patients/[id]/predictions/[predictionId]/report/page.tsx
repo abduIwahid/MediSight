@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 import { ShapFactorList } from "@/components/shared/ShapFactorList"
 import BrandMark from "@/components/shared/BrandMark"
 import { PrintButton } from "@/components/shared/PrintButton"
+import { getCurrentProfile } from "@/lib/current-profile"
 import type { PatientRow } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -61,10 +62,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
 
   // Issuing line data — real records only: the patient's hospital, and
   // the signed-in clinician generating this report.
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: generatorProfile } = user
-    ? await supabase.from("profiles").select("full_name").eq("id", user.id).single()
-    : { data: null }
+  const generatorProfile = await getCurrentProfile()
   const hospitalName = (patient as unknown as { hospitals?: { name: string } | null } | null)?.hospitals?.name || null
   const generatedBy = generatorProfile?.full_name || null
   const explanation = prediction.explanations?.[0] as { shap_payload?: unknown; clinical_explanation?: string } | undefined

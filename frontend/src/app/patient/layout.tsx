@@ -114,18 +114,19 @@ export default function PatientLayout({
           <Suspense fallback={<PulseLoader showWordmark={false} showLabel={false} />}>
             <PortalErrorBanner />
           </Suspense>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="h-full w-full max-w-7xl mx-auto"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          {/* No AnimatePresence mode="wait" here: an exit animation made
+              every navigation wait ~300ms for the old page to leave
+              before the new one mounted. The keyed div keeps the enter
+              animation only. */}
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="h-full w-full max-w-7xl mx-auto"
+          >
+            {children}
+          </motion.div>
         </main>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar"
-import { Input } from "@/components/ui/input"
+import { HeaderSearch } from "@/components/layout/HeaderSearch"
 import { Search, Bell, User, Menu, Settings, LogOut, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
@@ -65,7 +65,6 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
   const [headerAlerts, setHeaderAlerts] = useState<HeaderAlert[]>([])
   const [unreadAlertCount, setUnreadAlertCount] = useState(0)
   const notificationsRef = useRef<HTMLDivElement>(null)
@@ -73,9 +72,6 @@ export default function DashboardLayout({
   const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
-    setSearchQuery(params.get("search") || "")
     setMobileMenuOpen(false)
     setNotificationsOpen(false)
     setProfileOpen(false)
@@ -135,14 +131,6 @@ export default function DashboardLayout({
       document.removeEventListener("keydown", onKeyDown)
     }
   }, [notificationsOpen, profileOpen])
-
-  const handleSearch = (event?: React.FormEvent) => {
-    event?.preventDefault()
-    const readyQuery = searchQuery.trim()
-    if (readyQuery) {
-      router.push(`/patients?search=${encodeURIComponent(readyQuery)}`)
-    }
-  }
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -208,18 +196,7 @@ export default function DashboardLayout({
               <span className="text-base font-bold tracking-tight">WhyRisk</span>
             </Link>
 
-            <form onSubmit={handleSearch} className="w-full max-w-lg hidden sm:block">
-              <div className="relative group">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  type="search"
-                  placeholder="Search patients, MRN..."
-                  className="h-10 w-full rounded-full border-border/50 bg-muted/30 pl-10 pr-4 text-sm shadow-inner transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary"
-                />
-              </div>
-            </form>
+            <HeaderSearch />
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
@@ -339,18 +316,19 @@ export default function DashboardLayout({
           <Suspense fallback={<PulseLoader showWordmark={false} showLabel={false} />}>
             <PortalErrorBanner />
           </Suspense>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="h-full w-full max-w-7xl mx-auto"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          {/* No AnimatePresence mode="wait" here: an exit animation made
+              every navigation wait ~300ms for the old page to leave
+              before the new one mounted. The keyed div keeps the enter
+              animation only. */}
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="h-full w-full max-w-7xl mx-auto"
+          >
+            {children}
+          </motion.div>
         </main>
       </div>
     </div>

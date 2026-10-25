@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { ProfileForm } from "@/components/shared/ProfileForm"
+import { getCurrentProfile, getCurrentUser } from "@/lib/current-profile"
 import { redirect } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
@@ -13,11 +14,11 @@ export default async function SettingsPage() {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect("/login")
 
-  const [{ data: profile }, { data: hospitals }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
+  const [profile, { data: hospitals }] = await Promise.all([
+    getCurrentProfile(),
     supabase.from('hospitals').select('id, name').order('name')
   ])
 

@@ -22,22 +22,42 @@ export default async function AnalyticsPage() {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
-  // Population-level predictions stats — explicitly capped at the most
-  // recent 2,000 predictions; the view labels the cap when it is hit.
-  const { data: predictions, error: predErr } = await supabase
-    .from('predictions')
-    .select('disease, severity, probability, created_at')
-    .order('created_at', { ascending: false })
-    .limit(2000)
+  // The four reads are independent — one parallel batch instead of a
+  // sequential waterfall. Caps and labels are unchanged.
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const [predictionsRes, patientsByHospitalRes, alertStatsRes, recentPredictionsRes] = await Promise.all([
+    // Population-level predictions stats — explicitly capped at the most
+    // recent 2,000 predictions; the view labels the cap when it is hit.
+    supabase
+      .from('predictions')
+      .select('disease, severity, probability, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2000),
+    // Patient count per hospital — join hospitals table
+    supabase
+      .from('patients')
+      .select('hospital_id, hospitals!patients_hospital_id_fkey(name)')
+      .limit(10000),
+    // Alert stats — explicitly capped at the most recent 2,000 alerts.
+    supabase
+      .from('alerts')
+      .select('severity, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2000),
+    // Risk score distribution (30-day window)
+    supabase
+      .from('predictions')
+      .select('probability, severity, disease, created_at')
+      .gte('created_at', thirtyDaysAgo)
+      .order('created_at', { ascending: true }),
+  ])
+
+  const { data: predictions, error: predErr } = predictionsRes
+  const { data: patientsByHospital, error: hospErr } = patientsByHospitalRes
+  const { data: alertStats, error: alertErr } = alertStatsRes
+  const { data: recentPredictions, error: recentErr } = recentPredictionsRes
 
   if (predErr) console.error("Analytics predictions error:", predErr)
-
-  // Patient count per hospital — join hospitals table
-  const { data: patientsByHospital, error: hospErr } = await supabase
-    .from('patients')
-    .select('hospital_id, hospitals!patients_hospital_id_fkey(name)')
-    .limit(10000)
-
   if (hospErr) console.error("Analytics hospital error:", hospErr)
 
   // Flatten hospitals relation (may be object or array depending on Supabase version)
@@ -46,22 +66,7 @@ export default async function AnalyticsPage() {
     hospitals: Array.isArray(p.hospitals) ? p.hospitals[0] : p.hospitals
   }))
 
-  // Alert stats — explicitly capped at the most recent 2,000 alerts.
-  const { data: alertStats, error: alertErr } = await supabase
-    .from('alerts')
-    .select('severity, status, created_at')
-    .order('created_at', { ascending: false })
-    .limit(2000)
-
   if (alertErr) console.error("Analytics alerts error:", alertErr)
-
-  // Risk score distribution (30-day window)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: recentPredictions, error: recentErr } = await supabase
-    .from('predictions')
-    .select('probability, severity, disease, created_at')
-    .gte('created_at', thirtyDaysAgo)
-    .order('created_at', { ascending: true })
 
   const loadError = Boolean(predErr || hospErr || alertErr || recentErr)
 
