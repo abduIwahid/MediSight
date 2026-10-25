@@ -21,8 +21,9 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
     .select(`
       *,
       patients (
-        mrn,
-        demographics
+        *,
+        vitals (*),
+        diagnoses (*)
       ),
       explanations (*)
     `)
@@ -34,33 +35,24 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
   const patient = prediction.patients as unknown as PatientRow | null
   const explanation = prediction.explanations?.[0] as { shap_payload?: unknown; clinical_explanation?: string } | undefined
 
+  // Only the explanation actually stored with this prediction may be
+  // shown. If none was stored, the view says so — sample SHAP values or
+  // template text must never stand in for a real explanation.
   let shapPayload = []
   if (explanation?.shap_payload) {
     try {
-      shapPayload = typeof explanation.shap_payload === 'string' 
-        ? JSON.parse(explanation.shap_payload) 
+      shapPayload = typeof explanation.shap_payload === 'string'
+        ? JSON.parse(explanation.shap_payload)
         : explanation.shap_payload
     } catch (e) {
       console.error("Failed to parse SHAP payload", e)
     }
   }
 
-  // Fallback if no shap_payload in the database
-  if (!shapPayload || shapPayload.length === 0) {
-    shapPayload = [
-      { feature: "Blood Pressure", value: "140/90", impact: 0.15 },
-      { feature: "BMI", value: "32.4", impact: 0.10 },
-      { feature: "Age", value: "65", impact: 0.05 },
-      { feature: "Heart Rate", value: "85", impact: 0.02 },
-      { feature: "Exercise", value: "3x/week", impact: -0.12 },
-    ]
-  }
-
-  const clinicalExplanation = explanation?.clinical_explanation || 
-    `This patient has a ${prediction.severity} risk of ${prediction.disease}. The primary contributing factors are their blood pressure and BMI. Regular monitoring and lifestyle adjustments are recommended.`
+  const clinicalExplanation = explanation?.clinical_explanation || ""
 
   return (
-    <PredictionDetailView 
+    <PredictionDetailView
       prediction={prediction}
       patient={patient}
       shapPayload={shapPayload}

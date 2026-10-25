@@ -1,10 +1,13 @@
 "use client"
 
+import { useMemo } from "react"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ShapFactorList, ShapFeature } from "@/components/shared/ShapFactorList"
 import { RiskBadge } from "@/components/shared/RiskBadge"
+import { WhatIfSimulator } from "@/components/shared/WhatIfSimulator"
+import { buildMLPayload } from "@/lib/prediction-features"
 import type { PatientRow, PredictionRow } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -34,6 +37,10 @@ export function PredictionDetailView({
   const severity = prediction.severity ?? "Low"
   const gaugeColor = SEVERITY_GAUGE_COLOR[severity] ?? "#2E7FA8"
 
+  // The exact payload this prediction was generated with, rebuilt from
+  // the patient record by the same derivation the run flow uses.
+  const baseline = useMemo(() => (patient ? buildMLPayload(patient) : null), [patient])
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
@@ -42,13 +49,19 @@ export function PredictionDetailView({
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <p className="eyebrow">Prediction detail</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Why this score</h1>
           <p className="text-muted-foreground">
             Patient: {patient?.demographics?.first_name} {patient?.demographics?.last_name} | MRN: {patient?.mrn}
           </p>
         </div>
+        <Button variant="outline" asChild>
+          <Link href={`/patients/${patientId}/predictions/${prediction.id}/report`}>
+            <Printer className="mr-2 h-4 w-4" />
+            Download report
+          </Link>
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -97,7 +110,8 @@ export function PredictionDetailView({
             </CardHeader>
             <CardContent>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                {clinicalExplanation}
+                {clinicalExplanation ||
+                  "No clinical explanation was stored for this prediction."}
               </p>
             </CardContent>
           </Card>
@@ -121,6 +135,14 @@ export function PredictionDetailView({
           </Card>
         </div>
       </div>
+
+      {baseline && (
+        <WhatIfSimulator
+          baseline={baseline}
+          originalProbability={probability}
+          originalSeverity={severity}
+        />
+      )}
     </div>
   )
 }
