@@ -60,6 +60,14 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  // A prediction run from this page hands its row back via onResult;
+  // it becomes the current assessment immediately. The page never does
+  // a full router.refresh() after a run (deliberate, Batch 4), so
+  // without this the server-rendered card kept presenting the PREVIOUS
+  // score as "Current Assessment" next to the new inline result
+  // (QA Round 2, cluster 6).
+  const [freshPrediction, setFreshPrediction] = useState<PredictionRow | null>(null)
+  const currentPrediction = freshPrediction ?? latestPrediction
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [newLab, setNewLab] = useState({
@@ -149,9 +157,12 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
     setErrorMessage(null)
     setStatusMessage(null)
 
-    const { error } = await supabase.from('patients').delete().eq('id', patient.id)
-    if (error) {
-      console.error("Patient delete failed:", error)
+    // .select() verification: an RLS-refused delete returns no error and
+    // zero rows — without the row check it would look like success and
+    // navigate away from a record that still exists.
+    const { data: deleted, error } = await supabase.from('patients').delete().eq('id', patient.id).select('id')
+    if (error || !deleted || deleted.length === 0) {
+      if (error) console.error("Patient delete failed:", error)
       setErrorMessage('This patient record could not be deleted. You may not have permission, or the record is linked to other data.')
       setDeleteLoading(false)
       return
@@ -172,7 +183,9 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
     { header: "Date", cell: (l: LabResultRow) => fmtDate(l.recorded_at) }
   ]
 
-  const allPredictions = patient.predictions || []
+  const allPredictions = freshPrediction && !(patient.predictions || []).some((p) => p.id === freshPrediction.id)
+    ? [freshPrediction, ...(patient.predictions || [])]
+    : (patient.predictions || [])
   const sortedPreds = [...allPredictions].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
@@ -406,15 +419,15 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
 
       <motion.div variants={itemVariants} className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">
-          {latestPrediction ? (
+          {currentPrediction ? (
             <motion.div whileHover={{ scale: 1.01 }} className="transition-all">
               <PatientRiskCard
-                disease={latestPrediction.disease ?? "Diabetes"}
-                probability={latestPrediction.probability ?? null}
-                confidence={latestPrediction.confidence ?? null}
-                severity={latestPrediction.severity ?? "Unknown"}
+                disease={currentPrediction.disease ?? "Diabetes"}
+                probability={currentPrediction.probability ?? null}
+                confidence={currentPrediction.confidence ?? null}
+                severity={currentPrediction.severity ?? "Unknown"}
                 patientId={patient.id}
-                predictionId={latestPrediction.id ?? ""}
+                predictionId={currentPrediction.id ?? ""}
               />
             </motion.div>
           ) : (
@@ -426,14 +439,14 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
                 <p className="text-foreground text-base font-bold">No Risk Assessment</p>
                 <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-[250px]">Execute the AI predictive model to generate a baseline risk profile.</p>
               </div>
-              <RunPredictionButton patient={patient} />
+              <RunPredictionButton patient={patient} onResult={setFreshPrediction} />
             </div>
           )}
 
-          {latestPrediction && (
+          {currentPrediction && (
             <div className="bg-card border rounded-2xl p-5 shadow-sm">
               <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-4">Run Updated Assessment</h3>
-              <RunPredictionButton patient={patient} />
+              <RunPredictionButton patient={patient} onResult={setFreshPrediction} />
             </div>
           )}
 

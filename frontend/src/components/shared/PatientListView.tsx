@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
 import { DataTable } from "@/components/shared/DataTable"
@@ -77,15 +77,34 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
     setDeleteError(null)
     setDeletingId(patientId)
 
-    const { error } = await supabase.from('patients').delete().eq('id', patientId)
-    if (error) {
-      console.error("Patient delete failed:", error)
+    // .select() verification: an RLS-refused delete returns no error and
+    // zero rows — without the row check it would look like success.
+    const { data: deleted, error } = await supabase.from('patients').delete().eq('id', patientId).select('id')
+    if (error || !deleted || deleted.length === 0) {
+      if (error) console.error("Patient delete failed:", error)
       setDeleteError("This patient record could not be deleted. You may not have permission, or the record is linked to other data.")
       setDeletingId(null)
       return
     }
 
     router.refresh()
+  }
+
+  // The registry's own search box runs the SAME server search as the
+  // header (which routes to /patients?search=): submitting — or pausing
+  // typing — re-queries the server, so patients beyond the 25 most
+  // recent records are findable from this page too. The local filter
+  // still refines the rows on screen while typing.
+  const searchDebounce = useRef<number | null>(null)
+  const routeToSearch = (term: string) => {
+    const t = term.trim()
+    if (t === initialSearch) return
+    router.push(t ? `/patients?search=${encodeURIComponent(t)}` : "/patients")
+  }
+  const handleSearchChange = (value: string) => {
+    setQuery(value)
+    if (searchDebounce.current) window.clearTimeout(searchDebounce.current)
+    searchDebounce.current = window.setTimeout(() => routeToSearch(value), 600)
   }
 
   useEffect(() => {
@@ -228,19 +247,31 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">Patient Registry</h1>
           <p className="mt-1.5 text-sm text-muted-foreground/80">
-            Monitoring <span className="font-semibold text-foreground">{filtered.length}</span> of {normalizedPatients.length} recent patient records.
+            {initialSearch ? (
+              <>Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {normalizedPatients.length} records matching &ldquo;{initialSearch}&rdquo;.</>
+            ) : (
+              <>Monitoring <span className="font-semibold text-foreground">{filtered.length}</span> of {normalizedPatients.length} recent patient records.</>
+            )}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <div className="relative group">
+          <form
+            className="relative group"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (searchDebounce.current) window.clearTimeout(searchDebounce.current)
+              routeToSearch(query)
+            }}
+          >
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <Input
               placeholder="Search by name or MRN..."
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
+              aria-label="Search patients by name or MRN"
               className="pl-9 h-11 w-full sm:w-64 rounded-xl border-border/50 bg-card shadow-sm transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary"
             />
-          </div>
+          </form>
           <Link href="/patients/new" prefetch={true} className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" />
             New Assessment

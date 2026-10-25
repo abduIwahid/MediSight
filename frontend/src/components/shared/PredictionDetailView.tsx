@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { ShapFactorList, ShapFeature } from "@/components/shared/ShapFactorList"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import { WhatIfSimulator } from "@/components/shared/WhatIfSimulator"
-import { buildMLPayload } from "@/lib/prediction-features"
+import { InputsUsedDisclosure } from "@/components/shared/InputsUsedDisclosure"
+import { buildMLPayload, FEATURE_NAMES, type MLFeaturePayload } from "@/lib/prediction-features"
 import type { PatientRow, PredictionRow } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -41,9 +42,25 @@ export function PredictionDetailView({
   const patientName = patient?.demographics?.full_name || patient?.demographics?.name ||
     `${patient?.demographics?.first_name || ""} ${patient?.demographics?.last_name || ""}`.trim() || "Unknown Patient"
 
-  // The exact payload this prediction was generated with, rebuilt from
-  // the patient record by the same derivation the run flow uses.
-  const baseline = useMemo(() => (patient ? buildMLPayload(patient) : null), [patient])
+  // The payload this prediction was generated with. The run flows
+  // snapshot it into predictions.features — when that snapshot exists
+  // it IS the baseline (the what-if comparison and the inputs
+  // disclosure must describe the scored inputs, not today's record).
+  // Legacy rows without a snapshot fall back to re-deriving from the
+  // current record, and the disclosure says so (QA Round 2, cluster 4).
+  const derived = useMemo(() => (patient ? buildMLPayload(patient) : null), [patient])
+  const snapshot = useMemo<MLFeaturePayload | null>(() => {
+    const raw = prediction.features
+    if (!raw || typeof raw !== "object") return null
+    const out = {} as Record<string, number>
+    for (const name of FEATURE_NAMES) {
+      const v = (raw as Record<string, unknown>)[name]
+      if (typeof v !== "number" || !Number.isFinite(v)) return null
+      out[name] = v
+    }
+    return out as MLFeaturePayload
+  }, [prediction.features])
+  const baseline = snapshot ?? derived?.payload ?? null
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -151,6 +168,24 @@ export function PredictionDetailView({
           </Card>
         </div>
       </div>
+
+      {baseline && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Inputs used for this score</CardTitle>
+            <CardDescription>
+              Every model input, marked as recorded from this patient or filled with a population default.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InputsUsedDisclosure
+              payload={baseline}
+              recordedFeatures={derived?.recordedFeatures ?? []}
+              fromSnapshot={snapshot !== null}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {baseline && probability !== null && (
         <WhatIfSimulator

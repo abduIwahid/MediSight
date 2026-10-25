@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, Zap } from "lucide-react"
-import type { PatientRow } from "@/lib/types"
+import type { PatientRow, PredictionRow } from "@/lib/types"
 import { buildMLPayload } from "@/lib/prediction-features"
 import { useStagedLoadingLabel } from "@/lib/use-staged-loading-label"
 import { PatientRiskCard } from "@/components/shared/PatientRiskCard"
@@ -11,6 +11,12 @@ import { ShapFactorList, type ShapFeature } from "@/components/shared/ShapFactor
 
 interface RunPredictionButtonProps {
   patient: PatientRow
+  /** Called with the freshly saved prediction row so the host view can
+   *  present it as the current assessment immediately — the page does
+   *  NOT router.refresh() after a run (deliberate, Batch 4), so without
+   *  this hand-off the server-rendered "Current Assessment" card kept
+   *  showing the previous score as current (QA Round 2, cluster 6). */
+  onResult?: (prediction: PredictionRow) => void
 }
 
 interface RunResult {
@@ -23,7 +29,7 @@ interface RunResult {
   clinicalExplanation: string | null
 }
 
-export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
+export function RunPredictionButton({ patient, onResult }: RunPredictionButtonProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -39,7 +45,7 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
     setResult(null)
 
     try {
-      const mlPayload = buildMLPayload(patient)
+      const { payload: mlPayload } = buildMLPayload(patient)
 
       const mlRes = await fetch("/api/predict", {
         method: "POST",
@@ -74,57 +80,64 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
       // re-read of the whole patient page after every run.
       let savedShapPayload: ShapFeature[] = []
       let savedClinicalExplanation: string | null = null
+      const runWarnings: string[] = []
 
       if (inserted?.id) {
-        // Best-effort: snapshot the exact inputs this score was computed
-        // from (predictions.features, migration 20261025200000), so the
-        // what-if baseline and any later audit use the real payload
-        // instead of re-deriving it from a since-edited record. A failure
-        // here must not fail the run itself.
-        const { error: featuresErr } = await supabase
-          .from("predictions")
-          .update({ features: mlPayload })
-          .eq("id", inserted.id)
+        // The features snapshot and the SHAP explanation are independent
+        // follow-ups — they run in PARALLEL (QA Round 2, cluster 11).
+        // The snapshot stays a follow-up update, never part of the
+        // insert: predictions.features arrives with migration
+        // 20261025200000, and until it is applied the update fails
+        // tolerantly while the insert must keep working.
+        const explainPromise = (async (): Promise<boolean> => {
+          // Persist the SHAP explanation — the prediction detail page and
+          // the printed report read it from the explanations table.
+          // /predict returns no explanation, so /explain is called with
+          // the same payload. A failure is surfaced as a warning, never
+          // hidden: the score exists, its explanation does not.
+          try {
+            const expRes = await fetch("/api/explain", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(mlPayload),
+            })
+            if (!expRes.ok) throw new Error("Explanation request failed")
+            const explanation = await expRes.json()
+            // The ML service returns shap_values as a {feature: impact}
+            // dict; the stored format the detail page/report render is an
+            // array of {feature, value, impact} rows (same shape as the
+            // seeded explanations), so convert here using the payload that
+            // was actually scored.
+            const shapPayload = Object.entries(
+              (explanation.shap_values ?? {}) as Record<string, number>
+            ).map(([feature, impact]) => ({
+              feature,
+              value: (mlPayload as Record<string, number>)[feature] ?? null,
+              impact: Number(impact),
+            }))
+            const { error: expErr } = await supabase.from("explanations").insert({
+              prediction_id: inserted.id,
+              shap_payload: shapPayload,
+              clinical_explanation: explanation.clinical_explanation,
+            })
+            if (expErr) throw new Error(expErr.message)
+            savedShapPayload = shapPayload
+            savedClinicalExplanation = explanation.clinical_explanation ?? null
+            return true
+          } catch {
+            return false
+          }
+        })()
+
+        const [{ error: featuresErr }, explainOk] = await Promise.all([
+          supabase.from("predictions").update({ features: mlPayload }).eq("id", inserted.id),
+          explainPromise,
+        ])
         if (featuresErr) {
           console.warn("Prediction feature snapshot was not stored:", featuresErr.message)
         }
-
-        // Persist the SHAP explanation — the prediction detail page and
-        // the printed report read it from the explanations table, and
-        // until now nothing in the run flow ever wrote it. /predict
-        // returns no explanation, so /explain is called with the same
-        // payload. A failure is surfaced as a warning, never hidden:
-        // the score exists, its explanation does not.
-        try {
-          const expRes = await fetch("/api/explain", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(mlPayload),
-          })
-          if (!expRes.ok) throw new Error("Explanation request failed")
-          const explanation = await expRes.json()
-          // The ML service returns shap_values as a {feature: impact}
-          // dict; the stored format the detail page/report render is an
-          // array of {feature, value, impact} rows (same shape as the
-          // seeded explanations), so convert here using the payload that
-          // was actually scored.
-          const shapPayload = Object.entries(
-            (explanation.shap_values ?? {}) as Record<string, number>
-          ).map(([feature, impact]) => ({
-            feature,
-            value: (mlPayload as Record<string, number>)[feature] ?? null,
-            impact: Number(impact),
-          }))
-          const { error: expErr } = await supabase.from("explanations").insert({
-            prediction_id: inserted.id,
-            shap_payload: shapPayload,
-            clinical_explanation: explanation.clinical_explanation,
-          })
-          if (expErr) throw new Error(expErr.message)
-          savedShapPayload = shapPayload
-          savedClinicalExplanation = explanation.clinical_explanation ?? null
-        } catch {
-          setWarning(
+        if (!explainOk) {
+          runWarnings.push(
             "The prediction was saved, but its SHAP explanation could not be stored — the detail page will show this score without factor contributions."
           )
         }
@@ -146,18 +159,54 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
       }
 
       if (prediction.severity === "High" || prediction.severity === "Critical") {
-        await supabase.from("alerts").insert({
-          patient_id: patient.id,
-          type: `${prediction.severity} Diabetes Risk`,
-          severity: prediction.severity,
-          status: "New",
-        })
+        // Dedupe: one still-open alert per patient is enough — repeat
+        // runs used to mint a fresh "New" alert every time, so the bell
+        // and the Alerts Center counted runs instead of patients.
+        const { data: openAlerts } = await supabase
+          .from("alerts")
+          .select("id")
+          .eq("patient_id", patient.id)
+          .eq("status", "New")
+          .limit(1)
+        if (!openAlerts || openAlerts.length === 0) {
+          // The insert result is CHECKED — a silently failed alert for a
+          // High/Critical score is exactly the failure this flow exists
+          // to prevent (patients/new already surfaced it; this flow
+          // discarded the result).
+          const { error: alertErr } = await supabase.from("alerts").insert({
+            patient_id: patient.id,
+            type: `${prediction.severity} Diabetes Risk`,
+            severity: prediction.severity,
+            status: "New",
+          })
+          if (alertErr) {
+            console.error("High-risk alert could not be created:", alertErr)
+            runWarnings.push(
+              "The prediction was saved, but its high-risk alert could not be created — this patient will not appear in the Alerts Center until a later run succeeds."
+            )
+          }
+        }
       }
+
+      if (runWarnings.length > 0) setWarning(runWarnings.join(" "))
 
       // Render the just-run result from the payloads already in hand
       // (score + explanation + the saved row's id for the detail link)
-      // instead of router.refresh() re-fetching the whole page.
+      // instead of router.refresh() re-fetching the whole page — and hand
+      // the row to the host view so IT can present this score as the
+      // current assessment (cluster 6).
       if (inserted?.id) {
+        onResult?.({
+          id: inserted.id,
+          patient_id: patient.id,
+          disease: prediction.disease || "Diabetes",
+          probability: prediction.probability ?? null,
+          severity: prediction.severity,
+          confidence: prediction.confidence ?? null,
+          model_version: prediction.model_version ?? null,
+          created_at: new Date().toISOString(),
+          features: mlPayload,
+        })
         setResult({
           predictionId: inserted.id,
           disease: prediction.disease || "Diabetes",
@@ -206,14 +255,20 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
       )}
       {result && (
         <div className="space-y-3 pt-1">
-          <PatientRiskCard
-            disease={result.disease}
-            probability={result.probability}
-            confidence={result.confidence}
-            severity={result.severity}
-            patientId={patient.id}
-            predictionId={result.predictionId}
-          />
+          {/* When a host view takes the result (onResult), IT renders the
+              score as the current assessment — rendering the card here
+              too would show the same score twice. Standalone hosts get
+              the full card. */}
+          {!onResult && (
+            <PatientRiskCard
+              disease={result.disease}
+              probability={result.probability}
+              confidence={result.confidence}
+              severity={result.severity}
+              patientId={patient.id}
+              predictionId={result.predictionId}
+            />
+          )}
           {result.shapPayload.length > 0 && (
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
               <h4 className="mb-3 text-sm font-bold">Why this score — top factors</h4>
