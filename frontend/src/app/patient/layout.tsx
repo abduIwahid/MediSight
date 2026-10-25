@@ -1,10 +1,13 @@
 "use client"
 
 import { useEffect, useState, Suspense } from "react"
+import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { PatientSidebar } from "@/components/layout/PatientSidebar"
 import { Menu, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import BrandMark from "@/components/shared/BrandMark"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 function PortalErrorBanner() {
   const searchParams = useSearchParams()
@@ -36,7 +39,13 @@ export default function PatientLayout({
   }, [pathname])
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background/50">
+    <div className="relative flex h-dvh w-full overflow-hidden bg-background/50">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       <div className="hidden lg:flex lg:w-72 lg:flex-none">
         <PatientSidebar />
       </div>
@@ -66,19 +75,26 @@ export default function PatientLayout({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 shadow-sm backdrop-blur-md sm:px-6 lg:px-8">
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground lg:hidden"
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground lg:hidden"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            {/* Brand lockup for small screens — the sidebar is hidden there */}
+            <Link href="/patient/dashboard" className="flex items-center gap-2 lg:hidden">
+              <BrandMark className="h-8 w-8 shrink-0" />
+              <span className="text-base font-bold tracking-tight">WhyRisk</span>
+            </Link>
+          </div>
           <span className="text-sm font-semibold text-muted-foreground">Patient Portal</span>
         </header>
 
-        <main className="flex-1 overflow-auto custom-scrollbar p-4 sm:p-6 lg:p-8 relative">
-          <Suspense fallback={null}>
+        <main id="main-content" className="flex-1 overflow-auto custom-scrollbar p-4 sm:p-6 lg:p-8 relative">
+          <Suspense fallback={<PulseLoader showWordmark={false} showLabel={false} />}>
             <PortalErrorBanner />
           </Suspense>
           <AnimatePresence mode="wait">

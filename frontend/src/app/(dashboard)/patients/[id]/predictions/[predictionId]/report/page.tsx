@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { ShapFactorList } from "@/components/shared/ShapFactorList"
+import BrandMark from "@/components/shared/BrandMark"
 import { PrintButton } from "@/components/shared/PrintButton"
 import type { PatientRow } from "@/lib/types"
 
@@ -109,7 +110,10 @@ export default async function PredictionReportPage({ params }: { params: { id: s
       <article className="print-report rounded-2xl border bg-card p-8 shadow-sm">
         <header className="flex items-start justify-between gap-6 border-b border-border pb-5">
           <div>
-            <p className="font-display text-2xl uppercase tracking-wide">WhyRisk</p>
+            <div className="flex items-center gap-2.5">
+              <BrandMark className="h-9 w-9 shrink-0" />
+              <p className="font-display text-2xl uppercase tracking-wide">WhyRisk</p>
+            </div>
             <p className="eyebrow mt-1">Patient risk report</p>
           </div>
           <div className="text-right text-xs leading-relaxed text-muted-foreground">

@@ -1,13 +1,39 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar"
 import { Input } from "@/components/ui/input"
-import { Search, Bell, User, Menu, Settings, LogOut } from "lucide-react"
+import { Search, Bell, User, Menu, Settings, LogOut, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
+import BrandMark from "@/components/shared/BrandMark"
+import { PulseLoader } from "@/components/shared/PulseLoader"
+
+// Middleware sends cross-portal mistakes here as /dashboard?error=...
+// Only the portal messages middleware itself produces are rendered —
+// the same discipline as the login page's ?error= allowlist.
+const PORTAL_ERROR_MESSAGES = new Set([
+  "This area is for patients only.",
+])
+
+function PortalErrorBanner() {
+  const searchParams = useSearchParams()
+  const portalError = searchParams.get("error")
+  const [dismissed, setDismissed] = useState(false)
+
+  if (!portalError || dismissed || !PORTAL_ERROR_MESSAGES.has(portalError)) return null
+
+  return (
+    <div className="mx-auto mb-6 max-w-7xl rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+      <span>{portalError}</span>
+      <button onClick={() => setDismissed(true)} className="text-destructive/70 hover:text-destructive" aria-label="Dismiss">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
 
 export default function DashboardLayout({
   children,
@@ -54,7 +80,13 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background/50">
+    <div className="relative flex h-dvh w-full overflow-hidden bg-background/50">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       <div className="hidden lg:flex lg:w-72 lg:flex-none">
         <DashboardSidebar />
       </div>
@@ -94,6 +126,12 @@ export default function DashboardLayout({
               <Menu className="h-5 w-5" />
             </button>
 
+            {/* Brand lockup for small screens — the sidebar is hidden there */}
+            <Link href="/dashboard" className="flex items-center gap-2 lg:hidden">
+              <BrandMark className="h-8 w-8 shrink-0" />
+              <span className="text-base font-bold tracking-tight">WhyRisk</span>
+            </Link>
+
             <form onSubmit={handleSearch} className="w-full max-w-lg hidden sm:block">
               <div className="relative group">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -109,6 +147,15 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
+            {/* Search entry point below the sm breakpoint, where the
+                header search form is hidden — opens the patients list. */}
+            <Link
+              href="/patients"
+              aria-label="Search patients"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground sm:hidden"
+            >
+              <Search className="h-5 w-5" />
+            </Link>
             <div className="relative">
               <button
                 type="button"
@@ -183,7 +230,10 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto custom-scrollbar p-4 sm:p-6 lg:p-8 relative">
+        <main id="main-content" className="flex-1 overflow-auto custom-scrollbar p-4 sm:p-6 lg:p-8 relative">
+          <Suspense fallback={<PulseLoader showWordmark={false} showLabel={false} />}>
+            <PortalErrorBanner />
+          </Suspense>
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}

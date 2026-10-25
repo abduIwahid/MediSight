@@ -51,7 +51,7 @@ export default function AssistantPage() {
               <SelectValue placeholder="Select patient context" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="general">🌐 General / No Patient Selected</SelectItem>
+              <SelectItem value="general">General / No Patient Selected</SelectItem>
               {patients.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {getPatientDisplayName(p)}

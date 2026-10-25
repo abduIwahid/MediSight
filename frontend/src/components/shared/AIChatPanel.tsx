@@ -105,18 +105,17 @@ function buildContextMessage(patient: PatientRow): string {
   const vitals = patient.vitals || []
   const labs = patient.lab_results || []
 
-  let msg = `📋 **Patient Context Loaded: ${name}** (MRN: ${patient.mrn})\n\n`
+  let msg = `**Patient Context Loaded: ${name}** (MRN: ${patient.mrn})\n\n`
 
   if (latest) {
     const prob = ((latest.probability ?? 0) * 100).toFixed(1)
     const sev = latest.severity
-    const icon = sev === "Critical" ? "🔴" : sev === "High" ? "🟠" : sev === "Moderate" ? "🟡" : "🟢"
-    msg += `${icon} **Risk Status:** ${sev} — ${prob}% Diabetes Probability\n`
-    if (latest.confidence) msg += `📊 **Model Confidence:** ${(latest.confidence * 100).toFixed(0)}%\n`
-    msg += `🏥 **Disease Target:** ${latest.disease || "Diabetes"}\n`
-    if (preds.length > 1) msg += `📈 **Historical Predictions:** ${preds.length} assessments on record\n`
+    msg += `**Risk Status:** ${sev} — ${prob}% Diabetes Probability\n`
+    if (latest.confidence) msg += `**Model Confidence:** ${(latest.confidence * 100).toFixed(0)}%\n`
+    msg += `**Disease Target:** ${latest.disease || "Diabetes"}\n`
+    if (preds.length > 1) msg += `**Historical Predictions:** ${preds.length} assessments on record\n`
   } else {
-    msg += `⚠️ **No prediction has been run for this patient yet.**\n`
+    msg += `**No prediction has been run for this patient yet.**\n`
     msg += `Navigate to the patient's detail page and click "Run AI Prediction" to generate a risk assessment.\n`
   }
 
@@ -143,39 +142,39 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
 
   if (patientContext) {
     if (q.includes("risk") || q.includes("summarize") || q.includes("summary") || q.includes("paragraph")) {
-      return `📋 **Clinical Risk Summary**\n\n${patientContext}\n\n---\nBased on the patient's structured clinical data, the risk assessment reflects the 21 features evaluated by the WhyRisk LightGBM model. Please verify these findings against the full clinical chart before making decisions.`
+      return `**Clinical Risk Summary**\n\n${patientContext}\n\n---\nBased on the patient's structured clinical data, the risk assessment reflects the 21 features evaluated by the WhyRisk LightGBM model. Please verify these findings against the full clinical chart before making decisions.`
     }
     if (q.includes("lab") || q.includes("driving") || q.includes("factor") || q.includes("which")) {
-      return `🔬 **Key Risk Drivers**\n\nThe WhyRisk model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor a detailed SHAP waterfall chart, navigate to the patient's prediction detail page.`
+      return `**Key Risk Drivers**\n\nThe WhyRisk model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor a detailed SHAP waterfall chart, navigate to the patient's prediction detail page.`
     }
     if (q.includes("discharge") || q.includes("draft")) {
-      return `📝 **Discharge Risk Summary (AI Draft)**\n\n${patientContext}\n\n**Recommendations:**\n• Review current medications for contraindications\n• Schedule follow-up within 2 weeks if High/Critical risk\n• Consider HbA1c and comprehensive metabolic panel if not recent\n• Dietitian referral for lifestyle intervention if BMI is elevated\n\n---\n⚠️ This is an AI-generated draft — review and edit before official use.`
+      return `**Discharge Risk Summary (AI Draft)**\n\n${patientContext}\n\n**Recommendations:**\n• Review current medications for contraindications\n• Schedule follow-up within 2 weeks if High/Critical risk\n• Consider HbA1c and comprehensive metabolic panel if not recent\n• Dietitian referral for lifestyle intervention if BMI is elevated\n\n---\nNote: This is an AI-generated draft — review and edit before official use.`
     }
     if (q.includes("change") || q.includes("last visit") || q.includes("since") || q.includes("trend")) {
-      return `📈 **Trend Analysis**\n\n${patientContext}\n\nComparing historical predictions shows the trajectory of risk over time. If risk has increased since the last visit, consider re-evaluating:\n• Medication adherence\n• Weight and BMI changes\n• Blood pressure management\n• Physical activity levels\n\n---\nFull trend data is visible in the Prediction History on the patient detail page.`
+      return `**Trend Analysis**\n\n${patientContext}\n\nComparing historical predictions shows the trajectory of risk over time. If risk has increased since the last visit, consider re-evaluating:\n• Medication adherence\n• Weight and BMI changes\n• Blood pressure management\n• Physical activity levels\n\n---\nFull trend data is visible in the Prediction History on the patient detail page.`
     }
-    return `ℹ️ **Patient Insights**\n\n${patientContext}\n\nI can help with:\n• Risk summaries and severity explanations\n• Key clinical drivers (ask "which factors are driving the prediction?")\n• Discharge planning (ask "draft a discharge summary")\n• Trend analysis (ask "what changed since their last visit?")`
+    return `**Patient Insights**\n\n${patientContext}\n\nI can help with:\n• Risk summaries and severity explanations\n• Key clinical drivers (ask "which factors are driving the prediction?")\n• Discharge planning (ask "draft a discharge summary")\n• Trend analysis (ask "what changed since their last visit?")`
   }
 
   // General queries (no patient selected)
   if (q.includes("model") || q.includes("accuracy") || q.includes("performance")) {
     const metrics = modelStatus?.metrics
     if (metrics) {
-      return `🤖 **Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (253,680 survey responses).`
+      return `**Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (253,680 survey responses).`
     }
-    return `🤖 **Model Performance**\n\nThe WhyRisk ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
+    return `**Model Performance**\n\nThe WhyRisk ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
   }
   if (q.includes("diabetes") || q.includes("disease") || q.includes("predict")) {
-    return `🩺 **About WhyRisk Prediction**\n\nWhyRisk detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\n🟢 Low (< 20%) · 🟡 Moderate (20–50%) · 🟠 High (50–80%) · 🔴 Critical (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
+    return `**About WhyRisk Prediction**\n\nWhyRisk detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\nLow risk: (< 20%) · Moderate risk: (20–50%) · High risk: (50–80%) · Critical risk: (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
   }
   if (q.includes("help") || q.includes("what can") || q.includes("feature")) {
-    return `💡 **How I Can Help**\n\n1. **Patient risk summaries** — Select a patient and ask me to summarize their risk\n2. **Risk driver analysis** — Find out which clinical factors are influencing the prediction\n3. **Discharge drafts** — Generate a draft risk summary for discharge planning\n4. **Trend analysis** — Understand how a patient's risk has changed over time\n5. **Model performance** — Ask about the model's accuracy and metrics\n\nSelect a patient from the dropdown above to get started!`
+    return `**How I Can Help**\n\n1. **Patient risk summaries** — Select a patient and ask me to summarize their risk\n2. **Risk driver analysis** — Find out which clinical factors are influencing the prediction\n3. **Discharge drafts** — Generate a draft risk summary for discharge planning\n4. **Trend analysis** — Understand how a patient's risk has changed over time\n5. **Model performance** — Ask about the model's accuracy and metrics\n\nSelect a patient from the dropdown above to get started!`
   }
   if (q.includes("high risk") || q.includes("critical") || q.includes("alert")) {
-    return `🚨 **High-Risk Clinical Protocol**\n\nFor patients flagged as **High** or **Critical** risk:\n\n1. Immediate physician notification\n2. Order comprehensive metabolic panel (CMP) and HbA1c if not recent\n3. Review current medications for contraindications\n4. Schedule follow-up within 2 weeks\n5. Consider dietitian referral and lifestyle intervention program\n\nCheck the **Alerts Center** in the sidebar for active risk alerts across your patient panel.`
+    return `**High-Risk Clinical Protocol**\n\nFor patients flagged as **High** or **Critical** risk:\n\n1. Immediate physician notification\n2. Order comprehensive metabolic panel (CMP) and HbA1c if not recent\n3. Review current medications for contraindications\n4. Schedule follow-up within 2 weeks\n5. Consider dietitian referral and lifestyle intervention program\n\nCheck the **Alerts Center** in the sidebar for active risk alerts across your patient panel.`
   }
 
-  return `👋 **I'm WhyRisk**, your clinical decision support assistant.\n\nI can answer questions about:\n• Patient risk summaries and clinical factors\n• Model performance and predictions\n• High-risk protocols and clinical guidance\n\nTo get patient-specific insights: **Select a patient from the dropdown above**, then ask about their risk, lab drivers, or request a discharge summary.\n\nWhat would you like to know?`
+  return `**I'm WhyRisk**, your clinical decision support assistant.\n\nI can answer questions about:\n• Patient risk summaries and clinical factors\n• Model performance and predictions\n• High-risk protocols and clinical guidance\n\nTo get patient-specific insights: **Select a patient from the dropdown above**, then ask about their risk, lab drivers, or request a discharge summary.\n\nWhat would you like to know?`
 }
 
 export function AIChatPanel({ patientId }: AIChatPanelProps) {
@@ -183,7 +182,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     {
       id: "welcome",
       role: "assistant",
-      content: "👋 **I'm WhyRisk**, your clinical decision support assistant.\n\nSelect a patient from the dropdown above to load their clinical context, or ask me a general question about risk protocols, model performance, and clinical guidance."
+      content: "**I'm WhyRisk**, your clinical decision support assistant.\n\nSelect a patient from the dropdown above to load their clinical context, or ask me a general question about risk protocols, model performance, and clinical guidance."
     }
   ])
   const [input, setInput] = useState("")
@@ -289,7 +288,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
       setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         role: "assistant",
-        content: `⚠️ Error generating response: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`
+        content: `Error generating response: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`
       }])
     } finally {
       setIsLoading(false)
@@ -341,7 +340,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
         )}
       </CardHeader>
 
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+      <CardContent role="log" aria-live="polite" className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -417,8 +416,9 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
             placeholder={patientId ? "Ask about this patient's risk, labs, or request a discharge summary..." : "Ask a general clinical question..."}
             disabled={isLoading || isLoadingContext}
             className="flex-1"
+            aria-label="Message"
           />
-          <Button type="submit" size="icon" disabled={!input.trim() || isLoading || isLoadingContext}>
+          <Button type="submit" size="icon" aria-label="Send message" disabled={!input.trim() || isLoading || isLoadingContext}>
             <Send className="h-4 w-4" />
           </Button>
         </form>
