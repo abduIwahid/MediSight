@@ -51,7 +51,7 @@ export default function AboutPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
               <Stethoscope className="h-6 w-6" />
             </div>
-            <span className="text-xs uppercase tracking-wider font-semibold text-primary">24 Hours Monitoring</span>
+            <span className="text-xs uppercase tracking-wider font-semibold text-primary">Explainable AI</span>
             <h3 className="text-lg font-bold mt-1">Predictive Risk Assessment</h3>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
               Instant diabetes risk calculation powered by a trained ML model (LightGBM, CDC BRFSS 2015), plus a rule-based symptom screening wizard for triage. Models for further conditions are on the roadmap.
@@ -67,12 +67,12 @@ export default function AboutPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500 mb-4">
               <Clock className="h-6 w-6" />
             </div>
-            <span className="text-xs uppercase tracking-wider font-semibold text-sky-600">Operational Hours</span>
+            <span className="text-xs uppercase tracking-wider font-semibold text-sky-600">Service Facts</span>
             <h3 className="text-lg font-bold mt-1">Clinical AI Service</h3>
             <ul className="text-xs space-y-2 text-muted-foreground mt-3">
-              <li className="flex justify-between border-b pb-1"><span>Inference Engine:</span> <span className="font-semibold text-foreground">24/7 Uptime</span></li>
-              <li className="flex justify-between border-b pb-1"><span>Doctor Support:</span> <span className="font-semibold text-foreground">08:00 - 20:00 EST</span></li>
-              <li className="flex justify-between"><span>Alert Response:</span> <span className="font-semibold text-foreground">Immediate</span></li>
+              <li className="flex justify-between border-b pb-1"><span>Trained model:</span> <span className="font-semibold text-foreground">Diabetes (LightGBM)</span></li>
+              <li className="flex justify-between border-b pb-1"><span>Explanations:</span> <span className="font-semibold text-foreground">SHAP, stored per prediction</span></li>
+              <li className="flex justify-between"><span>Other conditions:</span> <span className="font-semibold text-foreground">Roadmap — not trained</span></li>
             </ul>
           </div>
         </div>
@@ -82,10 +82,10 @@ export default function AboutPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 mb-4">
               <Shield className="h-6 w-6" />
             </div>
-            <span className="text-xs uppercase tracking-wider font-semibold text-emerald-600">Emergency & Alerts</span>
-            <h3 className="text-lg font-bold mt-1">1-800-MEDISIGHT</h3>
+            <span className="text-xs uppercase tracking-wider font-semibold text-emerald-600">Alerts</span>
+            <h3 className="text-lg font-bold mt-1">Critical-Risk Alerts</h3>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-              Automated webhook alerts notify critical care teams instantly whenever a high-risk patient threshold is breached.
+              When a prediction is stored with Critical severity, a database trigger fires the alert pipeline and the case appears in the Alerts Center for review.
             </p>
           </div>
           <Link href="/alerts" className="text-xs font-semibold text-emerald-600 hover:underline mt-4 inline-flex items-center">

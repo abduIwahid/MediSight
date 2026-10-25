@@ -266,7 +266,7 @@ export default function PredictPage() {
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Full Name</Label>
-                <Input value={patient.name} onChange={(e) => setPatient({ ...patient, name: e.target.value })} placeholder="Jane Doe" />
+                <Input value={patient.name} onChange={(e) => setPatient({ ...patient, name: e.target.value })} placeholder="e.g. Ayesha Khan" />
               </div>
               <div className="space-y-1.5">
                 <Label>Age</Label>
