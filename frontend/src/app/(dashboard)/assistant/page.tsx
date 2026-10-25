@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { AIChatPanel } from "@/components/shared/AIChatPanel"
 import { createClient } from "@/lib/supabase/client"
 import type { PatientRow } from "@/lib/types"
+import { Input } from "@/components/ui/input"
+import { Search } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 function getPatientDisplayName(p: PatientRow): string {
@@ -18,7 +20,14 @@ function getPatientDisplayName(p: PatientRow): string {
 export default function AssistantPage() {
   const [patients, setPatients] = useState<PatientRow[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
+  const [patientSearch, setPatientSearch] = useState("")
   const supabase = createClient()
+
+  // The picker is searchable (QA Round 1, item 61): with a full patient
+  // panel, scrolling an unfiltered list to find one name is unusable.
+  const visiblePatients = patients.filter((p) =>
+    getPatientDisplayName(p).toLowerCase().includes(patientSearch.trim().toLowerCase())
+  )
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -39,7 +48,7 @@ export default function AssistantPage() {
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">AI Clinical Assistant</h1>
+          <h1 className="text-2xl font-bold tracking-tight">AI Assistant</h1>
           <p className="text-muted-foreground">Conversational decision support grounded in patient data.</p>
         </div>
         <div className="w-full sm:w-[320px]">
@@ -47,16 +56,32 @@ export default function AssistantPage() {
             value={selectedPatientId || "general"}
             onValueChange={(val) => setSelectedPatientId(val === "general" ? null : val)}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label="Select patient context">
               <SelectValue placeholder="Select patient context" />
             </SelectTrigger>
             <SelectContent>
+              <div className="sticky top-0 z-10 border-b bg-popover p-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={patientSearch}
+                    onChange={(e) => setPatientSearch(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder="Search patients..."
+                    aria-label="Search patients"
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+              </div>
               <SelectItem value="general">General / No Patient Selected</SelectItem>
-              {patients.map((p) => (
+              {visiblePatients.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {getPatientDisplayName(p)}
                 </SelectItem>
               ))}
+              {visiblePatients.length === 0 && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">No patients match your search.</p>
+              )}
             </SelectContent>
           </Select>
         </div>

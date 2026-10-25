@@ -3,7 +3,7 @@ import { Shield, Brain, Stethoscope, HeartPulse, Activity, Sparkles, ArrowRight,
 
 export default function AboutPage() {
   const departments = [
-    { name: "Endocrinology", desc: "The live model: diabetes risk prediction (LightGBM, CDC BRFSS 2015) with a SHAP explanation on every score.", icon: Activity, count: "Live" },
+    { name: "Endocrinology", desc: "The live model: diabetes risk prediction (LightGBM, CDC BRFSS 2015) with a SHAP explanation stored per prediction.", icon: Activity, count: "Live" },
     { name: "Cardiology", desc: "Heart disease risk modelling is on the roadmap — no trained model yet, and the product says so wherever it appears.", icon: HeartPulse, count: "Roadmap" },
     { name: "Nephrology", desc: "Chronic kidney disease modelling is on the roadmap; eGFR staging is already computed as a clinical indicator.", icon: Stethoscope, count: "Roadmap" },
     { name: "Clinical AI MLOps", desc: "Model registry, PSI drift status and retraining — the operational side of the one live model.", icon: Brain, count: "Live" },
@@ -13,7 +13,7 @@ export default function AboutPage() {
     { value: "0.8307", label: "Diabetes model AUC-ROC (held-out test split)" },
     { value: "21", label: "BRFSS health indicators per assessment" },
     { value: "1", label: "Trained model — diabetes (LightGBM)" },
-    { value: "100%", label: "Predictions shipped with a SHAP explanation" },
+    { value: "SHAP", label: "Explanations stored per prediction" },
   ]
 
   return (
@@ -28,14 +28,14 @@ export default function AboutPage() {
             Clinical AI that shows its reasons
           </h1>
           <p className="text-sm sm:text-base text-white/75 leading-relaxed">
-            WhyRisk bridges the gap between traditional clinical care and predictive machine learning, giving doctors early disease detection and risk insights they can inspect — not just trust.
+            WhyRisk bridges the gap between traditional clinical care and predictive machine learning, giving doctors diabetes risk screening and risk insights they can inspect — not just trust.
           </p>
           <div className="flex flex-wrap gap-4 pt-2">
             <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand/90">
               New Patient Risk Assessment <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <Link href="/doctors" className="inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-              Meet Our Doctors
+              Doctor Directory
             </Link>
           </div>
         </div>
@@ -64,10 +64,10 @@ export default function AboutPage() {
 
         <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2E7FA8]/10 text-[#2E7FA8] mb-4">
               <Clock className="h-6 w-6" />
             </div>
-            <span className="text-xs uppercase tracking-wider font-semibold text-sky-600">Service Facts</span>
+            <span className="text-xs uppercase tracking-wider font-semibold text-[#2E7FA8]">Service Facts</span>
             <h3 className="text-lg font-bold mt-1">Clinical AI Service</h3>
             <ul className="text-xs space-y-2 text-muted-foreground mt-3">
               <li className="flex justify-between border-b pb-1"><span>Trained model:</span> <span className="font-semibold text-foreground">Diabetes (LightGBM)</span></li>
@@ -79,16 +79,16 @@ export default function AboutPage() {
 
         <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#E2F0E6] text-[#1E7A46] mb-4">
               <Shield className="h-6 w-6" />
             </div>
-            <span className="text-xs uppercase tracking-wider font-semibold text-emerald-600">Alerts</span>
+            <span className="text-xs uppercase tracking-wider font-semibold text-[#1E7A46]">Alerts</span>
             <h3 className="text-lg font-bold mt-1">Critical-Risk Alerts</h3>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
               When a prediction is stored with Critical severity, a database trigger fires the alert pipeline and the case appears in the Alerts Center for review.
             </p>
           </div>
-          <Link href="/alerts" className="text-xs font-semibold text-emerald-600 hover:underline mt-4 inline-flex items-center">
+          <Link href="/alerts" className="text-xs font-semibold text-[#1E7A46] hover:underline mt-4 inline-flex items-center">
             View Alerts Center <ArrowRight className="ml-1 h-3 w-3" />
           </Link>
         </div>
@@ -111,7 +111,7 @@ export default function AboutPage() {
         <div className="text-center max-w-xl mx-auto">
           <h2 className="text-2xl font-bold tracking-tight">Clinical Departments & AI Specialties</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Bridging specialized clinical departments with validated machine learning decision support models.
+            Bridging specialized clinical departments with one documented machine learning decision support model.
           </p>
         </div>
 

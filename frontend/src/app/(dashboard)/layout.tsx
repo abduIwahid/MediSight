@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar"
@@ -10,6 +10,26 @@ import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
 import { PulseLoader } from "@/components/shared/PulseLoader"
+import { RiskBadge } from "@/components/shared/RiskBadge"
+
+interface HeaderAlert {
+  id: string
+  type: string
+  severity: string
+  created_at: string
+  patient_id: string
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
 
 // Middleware sends cross-portal mistakes here as /dashboard?error=...
 // Only the portal messages middleware itself produces are rendered —
@@ -46,6 +66,11 @@ export default function DashboardLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [headerAlerts, setHeaderAlerts] = useState<HeaderAlert[]>([])
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -62,8 +87,54 @@ export default function DashboardLayout({
       if (event.key === "Escape") setMobileMenuOpen(false)
     }
     window.addEventListener("keydown", onKeyDown)
+    // Basic focus handling: move focus into the drawer when it opens.
+    drawerRef.current?.focus()
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [mobileMenuOpen])
+
+  // Header bell: real unread alerts (status 'New'), refreshed on
+  // navigation — the badge exists only when there is something unread.
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    supabase
+      .from("alerts")
+      .select("id, type, severity, created_at, patient_id", { count: "exact" })
+      .eq("status", "New")
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .then(({ data, count }) => {
+        if (cancelled) return
+        setHeaderAlerts((data as HeaderAlert[]) || [])
+        setUnreadAlertCount(count ?? data?.length ?? 0)
+      })
+    return () => { cancelled = true }
+  }, [pathname])
+
+  // Both header dropdowns close on outside click and on Escape.
+  useEffect(() => {
+    if (!notificationsOpen && !profileOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setNotificationsOpen(false)
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [notificationsOpen, profileOpen])
 
   const handleSearch = (event?: React.FormEvent) => {
     event?.preventDefault()
@@ -98,15 +169,20 @@ export default function DashboardLayout({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-40 bg-foreground/40 lg:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div
+              ref={drawerRef}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 z-50 w-72 lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-72 outline-none lg:hidden"
             >
               <DashboardSidebar onClose={() => setMobileMenuOpen(false)} className="rounded-r-2xl border-r-0 shadow-2xl" />
             </motion.div>
@@ -115,7 +191,7 @@ export default function DashboardLayout({
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 shadow-sm backdrop-blur-md sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 shadow-sm sm:px-6 lg:px-8">
           <div className="flex flex-1 items-center gap-4">
             <button
               type="button"
@@ -156,47 +232,76 @@ export default function DashboardLayout({
             >
               <Search className="h-5 w-5" />
             </Link>
-            <div className="relative">
+            <div className="relative" ref={notificationsRef}>
               <button
                 type="button"
                 onClick={() => {
                   setNotificationsOpen((open) => !open)
                   setProfileOpen(false)
                 }}
+                aria-expanded={notificationsOpen}
+                aria-haspopup="true"
+                aria-label={unreadAlertCount > 0 ? `Alerts, ${unreadAlertCount} unread` : "Alerts"}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border-2 border-background"></span>
+                {unreadAlertCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {unreadAlertCount > 9 ? "9+" : unreadAlertCount}
+                  </span>
+                )}
               </button>
-              
+
               <AnimatePresence>
                 {notificationsOpen && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 mt-2 w-72 rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 z-50"
+                    className="absolute right-0 top-12 mt-2 w-80 rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 z-50"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-semibold">Notifications</p>
+                      <p className="text-sm font-semibold">Alerts</p>
                       <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => router.push("/alerts")}>View all</button>
                     </div>
-                    <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">
-                      No new alerts at this time.
-                    </div>
+                    {headerAlerts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+                        No new alerts at this time.
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {headerAlerts.map((alert) => (
+                          <Link
+                            key={alert.id}
+                            href={`/patients/${alert.patient_id}`}
+                            onClick={() => setNotificationsOpen(false)}
+                            className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-muted"
+                          >
+                            <RiskBadge severity={alert.severity} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{alert.type}</span>
+                              <span className="block text-xs text-muted-foreground">{timeAgo(alert.created_at)}</span>
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button
                 type="button"
                 onClick={() => {
                   setProfileOpen((open) => !open)
                   setNotificationsOpen(false)
                 }}
+                aria-expanded={profileOpen}
+                aria-haspopup="true"
+                aria-label="Account menu"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-primary transition-all hover:border-primary/50 hover:bg-primary/20"
               >
                 <User className="h-5 w-5" />

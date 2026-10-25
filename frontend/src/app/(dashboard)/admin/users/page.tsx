@@ -37,6 +37,7 @@ export default async function AdminUsersPage() {
     .from('profiles')
     .select('*, hospitals(name)')
     .order('created_at', { ascending: false })
+    .limit(1000)
 
   const { data: hospitals } = await supabase
     .from('hospitals')

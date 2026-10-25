@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react"
 import { Calendar, Clock, CheckCircle2, XCircle, CheckCheck, Loader2, CalendarX2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { PulseLoader } from "@/components/shared/PulseLoader"
+import { appointmentStatusClass } from "@/lib/status"
 
 type Appointment = {
   id: string
@@ -15,27 +18,27 @@ type Appointment = {
   patient: { full_name: string; email: string; phone: string | null } | null
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  Requested: "bg-amber-500/10 text-amber-700 border-amber-500/20",
-  Confirmed: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  Completed: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  Cancelled: "bg-red-500/10 text-red-600 border-red-500/20",
-}
-
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>("All")
   const supabase = createClient()
 
   const load = async () => {
     setLoading(true)
-    const { data } = await supabase
+    setLoadError(false)
+    const { data, error } = await supabase
       .from("appointments")
       .select("id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, phone)")
       .order("scheduled_at", { ascending: true })
-    setAppointments((data as unknown as Appointment[]) || [])
+    if (error) {
+      setLoadError(true)
+    } else {
+      setAppointments((data as unknown as Appointment[]) || [])
+    }
     setLoading(false)
   }
 
@@ -43,8 +46,12 @@ export default function AppointmentsPage() {
 
   const updateStatus = async (id: string, status: Appointment["status"]) => {
     setUpdatingId(id)
+    setActionError(null)
     const { error } = await supabase.from("appointments").update({ status }).eq("id", id)
-    if (!error) {
+    if (error) {
+      // A failed write is said out loud — the row keeps its real status.
+      setActionError("That appointment could not be updated. Please try again.")
+    } else {
       setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
     }
     setUpdatingId(null)
@@ -73,9 +80,20 @@ export default function AppointmentsPage() {
         ))}
       </div>
 
+      {actionError && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {actionError}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <PulseLoader showWordmark={false} />
+        </div>
+      ) : loadError ? (
+        <div role="alert" className="flex flex-col items-center justify-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-12 text-center">
+          <p className="text-sm text-destructive">Appointments could not be loaded. Check your connection and try again.</p>
+          <Button variant="outline" size="sm" onClick={load}>Try again</Button>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -93,7 +111,7 @@ export default function AppointmentsPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold">{a.patient?.full_name || "Unknown patient"}</p>
-                    <Badge className={STATUS_STYLE[a.status]} variant="outline">{a.status}</Badge>
+                    <Badge className={appointmentStatusClass(a.status)} variant="outline">{a.status}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">{a.patient?.email}{a.patient?.phone ? ` · ${a.patient.phone}` : ""}</p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -110,16 +128,16 @@ export default function AppointmentsPage() {
                     <>
                       {a.status === "Requested" && (
                         <>
-                          <button onClick={() => updateStatus(a.id, "Confirmed")} title="Confirm" className="rounded-full p-2 text-emerald-600 hover:bg-emerald-500/10">
+                          <button onClick={() => updateStatus(a.id, "Confirmed")} title="Confirm" aria-label="Confirm appointment" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#1E7A46] hover:bg-[#E2F0E6]">
                             <CheckCircle2 className="h-4 w-4" />
                           </button>
-                          <button onClick={() => updateStatus(a.id, "Cancelled")} title="Reject" className="rounded-full p-2 text-red-600 hover:bg-red-500/10">
+                          <button onClick={() => updateStatus(a.id, "Cancelled")} title="Reject" aria-label="Reject appointment" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#C0392B] hover:bg-[#FAE9E7]">
                             <XCircle className="h-4 w-4" />
                           </button>
                         </>
                       )}
                       {a.status === "Confirmed" && (
-                        <button onClick={() => updateStatus(a.id, "Completed")} title="Mark Completed" className="rounded-full p-2 text-blue-600 hover:bg-blue-500/10">
+                        <button onClick={() => updateStatus(a.id, "Completed")} title="Mark Completed" aria-label="Mark appointment completed" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#1F6E96] hover:bg-[#2E7FA8]/10">
                           <CheckCheck className="h-4 w-4" />
                         </button>
                       )}

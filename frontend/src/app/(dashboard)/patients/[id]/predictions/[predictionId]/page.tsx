@@ -30,7 +30,9 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
     .eq('id', params.predictionId)
     .single()
 
-  if (!prediction) return notFound()
+  // The prediction must belong to the patient in the URL — a mismatched
+  // pair is a not-found, not a view of someone else's assessment.
+  if (!prediction || prediction.patient_id !== params.id) return notFound()
 
   const patient = prediction.patients as unknown as PatientRow | null
   const explanation = prediction.explanations?.[0] as { shap_payload?: unknown; clinical_explanation?: string } | undefined

@@ -67,7 +67,7 @@ export default function NewPatientPage() {
           .single()
         resolvedHospitalId = firstHospital?.id || null
       }
-      if (!resolvedHospitalId) throw new Error("No hospital found. Please create a hospital first.")
+      if (!resolvedHospitalId) throw new Error("No hospital is configured for your account yet. Please ask an admin to set up a hospital before adding patients.")
 
       // 1. Run the model FIRST. Until the score exists, nothing is
       // written: if the ML service is down (503), the submit aborts here

@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   )
 
   // Fetch recent new alerts (both High and Critical)
-  const { data: recentAlerts } = await supabase
+  const { data: recentAlerts, error: alertsError } = await supabase
     .from('alerts')
     .select('*, patients(mrn)')
     .eq('status', 'New')
@@ -21,21 +21,31 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(8)
 
-  // Quick stats
-  const { count: totalPatients } = await supabase.from('patients').select('*', { count: 'exact', head: true })
-  const { count: totalAlerts } = await supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'New')
-  const { count: totalDoctors } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'doctor')
-  const { count: criticalAlerts } = await supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'New').eq('severity', 'Critical')
-  const { count: totalPredictions } = await supabase.from('predictions').select('*', { count: 'exact', head: true })
+  // Quick stats. Definitions are the same on every surface (QA Round 1):
+  // Total Patients counts the clinical patients table; Active Doctors
+  // counts APPROVED doctors only (doctors.status), not every profile
+  // that happens to carry the doctor role.
+  const [patientsRes, alertsCountRes, doctorsRes, criticalRes, predictionsRes] = await Promise.all([
+    supabase.from('patients').select('*', { count: 'exact', head: true }),
+    supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'New'),
+    supabase.from('doctors').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+    supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'New').eq('severity', 'Critical'),
+    supabase.from('predictions').select('*', { count: 'exact', head: true }),
+  ])
+
+  const statsError = Boolean(
+    alertsError || patientsRes.error || alertsCountRes.error || doctorsRes.error || criticalRes.error || predictionsRes.error
+  )
 
   return (
-    <DashboardClientView 
+    <DashboardClientView
       recentAlerts={recentAlerts || []}
-      totalPatients={totalPatients || 0}
-      totalAlerts={totalAlerts || 0}
-      totalDoctors={totalDoctors || 0}
-      criticalAlerts={criticalAlerts || 0}
-      totalPredictions={totalPredictions || 0}
+      totalPatients={patientsRes.count || 0}
+      totalAlerts={alertsCountRes.count || 0}
+      totalDoctors={doctorsRes.count || 0}
+      criticalAlerts={criticalRes.count || 0}
+      totalPredictions={predictionsRes.count || 0}
+      statsError={statsError}
     />
   )
 }

@@ -13,18 +13,23 @@ export default async function DoctorsPage() {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
+  // The directory lists APPROVED doctors only (QA Round 1, item 31):
+  // the inner join to the doctors table with status = 'approved' keeps
+  // pending and rejected sign-ups out. Availability comes from the one
+  // source of truth, profiles.availability_status.
   const { data: doctors, error } = await supabase
     .from('profiles')
-    .select('id, full_name, specialty, phone, email, department, hospital_id, hospitals(name), avatar_url, bio, available, consultation_fee, services')
+    .select('id, full_name, specialty, phone, email, department, hospital_id, hospitals(name), avatar_url, bio, availability_status, consultation_fee, services, doctors!inner(status)')
     .eq('role', 'doctor')
+    .eq('doctors.status', 'approved')
     .order('full_name', { ascending: true })
 
   if (error) {
     console.error('Error loading doctors:', error)
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
-        <h2 className="font-bold">Error loading doctor directory</h2>
-        <p className="text-sm">{error.message}</p>
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
+        <h2 className="font-bold">The doctor directory could not be loaded</h2>
+        <p className="text-sm">Please reload the page to try again.</p>
       </div>
     )
   }
@@ -34,15 +39,7 @@ export default async function DoctorsPage() {
     name: doctor.full_name,
   }))
 
-  // Show real doctors only; if none exist, display a friendly message
-  if (normalizedDoctors.length === 0) {
-    return (
-      <div className="rounded-xl border border-muted/20 bg-muted/10 p-6 text-muted-foreground">
-        <h2 className="font-bold">No doctors found</h2>
-        <p className="text-sm">The directory is currently empty. Please add doctor profiles.</p>
-      </div>
-    )
-  }
-
+  // An empty directory renders the view's own EmptyState (which says
+  // what happens next) instead of a page-level dead end.
   return <DoctorListView doctors={normalizedDoctors} />
 }

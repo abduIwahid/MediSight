@@ -1,7 +1,17 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { MLOpsView, type DriftData, type MlModelStatus } from "@/components/shared/MLOpsView"
+import nextDynamic from "next/dynamic"
+import { PulseLoader } from "@/components/shared/PulseLoader"
+import type { DriftData, MlModelStatus } from "@/components/shared/MLOpsView"
 import { getMlServiceUrl, mlServiceFetch } from "@/lib/ml-service"
+
+// Recharts is heavy — load the MLOps view (and its charts) on demand.
+// (Aliased import: a bare `dynamic` collides with this route's
+// `export const dynamic` segment config.)
+const MLOpsView = nextDynamic(
+  () => import("@/components/shared/MLOpsView").then((m) => m.MLOpsView),
+  { loading: () => <PulseLoader label="Loading MLOps" /> }
+)
 
 export const dynamic = 'force-dynamic'
 
@@ -35,18 +45,10 @@ export default async function AdminMLOpsPage() {
       serviceConnected = true
     }
   } catch {
-    // FastAPI not running — provide demo fallback so page is still informative
-  }
-
-  // Fallback demo data when FastAPI is offline
-  if (!modelStatus) {
-    modelStatus = {
-      _demo: true,            // flag used by MLOpsView to show "Not Connected" notice
-      status: 'idle',
-      version: '1.0.0',
-      last_trained: null,
-      accuracy: null,
-    }
+    // ML service offline — modelStatus stays null and the view renders an
+    // honest offline state. (This page used to fabricate a demo status —
+    // status 'idle', version '1.0.0' — and pass it off as real data;
+    // removed in QA Round 1, item 55.)
   }
 
   // Prediction volume trend from Supabase (always available)

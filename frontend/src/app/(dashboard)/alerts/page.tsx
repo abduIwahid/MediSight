@@ -1,9 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { RiskBadge, RiskSeverity } from "@/components/shared/RiskBadge"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 import type { PatientDemographics } from "@/lib/types"
+import { fmtDateTime } from "@/lib/dates"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from "lucide-react"
@@ -16,6 +19,7 @@ interface Alert {
   severity: RiskSeverity | string
   status: string
   created_at: string
+  updated_at?: string
   patients?: {
     mrn: string
     demographics: PatientDemographics
@@ -41,34 +45,59 @@ function timeAgo(iso: string): string {
   return `${days}d ago`
 }
 
+// Row tint per severity, from the canonical RiskBadge palette.
+function severityRowClass(severity: string): string {
+  switch (severity) {
+    case "Critical":
+    case "High":
+      return "border-[#C0392B]/25 bg-[#FAE9E7]/50 hover:bg-[#FAE9E7]"
+    case "Moderate":
+      return "border-[#D97706]/25 bg-[#FDF0DC]/50 hover:bg-[#FDF0DC]"
+    case "Low":
+      return "border-[#1E7A46]/25 bg-[#E2F0E6]/50 hover:bg-[#E2F0E6]"
+    default:
+      return "border-border bg-card hover:bg-muted/40"
+  }
+}
+
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [acknowledged, setAcknowledged] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [ackError, setAckError] = useState<string | null>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    const fetchAlerts = async () => {
-      // Fetch New alerts with patient join
-      const { data: newAlerts, error } = await supabase
-        .from('alerts')
-        .select('*, patients(mrn, demographics)')
-        .eq('status', 'New')
-        .order('created_at', { ascending: false })
+  const fetchAlerts = useCallback(async () => {
+    setLoading(true)
+    setLoadError(false)
+    // Fetch New alerts with patient join
+    const { data: newAlerts, error } = await supabase
+      .from('alerts')
+      .select('*, patients(mrn, demographics)')
+      .eq('status', 'New')
+      .order('created_at', { ascending: false })
 
-      // Fetch recently acknowledged
-      const { data: ackAlerts } = await supabase
-        .from('alerts')
-        .select('*, patients(mrn, demographics)')
-        .eq('status', 'Acknowledged')
-        .order('created_at', { ascending: false })
-        .limit(5)
+    // Fetch recently acknowledged — ordered and stamped by the
+    // acknowledgment time (updated_at moves when the ack write lands),
+    // not by when the alert was created.
+    const { data: ackAlerts } = await supabase
+      .from('alerts')
+      .select('*, patients(mrn, demographics)')
+      .eq('status', 'Acknowledged')
+      .order('updated_at', { ascending: false })
+      .limit(5)
 
-      if (!error && newAlerts) setAlerts(newAlerts)
-      if (ackAlerts) setAcknowledged(ackAlerts)
-      setLoading(false)
+    if (error) {
+      setLoadError(true)
+    } else if (newAlerts) {
+      setAlerts(newAlerts)
     }
+    if (ackAlerts) setAcknowledged(ackAlerts)
+    setLoading(false)
+  }, [supabase])
 
+  useEffect(() => {
     fetchAlerts()
 
     // Real-time subscription
@@ -91,18 +120,29 @@ export default function AlertsPage() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase])
+  }, [supabase, fetchAlerts])
 
   const handleAcknowledge = async (id: string) => {
     const alert = alerts.find(a => a.id === id)
+    if (!alert) return
+    setAckError(null)
+    // Optimistic move to the acknowledged list…
     setAlerts((current) => current.filter((a) => a.id !== id))
-    if (alert) setAcknowledged((prev) => [{ ...alert, status: 'Acknowledged' }, ...prev.slice(0, 4)])
+    setAcknowledged((prev) => [{ ...alert, status: 'Acknowledged', updated_at: new Date().toISOString() }, ...prev.slice(0, 4)])
 
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase
+    const { error } = await supabase
       .from('alerts')
       .update({ status: 'Acknowledged', acknowledged_by: user?.id })
       .eq('id', id)
+
+    if (error) {
+      // …rolled back on failure: the alert returns to the active list
+      // and the failure is said out loud instead of styled as success.
+      setAlerts((current) => [alert, ...current])
+      setAcknowledged((prev) => prev.filter((a) => a.id !== id))
+      setAckError("That alert could not be acknowledged. It has been put back in the active list — please try again.")
+    }
   }
 
   const criticalCount = alerts.filter(a => a.severity === 'Critical').length
@@ -118,13 +158,13 @@ export default function AlertsPage() {
         {alerts.length > 0 && (
           <div className="flex gap-3">
             {criticalCount > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm font-medium">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FAE9E7] border border-[#C0392B]/25 text-[#C0392B] text-sm font-medium">
                 <AlertTriangle className="h-4 w-4" />
                 {criticalCount} Critical
               </div>
             )}
             {highCount > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 text-sm font-medium">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FAE9E7] border border-[#C0392B]/25 text-[#C0392B] text-sm font-medium">
                 <AlertTriangle className="h-4 w-4" />
                 {highCount} High
               </div>
@@ -132,6 +172,12 @@ export default function AlertsPage() {
           </div>
         )}
       </div>
+
+      {ackError && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {ackError}
+        </div>
+      )}
 
       {/* Active Alerts */}
       <Card>
@@ -141,37 +187,38 @@ export default function AlertsPage() {
             <CardTitle>Active Alerts</CardTitle>
           </div>
           <CardDescription>
-            {alerts.length === 0
-              ? "You're all caught up — no unacknowledged alerts."
-              : `${alerts.length} unacknowledged alert${alerts.length !== 1 ? "s" : ""} require attention.`}
+            {loadError
+              ? "Alerts could not be loaded."
+              : alerts.length === 0
+                ? "You're all caught up — no unacknowledged alerts."
+                : `${alerts.length} unacknowledged alert${alerts.length !== 1 ? "s" : ""} require attention.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center p-12 text-muted-foreground gap-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Loading alerts...
+            <div className="flex items-center justify-center p-12">
+              <PulseLoader showWordmark={false} />
+            </div>
+          ) : loadError ? (
+            <div role="alert" className="flex flex-col items-center justify-center gap-3 p-12 text-center">
+              <p className="text-sm text-destructive">Alerts could not be loaded. Check your connection and try again.</p>
+              <Button variant="outline" size="sm" onClick={fetchAlerts}>Try again</Button>
             </div>
           ) : alerts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 text-muted-foreground border rounded-lg border-dashed">
-              <CheckCircle2 className="h-10 w-10 mb-4 text-green-500 opacity-60" />
-              <p className="font-medium">No new alerts</p>
-              <p className="text-xs mt-1">Alerts are generated automatically when patients are assessed as High or Critical risk.</p>
-            </div>
+            <EmptyState
+              icon={CheckCircle2}
+              title="No new alerts"
+              description="Alerts are generated automatically when patients are assessed as High or Critical risk."
+            />
           ) : (
             <div className="space-y-3">
               {alerts.map((alert) => {
                 const name = getPatientName(alert)
                 const mrn = alert.patients?.mrn || ""
-                const isCritical = alert.severity === "Critical"
                 return (
                   <div
                     key={alert.id}
-                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl transition-colors ${
-                      isCritical
-                        ? "border-red-500/30 bg-red-500/5 hover:bg-red-500/10"
-                        : "border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10"
-                    }`}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl transition-colors ${severityRowClass(alert.severity)}`}
                   >
                     <div className="space-y-1.5 mb-4 sm:mb-0">
                       <div className="flex items-center gap-3">
@@ -189,7 +236,7 @@ export default function AlertsPage() {
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {timeAgo(alert.created_at)} · {new Date(alert.created_at).toLocaleString()}
+                        {timeAgo(alert.created_at)} · {fmtDateTime(alert.created_at)}
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -214,7 +261,7 @@ export default function AlertsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-green-500" />
+              <ShieldCheck className="h-5 w-5 text-[#1E7A46]" />
               <CardTitle className="text-base">Recently Acknowledged</CardTitle>
             </div>
             <CardDescription>Last {acknowledged.length} acknowledged alerts</CardDescription>
@@ -233,7 +280,9 @@ export default function AlertsPage() {
                       <span className="text-xs text-muted-foreground ml-2">{getPatientName(alert)}</span>
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">{timeAgo(alert.created_at)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    acknowledged {timeAgo(alert.updated_at || alert.created_at)}
+                  </span>
                 </div>
               ))}
             </div>

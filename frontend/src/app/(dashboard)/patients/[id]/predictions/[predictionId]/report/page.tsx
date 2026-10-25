@@ -19,7 +19,9 @@ const SEVERITY_TEXT_COLOR: Record<string, string> = {
 
 function fmtDate(iso?: string | null): string {
   if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+  // Same convention as the rest of the product: Asia/Karachi, stated
+  // explicitly so the server-rendered report matches the client views.
+  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Karachi" })
 }
 
 /**
@@ -44,16 +46,27 @@ export default async function PredictionReportPage({ params }: { params: { id: s
       *,
       patients (
         *,
-        vitals (*)
+        vitals (*),
+        hospitals (name)
       ),
       explanations (*)
     `)
     .eq("id", params.predictionId)
     .single()
 
-  if (!prediction) return notFound()
+  // The prediction must belong to the patient in the URL.
+  if (!prediction || prediction.patient_id !== params.id) return notFound()
 
   const patient = prediction.patients as unknown as PatientRow | null
+
+  // Issuing line data — real records only: the patient's hospital, and
+  // the signed-in clinician generating this report.
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: generatorProfile } = user
+    ? await supabase.from("profiles").select("full_name").eq("id", user.id).single()
+    : { data: null }
+  const hospitalName = (patient as unknown as { hospitals?: { name: string } | null } | null)?.hospitals?.name || null
+  const generatedBy = generatorProfile?.full_name || null
   const explanation = prediction.explanations?.[0] as { shap_payload?: unknown; clinical_explanation?: string } | undefined
 
   let shapPayload: { feature: string; value: string | number; impact: number }[] = []
@@ -92,8 +105,10 @@ export default async function PredictionReportPage({ params }: { params: { id: s
   if (age != null) indicators.push({ label: "Age", value: `${age} years` })
   if (gender) indicators.push({ label: "Sex", value: gender })
 
-  const probability = prediction.probability ?? 0
-  const severity = prediction.severity ?? "Low"
+  // Missing values print as "Not recorded" — never a defaulted 0% or
+  // "Low" on a clinical document (QA Round 1, item 90).
+  const probability = prediction.probability ?? null
+  const severity = prediction.severity ?? null
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
@@ -133,19 +148,31 @@ export default async function PredictionReportPage({ params }: { params: { id: s
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               {prediction.disease || "Diabetes"} risk assessment
             </h2>
-            <p className="mt-2 font-display text-5xl leading-none">
-              {(probability * 100).toFixed(1)}
-              <span className="font-sans text-base font-semibold text-muted-foreground">%</span>
-            </p>
+            {probability !== null ? (
+              <p className="mt-2 font-display text-5xl leading-none">
+                {(probability * 100).toFixed(1)}
+                <span className="font-sans text-base font-semibold text-muted-foreground">%</span>
+              </p>
+            ) : (
+              <p className="mt-2 text-xl font-semibold">Score not recorded</p>
+            )}
             <p className="mt-1.5 text-sm">
               Severity:{" "}
-              <span className="font-bold" style={{ color: SEVERITY_TEXT_COLOR[severity] ?? "#06141B" }}>
-                {severity}
-              </span>
+              {severity ? (
+                <span className="font-bold" style={{ color: SEVERITY_TEXT_COLOR[severity] ?? "#06141B" }}>
+                  {severity}
+                </span>
+              ) : (
+                <span className="font-bold">Not recorded</span>
+              )}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Model confidence {((prediction.confidence ?? 0) * 100).toFixed(1)}% — the probability the model
-              assigns to the class it predicted, not a calibrated accuracy estimate.
+              {prediction.confidence != null
+                ? `Model confidence ${(prediction.confidence * 100).toFixed(1)}% — the probability the model assigns to the class it predicted, not a calibrated accuracy estimate.`
+                : "Model confidence was not recorded for this assessment."}
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              Bands: Low under 0.20 · Moderate 0.20–0.49 · High 0.50–0.79 · Critical 0.80 and above.
             </p>
           </div>
         </section>
@@ -180,6 +207,12 @@ export default async function PredictionReportPage({ params }: { params: { id: s
         </section>
 
         <footer className="pt-5">
+          {(hospitalName || generatedBy) && (
+            <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+              Issued by {hospitalName || "WhyRisk"}
+              {generatedBy ? ` · Report generated by ${generatedBy}` : ""} · {fmtDate(new Date().toISOString())}
+            </p>
+          )}
           <p className="max-w-[70ch] text-xs leading-relaxed text-muted-foreground">
             WhyRisk is an experimental clinical decision-support and research tool. It is not a certified
             medical device and does not replace professional diagnosis. This report summarises a model
