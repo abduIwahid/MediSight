@@ -1,21 +1,34 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, Zap } from "lucide-react"
 import type { PatientRow } from "@/lib/types"
 import { buildMLPayload } from "@/lib/prediction-features"
+import { useStagedLoadingLabel } from "@/lib/use-staged-loading-label"
+import { PatientRiskCard } from "@/components/shared/PatientRiskCard"
+import { ShapFactorList, type ShapFeature } from "@/components/shared/ShapFactorList"
 
 interface RunPredictionButtonProps {
   patient: PatientRow
+}
+
+interface RunResult {
+  predictionId: string
+  disease: string
+  probability: number | null
+  confidence: number | null
+  severity: string
+  shapPayload: ShapFeature[]
+  clinicalExplanation: string | null
 }
 
 export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
-  const router = useRouter()
+  const [result, setResult] = useState<RunResult | null>(null)
+  const loadingLabel = useStagedLoadingLabel(loading, "Running AI Model...")
   const supabase = createClient()
 
   const handleRunPrediction = async () => {
@@ -23,6 +36,7 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
     setLoading(true)
     setError(null)
     setWarning(null)
+    setResult(null)
 
     try {
       const mlPayload = buildMLPayload(patient)
@@ -54,6 +68,12 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
         .single()
 
       if (predErr) throw new Error(`Save error: ${predErr.message}`)
+
+      // Captured from the in-hand /api/predict + /api/explain payloads
+      // so the result below renders immediately — no router.refresh()
+      // re-read of the whole patient page after every run.
+      let savedShapPayload: ShapFeature[] = []
+      let savedClinicalExplanation: string | null = null
 
       if (inserted?.id) {
         // Best-effort: snapshot the exact inputs this score was computed
@@ -101,6 +121,8 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
             clinical_explanation: explanation.clinical_explanation,
           })
           if (expErr) throw new Error(expErr.message)
+          savedShapPayload = shapPayload
+          savedClinicalExplanation = explanation.clinical_explanation ?? null
         } catch {
           setWarning(
             "The prediction was saved, but its SHAP explanation could not be stored — the detail page will show this score without factor contributions."
@@ -132,7 +154,20 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
         })
       }
 
-      router.refresh()
+      // Render the just-run result from the payloads already in hand
+      // (score + explanation + the saved row's id for the detail link)
+      // instead of router.refresh() re-fetching the whole page.
+      if (inserted?.id) {
+        setResult({
+          predictionId: inserted.id,
+          disease: prediction.disease || "Diabetes",
+          probability: prediction.probability ?? null,
+          confidence: prediction.confidence ?? null,
+          severity: prediction.severity,
+          shapPayload: savedShapPayload,
+          clinicalExplanation: savedClinicalExplanation,
+        })
+      }
       setLoading(false)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Prediction failed. Please try again.")
@@ -150,7 +185,7 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Running AI Model...
+            {loadingLabel}
           </>
         ) : (
           <>
@@ -168,6 +203,29 @@ export function RunPredictionButton({ patient }: RunPredictionButtonProps) {
         <p role="alert" className="rounded-lg border border-[#D97706]/30 bg-[#FDF0DC] px-3 py-2 text-xs text-[#A85008]">
           {warning}
         </p>
+      )}
+      {result && (
+        <div className="space-y-3 pt-1">
+          <PatientRiskCard
+            disease={result.disease}
+            probability={result.probability}
+            confidence={result.confidence}
+            severity={result.severity}
+            patientId={patient.id}
+            predictionId={result.predictionId}
+          />
+          {result.shapPayload.length > 0 && (
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <h4 className="mb-3 text-sm font-bold">Why this score — top factors</h4>
+              <ShapFactorList data={result.shapPayload} />
+              {result.clinicalExplanation && (
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {result.clinicalExplanation}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

@@ -194,6 +194,12 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [contextStatus, setContextStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle")
+  // The selected patient's context and the model status are fetched
+  // ONCE (per patient selection / per panel mount) and reused for every
+  // message in the conversation — handleSend used to re-fetch both on
+  // every send, adding two round trips of latency to each message.
+  const [patientData, setPatientData] = useState<PatientRow | null>(null)
+  const [modelStatus, setModelStatus] = useState<ModelStatusInfo | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -205,10 +211,26 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     scrollToBottom()
   }, [messages])
 
+  // Model status is conversation-independent — fetch it once when the
+  // panel mounts (it only feeds the local "model performance" answer).
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/ml/model-status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) setModelStatus(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Auto-load patient context when a patient is selected
   useEffect(() => {
     if (!patientId) {
       setContextStatus("idle")
+      setPatientData(null)
       return
     }
 
@@ -217,6 +239,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     fetchPatientContext(patientId, supabase)
       .then((patient) => {
         if (patient) {
+          setPatientData(patient)
           setContextStatus("loaded")
           const contextMsg = buildContextMessage(patient)
           setMessages([
@@ -230,11 +253,14 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
           // A failed load must not claim "context loaded" in the header,
           // and must not wipe an ongoing conversation — the header shows
           // the honest error state and the chat continues without
-          // patient context.
+          // patient context. The cached context is cleared too, so a
+          // previous patient's data can never leak into this chat.
+          setPatientData(null)
           setContextStatus("error")
         }
       })
       .catch(() => {
+        setPatientData(null)
         setContextStatus("error")
       })
       .finally(() => setIsLoadingContext(false))
@@ -249,12 +275,9 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     setIsLoading(true)
 
     try {
-      const [patientData, modelStatusRes] = await Promise.all([
-        patientId ? fetchPatientContext(patientId, supabase) : Promise.resolve(null),
-        fetch("/api/ml/model-status").then(r => r.ok ? r.json() : null).catch(() => null)
-      ])
-
-      const patientContext = buildPatientSummary(patientData)
+      // Reuse the context loaded when the patient was selected and the
+      // model status fetched at mount — no per-message refetching.
+      const patientContext = patientId ? buildPatientSummary(patientData) : ""
 
       // Try the real AI (Gemini) first. Send recent chat history for conversational context.
       let reply: string | null = null
@@ -278,7 +301,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
       // template response — it must never pass as a live AI answer.
       let usedFallback = false
       if (!reply) {
-        reply = generateLocalResponse(text, patientContext, modelStatusRes)
+        reply = generateLocalResponse(text, patientContext, modelStatus)
         usedFallback = true
       }
 

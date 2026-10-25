@@ -15,18 +15,30 @@ import { mlServiceFetch } from "@/lib/ml-service"
  * through: the published performance figure is the documented held-out
  * result in the README, and mixing a second number here would confuse
  * the claim.
+ *
+ * This is a public page's status feed, so responses are CDN-cacheable
+ * (s-maxage): a burst of visitors shares one upstream check instead of
+ * each hitting the ML service. The upstream calls are also time-bounded
+ * well below the mlServiceFetch default — a status probe must never
+ * hold the page for a cold-start-scale wait.
  */
+export const dynamic = "force-dynamic"
+
+const LIVE_HEADERS = { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" }
+const DOWN_HEADERS = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" }
+const STATUS_TIMEOUT_MS = 10_000
+
 export async function GET() {
   try {
-    const statusRes = await mlServiceFetch("/model-status", { requireAuth: false })
+    const statusRes = await mlServiceFetch("/model-status", { requireAuth: false, timeoutMs: STATUS_TIMEOUT_MS })
     if (!statusRes || !statusRes.ok) {
-      return NextResponse.json({ live: false })
+      return NextResponse.json({ live: false }, { headers: DOWN_HEADERS })
     }
     const status = await statusRes.json()
 
     let drift: { available: boolean; currentPsi: number | null; driftDetected: boolean; threshold: number | null } | null = null
     try {
-      const driftRes = await mlServiceFetch("/drift-status")
+      const driftRes = await mlServiceFetch("/drift-status", { timeoutMs: STATUS_TIMEOUT_MS })
       if (driftRes && driftRes.ok) {
         const d = await driftRes.json()
         drift = {
@@ -48,8 +60,8 @@ export async function GET() {
       lastTrained: status.last_trained ?? null,
       diseases: Array.isArray(status.diseases) ? status.diseases : [],
       drift,
-    })
+    }, { headers: LIVE_HEADERS })
   } catch {
-    return NextResponse.json({ live: false })
+    return NextResponse.json({ live: false }, { headers: DOWN_HEADERS })
   }
 }

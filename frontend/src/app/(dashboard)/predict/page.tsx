@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
+import { ALL_SYMPTOMS } from "@/lib/symptoms"
 
 /* ------------------------------------------------------------------ */
 /*  Static config                                                      */
@@ -80,8 +81,6 @@ const RISK_STYLES: Record<string, string> = {
 
 export default function PredictPage() {
   const [step, setStep] = useState(0)
-  const [allSymptoms, setAllSymptoms] = useState<string[]>([])
-  const [symptomsState, setSymptomsState] = useState<"loading" | "ready" | "error">("loading")
   const [selectedSymptoms, setSelectedSymptoms] = useState<Set<string>>(new Set())
   const [symptomSearch, setSymptomSearch] = useState("")
   const [patient, setPatient] = useState<PatientDetails>({
@@ -103,34 +102,15 @@ export default function PredictPage() {
     headingRef.current?.focus()
   }, [step])
 
-  const loadSymptoms = () => {
-    setSymptomsState("loading")
-    fetch("/api/predict-symptoms")
-      .then((r) => {
-        if (!r.ok) throw new Error("symptom list failed")
-        return r.json()
-      })
-      .then((data) => {
-        setAllSymptoms(data.symptoms || [])
-        setSymptomsState("ready")
-      })
-      .catch(() => {
-        // A failed load is an error state — never an empty list that
-        // looks like "there are no symptoms".
-        setAllSymptoms([])
-        setSymptomsState("error")
-      })
-  }
-
-  useEffect(() => {
-    loadSymptoms()
-  }, [])
-
+  // The symptom list is static data (lib/symptoms, shared with the
+  // scoring API route) — imported directly instead of fetched from
+  // /api/predict-symptoms at runtime. There is no load failure mode to
+  // render anymore; the API GET route still serves the same list.
   const filteredSymptoms = useMemo(() => {
     const q = symptomSearch.trim().toLowerCase()
-    if (!q) return allSymptoms
-    return allSymptoms.filter((s) => formatSymptomLabel(s).toLowerCase().includes(q))
-  }, [allSymptoms, symptomSearch])
+    if (!q) return ALL_SYMPTOMS
+    return ALL_SYMPTOMS.filter((s) => formatSymptomLabel(s).toLowerCase().includes(q))
+  }, [symptomSearch])
 
   const toggleSymptom = (id: string) => {
     setSelectedSymptoms((prev) => {
@@ -274,16 +254,7 @@ export default function PredictPage() {
                   {formatSymptomLabel(s)}
                 </label>
               ))}
-              {symptomsState === "loading" && (
-                <p className="col-span-full text-sm text-muted-foreground">Loading symptoms...</p>
-              )}
-              {symptomsState === "error" && (
-                <div role="alert" className="col-span-full rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                  The symptom list could not be loaded.{" "}
-                  <button type="button" onClick={loadSymptoms} className="font-semibold underline">Try again</button>
-                </div>
-              )}
-              {symptomsState === "ready" && filteredSymptoms.length === 0 && (
+              {filteredSymptoms.length === 0 && (
                 <p className="col-span-full text-sm text-muted-foreground">No symptoms match your search.</p>
               )}
             </div>

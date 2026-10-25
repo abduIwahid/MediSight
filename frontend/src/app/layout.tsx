@@ -5,15 +5,19 @@ import { cn } from "@/lib/utils";
 import { MotionProvider } from "@/components/providers/MotionProvider";
 
 const archivo = Archivo({ subsets: ['latin'], variable: '--font-sans' });
+// Display + mono fonts are not the body face — don't let their preload
+// compete with Archivo and first paint on every page.
 const anton = Anton({
   subsets: ['latin'],
   weight: '400',
   variable: '--font-display',
+  preload: false,
 });
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['500', '600'],
   variable: '--font-mono',
+  preload: false,
 });
 
 const description =
