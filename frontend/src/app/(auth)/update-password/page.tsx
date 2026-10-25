@@ -63,7 +63,7 @@ export default function UpdatePasswordPage() {
             <div className="text-center">
               <h1 className="text-2xl font-bold">Set a new password</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Choose a strong password for your MediSight AI account.
+                Choose a strong password for your WhyRisk account.
               </p>
             </div>
 

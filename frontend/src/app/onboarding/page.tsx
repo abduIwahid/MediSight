@@ -74,7 +74,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-sm">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Complete your profile</h1>
-          <p className="text-sm text-muted-foreground mt-2">Welcome to MediSight AI</p>
+          <p className="text-sm text-muted-foreground mt-2">Welcome to WhyRisk</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">

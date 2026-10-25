@@ -95,10 +95,10 @@ export default function SignupPage() {
         <div className="grid gap-8 px-8 py-10 grid-cols-1 md:px-12 md:py-12">
           <div className="space-y-6">
             <div className="space-y-2">
-              <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Welcome to MediSight</p>
+              <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Welcome to WhyRisk</p>
               <h1 className="text-3xl font-semibold text-slate-950">Create your account</h1>
               <p className="max-w-xl text-sm leading-6 text-slate-600">
-                Start your journey with MediSight AI and access secure clinical insights in one place.
+                Start your journey with WhyRisk and access secure clinical insights in one place.
               </p>
             </div>
 

@@ -1,4 +1,4 @@
-# MediSight frontend
+# WhyRisk frontend
 
 Next.js 14 (App Router) + Tailwind CSS + shadcn/ui. This folder is the
 web app: auth flows, role-based dashboards (patient / doctor / admin),

@@ -48,9 +48,9 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/patient/dashboard" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
           <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg shadow-md group-hover:scale-105 transition-transform">
-            <Image src="/logo.png" alt="MediSight AI Logo" fill className="object-cover" />
+            <Image src="/logo.png" alt="WhyRisk Logo" fill className="object-cover" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-primary">MediSight AI</span>
+          <span className="text-xl font-bold tracking-tight text-primary">WhyRisk</span>
         </Link>
       </div>
 

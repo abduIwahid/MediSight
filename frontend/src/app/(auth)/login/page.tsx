@@ -125,7 +125,7 @@ function LoginPageInner() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
               <span className="font-display text-sm tracking-wider">M</span>
             </div>
-            <span className="font-heading text-lg font-bold">MediSight</span>
+            <span className="font-heading text-lg font-bold">WhyRisk</span>
           </div>
           <div className="relative z-10 space-y-5">
             <h2 className="font-heading text-3xl font-bold leading-tight">

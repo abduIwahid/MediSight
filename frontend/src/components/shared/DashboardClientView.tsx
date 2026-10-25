@@ -44,7 +44,7 @@ export function DashboardClientView({
             transition={{ delay: 0.2, duration: 0.5 }}
             className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8FC3DC]"
           >
-            <Sparkles className="h-4 w-4" /> MediSight — Clinical Intelligence Platform
+            <Sparkles className="h-4 w-4" /> WhyRisk — Clinical Intelligence Platform
           </motion.p>
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Hospital Command Centre</h1>
           <p className="text-sm sm:text-base text-white/75 leading-relaxed max-w-2xl">

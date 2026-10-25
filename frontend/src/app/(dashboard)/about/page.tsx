@@ -28,7 +28,7 @@ export default function AboutPage() {
             Clinical AI that shows its reasons
           </h1>
           <p className="text-sm sm:text-base text-white/75 leading-relaxed">
-            MediSight bridges the gap between traditional clinical care and predictive machine learning, giving doctors early disease detection and risk insights they can inspect — not just trust.
+            WhyRisk bridges the gap between traditional clinical care and predictive machine learning, giving doctors early disease detection and risk insights they can inspect — not just trust.
           </p>
           <div className="flex flex-wrap gap-4 pt-2">
             <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand/90">

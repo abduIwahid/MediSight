@@ -1,6 +1,6 @@
-# MediSight AI
+# WhyRisk
 
-> MediSight AI is a healthcare risk-prediction and clinical decision-support platform built during a machine-learning internship at Ezitech Institute (Eziline Software House), Islamabad. It combines a Next.js web application, a FastAPI machine-learning service, and a Supabase (PostgreSQL) backend with row-level security.
+> WhyRisk is a healthcare risk-prediction and clinical decision-support platform built during a machine-learning internship at Ezitech Institute (Eziline Software House), Islamabad. It combines a Next.js web application, a FastAPI machine-learning service, and a Supabase (PostgreSQL) backend with row-level security.
 
 ## What it does
 
@@ -19,9 +19,9 @@
 
 ## Pages
 
-- [Welcome](/welcome): what MediSight is, what is real today, and what is roadmap.
+- [Welcome](/welcome): what WhyRisk is, what is real today, and what is roadmap.
 - [Model card](/model-card): the model's dataset, measured performance, live service status, and limitations, stated in full.
 
 ## Disclaimer
 
-MediSight AI is an experimental clinical decision-support and research tool. It is not a certified medical device and is not a substitute for professional medical diagnosis, treatment, or clinical judgment. Predictions must be reviewed by qualified healthcare professionals.
+WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical device and is not a substitute for professional medical diagnosis, treatment, or clinical judgment. Predictions must be reviewed by qualified healthcare professionals.

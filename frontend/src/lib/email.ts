@@ -69,7 +69,7 @@ async function sendEmail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `MediSight <${config.from}>`,
+        from: `WhyRisk <${config.from}>`,
         to: [to],
         ...(options?.replyTo ? { reply_to: options.replyTo } : {}),
         subject,
@@ -100,11 +100,11 @@ export async function sendAppointmentConfirmationEmail(data: AppointmentEmailDat
   if (data.reason) lines.push(`Reason for visit: ${data.reason}`)
   lines.push(
     "",
-    "If you need to change or cancel this appointment, sign in to MediSight and open your appointments.",
+    "If you need to change or cancel this appointment, sign in to WhyRisk and open your appointments.",
     "",
-    "— MediSight"
+    "— WhyRisk"
   )
-  return sendEmail(data.patientEmail, "Your MediSight appointment", lines.join("\n"))
+  return sendEmail(data.patientEmail, "Your WhyRisk appointment", lines.join("\n"))
 }
 
 /**
@@ -122,8 +122,8 @@ export async function sendAppointmentReminderEmail(data: AppointmentEmailData): 
     `Status: ${data.status}`,
   ]
   if (data.reason) lines.push(`Reason for visit: ${data.reason}`)
-  lines.push("", "— MediSight")
-  return sendEmail(data.patientEmail, "Reminder: your MediSight appointment", lines.join("\n"))
+  lines.push("", "— WhyRisk")
+  return sendEmail(data.patientEmail, "Reminder: your WhyRisk appointment", lines.join("\n"))
 }
 
 export interface ContactInquiryEmailData {
@@ -145,14 +145,14 @@ const DEFAULT_CONTACT_RECIPIENT = "contact@abdulwahid.me"
 export async function sendContactInquiryEmail(data: ContactInquiryEmailData): Promise<boolean> {
   const to = process.env.CONTACT_TO_EMAIL || DEFAULT_CONTACT_RECIPIENT
   const lines = [
-    "New inquiry from the MediSight contact page.",
+    "New inquiry from the WhyRisk contact page.",
     "",
     `Name: ${data.name}`,
     `Email: ${data.email}`,
   ]
   if (data.department) lines.push(`Department / facility: ${data.department}`)
   lines.push(`Subject: ${data.subject}`, "", "Message:", data.message)
-  return sendEmail(to, `[MediSight Contact] ${data.subject}`, lines.join("\n"), {
+  return sendEmail(to, `[WhyRisk Contact] ${data.subject}`, lines.join("\n"), {
     replyTo: data.email,
   })
 }

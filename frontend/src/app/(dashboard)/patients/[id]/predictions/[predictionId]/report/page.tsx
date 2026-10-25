@@ -109,7 +109,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
       <article className="print-report rounded-2xl border bg-card p-8 shadow-sm">
         <header className="flex items-start justify-between gap-6 border-b border-border pb-5">
           <div>
-            <p className="font-display text-2xl uppercase tracking-wide">MediSight</p>
+            <p className="font-display text-2xl uppercase tracking-wide">WhyRisk</p>
             <p className="eyebrow mt-1">Patient risk report</p>
           </div>
           <div className="text-right text-xs leading-relaxed text-muted-foreground">
@@ -177,7 +177,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
 
         <footer className="pt-5">
           <p className="max-w-[70ch] text-xs leading-relaxed text-muted-foreground">
-            MediSight is an experimental clinical decision-support and research tool. It is not a certified
+            WhyRisk is an experimental clinical decision-support and research tool. It is not a certified
             medical device and does not replace professional diagnosis. This report summarises a model
             estimate and its explanation; clinical decisions must be made by a qualified healthcare
             professional using the full patient record.

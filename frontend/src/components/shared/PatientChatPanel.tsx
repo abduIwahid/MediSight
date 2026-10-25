@@ -24,7 +24,7 @@ function generateLocalFallback(message: string): string {
   if (q.includes("chest pain") || q.includes("breath") || q.includes("stroke") || q.includes("bleeding")) {
     return "🚨 **This could be an emergency.** Please seek immediate medical attention or call your local emergency number right now — don't wait on a chat response.\n\nThis assistant does not replace professional medical advice."
   }
-  return "👋 I'm the MediSight Patient Assistant. Tell me a bit about your symptoms — how long you've had them and how they feel — and I'll suggest which specialist to book with.\n\nI can't diagnose you or run clinical predictions; a doctor handles that once you're booked in.\n\n(Note: the AI service isn't reachable right now, so this is a general fallback response.)"
+  return "👋 I'm the WhyRisk Patient Assistant. Tell me a bit about your symptoms — how long you've had them and how they feel — and I'll suggest which specialist to book with.\n\nI can't diagnose you or run clinical predictions; a doctor handles that once you're booked in.\n\n(Note: the AI service isn't reachable right now, so this is a general fallback response.)"
 }
 
 export function PatientChatPanel() {
@@ -32,7 +32,7 @@ export function PatientChatPanel() {
     {
       id: "welcome",
       role: "assistant",
-      content: "👋 Hi, I'm your **MediSight Patient Assistant**. Tell me what symptoms you're experiencing and I'll help point you to the right kind of doctor and get you booked in.\n\nI don't diagnose conditions or replace professional medical advice — for anything urgent, please seek emergency care right away."
+      content: "👋 Hi, I'm your **WhyRisk Patient Assistant**. Tell me what symptoms you're experiencing and I'll help point you to the right kind of doctor and get you booked in.\n\nI don't diagnose conditions or replace professional medical advice — for anything urgent, please seek emergency care right away."
     }
   ])
   const [input, setInput] = useState("")
@@ -90,7 +90,7 @@ export function PatientChatPanel() {
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <CardTitle>MediSight Patient Assistant</CardTitle>
+          <CardTitle>WhyRisk Patient Assistant</CardTitle>
         </div>
         <CardDescription>Symptom guidance and specialist recommendations — not a diagnosis.</CardDescription>
       </CardHeader>

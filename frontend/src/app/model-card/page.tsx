@@ -71,7 +71,7 @@ export default function ModelCardPage() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
-          <span className="font-display text-xl uppercase tracking-wide">MediSight</span>
+          <span className="font-display text-xl uppercase tracking-wide">WhyRisk</span>
           <Link
             href="/welcome"
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -89,7 +89,7 @@ export default function ModelCardPage() {
           Documented honestly.
         </h1>
         <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
-          This page states exactly what MediSight&apos;s model is, what data it was trained and measured on, and
+          This page states exactly what WhyRisk&apos;s model is, what data it was trained and measured on, and
           what it does not do. Figures here come from the project documentation and the held-out evaluation —
           nothing on this page is estimated or rounded up.
         </p>
@@ -165,7 +165,7 @@ export default function ModelCardPage() {
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Roadmap — not trained models</p>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
               <li>Heart disease, stroke, chronic kidney disease, hypertension, asthma and COPD are planned future models.</li>
-              <li>They are listed so the scope is transparent: today, MediSight predicts diabetes risk only.</li>
+              <li>They are listed so the scope is transparent: today, WhyRisk predicts diabetes risk only.</li>
             </ul>
           </div>
         </section>
@@ -175,16 +175,16 @@ export default function ModelCardPage() {
           <ul className="mt-3 max-w-[70ch] list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>The model was trained on United States survey data (BRFSS 2015); performance on other populations has not been validated.</li>
             <li>A score is a screening estimate, not a diagnosis. False positives and false negatives occur.</li>
-            <li>MediSight is an experimental clinical decision-support and research tool. It is not a certified medical device and does not replace professional diagnosis.</li>
+            <li>WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical device and does not replace professional diagnosis.</li>
           </ul>
         </section>
       </main>
 
       <footer className="bg-foreground py-8 text-[#C8D6DA]">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3.5 px-5">
-          <span className="font-display text-lg uppercase tracking-wide text-white">MediSight</span>
+          <span className="font-display text-lg uppercase tracking-wide text-white">WhyRisk</span>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
-            MediSight is an experimental clinical decision-support and research tool. It is not a certified medical
+            WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical
             device and does not replace professional diagnosis. Built during a machine-learning internship at Ezitech
             Institute, Islamabad.
           </p>

@@ -50,7 +50,7 @@ export default function ContactPage() {
     <div className="space-y-10 max-w-5xl mx-auto pb-10">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Contact</h1>
-        <p className="text-sm text-muted-foreground mt-1">MediSight is an experimental research tool maintained by its developer. For anything about the platform or the model, use the channels below.</p>
+        <p className="text-sm text-muted-foreground mt-1">WhyRisk is an experimental research tool maintained by its developer. For anything about the platform or the model, use the channels below.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -102,7 +102,7 @@ export default function ContactPage() {
               <ShieldCheck className="h-4 w-4" /> Before You Write
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Do not send patient-identifiable information through this page or by email. MediSight is an experimental research tool, not a clinical support channel, and it is not a certified medical device.
+              Do not send patient-identifiable information through this page or by email. WhyRisk is an experimental research tool, not a clinical support channel, and it is not a certified medical device.
             </p>
           </div>
         </div>

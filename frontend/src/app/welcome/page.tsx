@@ -3,7 +3,7 @@ import type { CSSProperties } from "react"
 import { Activity, ArrowRight, CalendarCheck, ListChecks } from "lucide-react"
 
 /* ------------------------------------------------------------------ */
-/*  MediSight public landing page.                                     */
+/*  WhyRisk public landing page.                                     */
 /*  Every number on this page is a verified project fact (see the      */
 /*  README): one trained diabetes model, its held-out AUC-ROC, the     */
 /*  BRFSS 2015 dataset, and a SHAP explanation on every prediction.    */
@@ -65,7 +65,7 @@ export default function WelcomePage() {
               M
             </span>
             <span className="font-display text-[21px] uppercase leading-none tracking-wide">
-              MediSight
+              WhyRisk
               <span className="mt-1 block font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand-text">
                 Risk, explained
               </span>
@@ -105,7 +105,7 @@ export default function WelcomePage() {
               className="reveal reveal-slow mt-6 max-w-[620px] text-[17.5px] leading-relaxed text-[#33454F]"
               style={{ "--d": "200ms" } as CSSProperties}
             >
-              MediSight estimates your diabetes risk with a trained machine-learning model — and shows you the reasons
+              WhyRisk estimates your diabetes risk with a trained machine-learning model — and shows you the reasons
               behind the score, in plain language. No black box. No invented numbers.
             </p>
             <div className="reveal mt-7 flex flex-wrap gap-3" style={{ "--d": "320ms" } as CSSProperties}>
@@ -261,7 +261,7 @@ export default function WelcomePage() {
           </p>
           <div className="mt-[22px] grid overflow-hidden rounded-[14px] border border-border bg-card md:grid-cols-[200px_1fr]">
             <div className="hidden bg-foreground p-5 text-[#DCE7EA] md:block">
-              <div className="font-display text-[17px] uppercase tracking-wide text-white">MediSight</div>
+              <div className="font-display text-[17px] uppercase tracking-wide text-white">WhyRisk</div>
               <ul className="mt-[18px] space-y-1 text-[13.5px]">
                 {["Overview", "Patients", "Doctors", "Appointments", "ML Models", "MLOps", "Audit log"].map((item, i) => (
                   <li key={item} className={i === 0 ? "rounded-lg bg-primary px-2.5 py-[9px] font-bold text-white" : "px-2.5 py-[9px] opacity-80"}>
@@ -291,12 +291,12 @@ export default function WelcomePage() {
       {/* Footer */}
       <footer className="mt-14 bg-foreground py-[30px] text-[#C8D6DA]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3.5 px-5">
-          <span className="font-display text-lg uppercase tracking-wide text-white">MediSight</span>
+          <span className="font-display text-lg uppercase tracking-wide text-white">WhyRisk</span>
           <a href="/model-card" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
             Model card
           </a>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
-            MediSight is an experimental clinical decision-support and research tool. It is not a certified medical
+            WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical
             device and does not replace professional diagnosis. Built during a machine-learning internship at Ezitech
             Institute, Islamabad.
           </p>

@@ -25,18 +25,18 @@ export const metadata: Metadata = {
   metadataBase: process.env.NEXT_PUBLIC_SITE_URL
     ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
     : undefined,
-  title: "MediSight",
+  title: "WhyRisk",
   description,
   openGraph: {
     type: "website",
-    siteName: "MediSight",
-    title: "MediSight",
+    siteName: "WhyRisk",
+    title: "WhyRisk",
     description,
     images: ["/logo.png"],
   },
   twitter: {
     card: "summary",
-    title: "MediSight",
+    title: "WhyRisk",
     description,
     images: ["/logo.png"],
   },

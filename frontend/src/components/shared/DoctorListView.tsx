@@ -109,7 +109,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Doctor Directory</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Browse vetted doctors and specialists available through MediSight AI.
+            Browse vetted doctors and specialists available through WhyRisk.
           </p>
         </div>
       </div>

@@ -139,10 +139,10 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
 
   if (patientContext) {
     if (q.includes("risk") || q.includes("summarize") || q.includes("summary") || q.includes("paragraph")) {
-      return `📋 **Clinical Risk Summary**\n\n${patientContext}\n\n---\nBased on the patient's structured clinical data, the risk assessment reflects the 21 features evaluated by the MediSight LightGBM model. Please verify these findings against the full clinical chart before making decisions.`
+      return `📋 **Clinical Risk Summary**\n\n${patientContext}\n\n---\nBased on the patient's structured clinical data, the risk assessment reflects the 21 features evaluated by the WhyRisk LightGBM model. Please verify these findings against the full clinical chart before making decisions.`
     }
     if (q.includes("lab") || q.includes("driving") || q.includes("factor") || q.includes("which")) {
-      return `🔬 **Key Risk Drivers**\n\nThe MediSight model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor a detailed SHAP waterfall chart, navigate to the patient's prediction detail page.`
+      return `🔬 **Key Risk Drivers**\n\nThe WhyRisk model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor a detailed SHAP waterfall chart, navigate to the patient's prediction detail page.`
     }
     if (q.includes("discharge") || q.includes("draft")) {
       return `📝 **Discharge Risk Summary (AI Draft)**\n\n${patientContext}\n\n**Recommendations:**\n• Review current medications for contraindications\n• Schedule follow-up within 2 weeks if High/Critical risk\n• Consider HbA1c and comprehensive metabolic panel if not recent\n• Dietitian referral for lifestyle intervention if BMI is elevated\n\n---\n⚠️ This is an AI-generated draft — review and edit before official use.`
@@ -159,10 +159,10 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
     if (metrics) {
       return `🤖 **Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (253,680 survey responses).`
     }
-    return `🤖 **Model Performance**\n\nThe MediSight ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
+    return `🤖 **Model Performance**\n\nThe WhyRisk ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
   }
   if (q.includes("diabetes") || q.includes("disease") || q.includes("predict")) {
-    return `🩺 **About MediSight AI Prediction**\n\nMediSight AI detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\n🟢 Low (< 20%) · 🟡 Moderate (20–50%) · 🟠 High (50–80%) · 🔴 Critical (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
+    return `🩺 **About WhyRisk Prediction**\n\nWhyRisk detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\n🟢 Low (< 20%) · 🟡 Moderate (20–50%) · 🟠 High (50–80%) · 🔴 Critical (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
   }
   if (q.includes("help") || q.includes("what can") || q.includes("feature")) {
     return `💡 **How I Can Help**\n\n1. **Patient risk summaries** — Select a patient and ask me to summarize their risk\n2. **Risk driver analysis** — Find out which clinical factors are influencing the prediction\n3. **Discharge drafts** — Generate a draft risk summary for discharge planning\n4. **Trend analysis** — Understand how a patient's risk has changed over time\n5. **Model performance** — Ask about the model's accuracy and metrics\n\nSelect a patient from the dropdown above to get started!`
@@ -171,7 +171,7 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
     return `🚨 **High-Risk Clinical Protocol**\n\nFor patients flagged as **High** or **Critical** risk:\n\n1. Immediate physician notification\n2. Order comprehensive metabolic panel (CMP) and HbA1c if not recent\n3. Review current medications for contraindications\n4. Schedule follow-up within 2 weeks\n5. Consider dietitian referral and lifestyle intervention program\n\nCheck the **Alerts Center** in the sidebar for active risk alerts across your patient panel.`
   }
 
-  return `👋 **I'm MediSight AI**, your clinical decision support assistant.\n\nI can answer questions about:\n• Patient risk summaries and clinical factors\n• Model performance and predictions\n• High-risk protocols and clinical guidance\n\nTo get patient-specific insights: **Select a patient from the dropdown above**, then ask about their risk, lab drivers, or request a discharge summary.\n\nWhat would you like to know?`
+  return `👋 **I'm WhyRisk**, your clinical decision support assistant.\n\nI can answer questions about:\n• Patient risk summaries and clinical factors\n• Model performance and predictions\n• High-risk protocols and clinical guidance\n\nTo get patient-specific insights: **Select a patient from the dropdown above**, then ask about their risk, lab drivers, or request a discharge summary.\n\nWhat would you like to know?`
 }
 
 export function AIChatPanel({ patientId }: AIChatPanelProps) {
@@ -179,7 +179,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     {
       id: "welcome",
       role: "assistant",
-      content: "👋 **I'm MediSight AI**, your clinical decision support assistant.\n\nSelect a patient from the dropdown above to load their clinical context, or ask me a general question about risk protocols, model performance, and clinical guidance."
+      content: "👋 **I'm WhyRisk**, your clinical decision support assistant.\n\nSelect a patient from the dropdown above to load their clinical context, or ask me a general question about risk protocols, model performance, and clinical guidance."
     }
   ])
   const [input, setInput] = useState("")
@@ -300,7 +300,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <CardTitle>MediSight Clinical Copilot</CardTitle>
+          <CardTitle>WhyRisk Clinical Copilot</CardTitle>
           {isLoadingContext && (
             <div className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
