@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { brfssAgeBand } from "@/lib/prediction-features"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
@@ -119,7 +120,7 @@ export default function NewPatientPage() {
 
       // 4. Call local FastAPI /predict
       const ageNum = parseInt(formData.age)
-      const ageGroup = Math.min(13, Math.max(1, Math.ceil(ageNum / 10)))
+      const ageGroup = brfssAgeBand(ageNum)
       const bmiNum = parseFloat(formData.bmi) || 25
       const bpHigh = parseInt(formData.bpSystolic) >= 130 ? 1.0 : 0.0
 

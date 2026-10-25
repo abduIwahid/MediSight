@@ -1,6 +1,23 @@
 import type { PatientRow } from "@/lib/types"
 
 /**
+ * Maps an age in years to the BRFSS `_AGEG5YR` band (1–13) the diabetes
+ * model was trained on: 1 = 18–24, then five-year bands 2 = 25–29 …
+ * 12 = 75–79, and 13 = 80 or older. Ages under 25 map to band 1.
+ *
+ * This is the ONLY age mapping the frontend may use. Two earlier
+ * derivations disagreed with the training coding — `ceil(age / 10)` in
+ * this file's caller history and `floor(age / 5)` in the retired
+ * predict-risk edge function — and silently fed the model wrong bands
+ * (e.g. age 65 must be band 10, not 7 or 13).
+ */
+export function brfssAgeBand(ageYears: number): number {
+  if (!Number.isFinite(ageYears) || ageYears < 25) return 1
+  if (ageYears >= 80) return 13
+  return Math.floor((ageYears - 25) / 5) + 2
+}
+
+/**
  * Builds the 21-feature BRFSS payload the ML service expects from a
  * patient record. This is the single derivation used both when a real
  * prediction is run (RunPredictionButton) and when the what-if simulator
@@ -26,7 +43,7 @@ export function buildMLPayload(patient: PatientRow) {
       ? Math.floor((Date.now() - new Date(dobRaw).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
       : 40
   )
-  const ageGroup = Math.min(13, Math.max(1, Math.ceil(ageNum / 10)))
+  const ageGroup = brfssAgeBand(ageNum)
   const hasHeart = diagnoses.some((dx) => dx.condition?.toLowerCase().includes("heart"))
   const hasStroke = diagnoses.some((dx) => dx.condition?.toLowerCase().includes("stroke"))
 
