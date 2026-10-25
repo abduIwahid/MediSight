@@ -40,12 +40,30 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
   // Only the explanation actually stored with this prediction may be
   // shown. If none was stored, the view says so — sample SHAP values or
   // template text must never stand in for a real explanation.
-  let shapPayload = []
+  // The stored shape must be the array the views render: the column's
+  // own default is an object ({}), and legacy rows may hold the ML
+  // service's native {feature: impact} dict. A dict converts (values
+  // from this prediction's stored feature snapshot); anything else
+  // degrades to "not recorded" instead of crashing the view
+  // (QA Round 2, cluster 9).
+  let shapPayload: { feature: string; value: string | number; impact: number }[] = []
   if (explanation?.shap_payload) {
     try {
-      shapPayload = typeof explanation.shap_payload === 'string'
+      const parsed = typeof explanation.shap_payload === 'string'
         ? JSON.parse(explanation.shap_payload)
         : explanation.shap_payload
+      if (Array.isArray(parsed)) {
+        shapPayload = parsed
+      } else if (parsed && typeof parsed === 'object') {
+        const features = (prediction.features ?? {}) as Record<string, number>
+        shapPayload = Object.entries(parsed as Record<string, number>)
+          .filter(([, impact]) => Number.isFinite(Number(impact)))
+          .map(([feature, impact]) => ({
+            feature,
+            value: features[feature] ?? null,
+            impact: Number(impact),
+          }))
+      }
     } catch (e) {
       console.error("Failed to parse SHAP payload", e)
     }

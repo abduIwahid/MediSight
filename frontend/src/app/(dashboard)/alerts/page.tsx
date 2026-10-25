@@ -131,12 +131,16 @@ export default function AlertsPage() {
     setAcknowledged((prev) => [{ ...alert, status: 'Acknowledged', updated_at: new Date().toISOString() }, ...prev.slice(0, 4)])
 
     const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase
+    // .select() verification: under RLS a refused update returns NO error
+    // and zero rows — checking only `error` let a refused ack look like
+    // success while the database still said "New" (QA Round 2, cluster 7).
+    const { data: updated, error } = await supabase
       .from('alerts')
       .update({ status: 'Acknowledged', acknowledged_by: user?.id })
       .eq('id', id)
+      .select('id')
 
-    if (error) {
+    if (error || !updated || updated.length === 0) {
       // …rolled back on failure: the alert returns to the active list
       // and the failure is said out loud instead of styled as success.
       setAlerts((current) => [alert, ...current])

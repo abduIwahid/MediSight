@@ -47,8 +47,11 @@ export default function AppointmentsPage() {
   const updateStatus = async (id: string, status: Appointment["status"]) => {
     setUpdatingId(id)
     setActionError(null)
-    const { error } = await supabase.from("appointments").update({ status }).eq("id", id)
-    if (error) {
+    // .select() verification: an RLS-refused update returns no error and
+    // zero rows — without the row check the UI would show a status the
+    // database never stored (QA Round 2, cluster 7).
+    const { data: updated, error } = await supabase.from("appointments").update({ status }).eq("id", id).select("id")
+    if (error || !updated || updated.length === 0) {
       // A failed write is said out loud — the row keeps its real status.
       setActionError("That appointment could not be updated. Please try again.")
     } else {

@@ -89,22 +89,33 @@ export default function DashboardLayout({
   }, [mobileMenuOpen])
 
   // Header bell: real unread alerts (status 'New'), refreshed on
-  // navigation — the badge exists only when there is something unread.
+  // navigation AND when the window regains focus — acknowledging an
+  // alert on the Alerts page (or in another tab) otherwise leaves this
+  // badge disagreeing with the Alerts Center until the next navigation
+  // (QA Round 2, cluster 7). The badge exists only when there is
+  // something unread.
   useEffect(() => {
     let cancelled = false
     const supabase = createClient()
-    supabase
-      .from("alerts")
-      .select("id, type, severity, created_at, patient_id", { count: "exact" })
-      .eq("status", "New")
-      .order("created_at", { ascending: false })
-      .limit(5)
-      .then(({ data, count }) => {
-        if (cancelled) return
-        setHeaderAlerts((data as HeaderAlert[]) || [])
-        setUnreadAlertCount(count ?? data?.length ?? 0)
-      })
-    return () => { cancelled = true }
+    const loadHeaderAlerts = () => {
+      supabase
+        .from("alerts")
+        .select("id, type, severity, created_at, patient_id", { count: "exact" })
+        .eq("status", "New")
+        .order("created_at", { ascending: false })
+        .limit(5)
+        .then(({ data, count }) => {
+          if (cancelled) return
+          setHeaderAlerts((data as HeaderAlert[]) || [])
+          setUnreadAlertCount(count ?? data?.length ?? 0)
+        })
+    }
+    loadHeaderAlerts()
+    window.addEventListener("focus", loadHeaderAlerts)
+    return () => {
+      cancelled = true
+      window.removeEventListener("focus", loadHeaderAlerts)
+    }
   }, [pathname])
 
   // Both header dropdowns close on outside click and on Escape.

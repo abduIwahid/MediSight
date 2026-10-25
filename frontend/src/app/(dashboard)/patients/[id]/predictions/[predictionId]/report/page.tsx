@@ -4,9 +4,12 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { ShapFactorList } from "@/components/shared/ShapFactorList"
+import { InputsUsedDisclosure } from "@/components/shared/InputsUsedDisclosure"
 import BrandMark from "@/components/shared/BrandMark"
 import { PrintButton } from "@/components/shared/PrintButton"
 import { getCurrentProfile } from "@/lib/current-profile"
+import { buildMLPayload, FEATURE_NAMES } from "@/lib/prediction-features"
+import { featureLabel, formatFeatureValue } from "@/lib/feature-labels"
 import type { PatientRow } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -48,6 +51,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
       patients (
         *,
         vitals (*),
+        diagnoses (*),
         hospitals (name)
       ),
       explanations (*)
@@ -67,12 +71,28 @@ export default async function PredictionReportPage({ params }: { params: { id: s
   const generatedBy = generatorProfile?.full_name || null
   const explanation = prediction.explanations?.[0] as { shap_payload?: unknown; clinical_explanation?: string } | undefined
 
+  // Same shape discipline as the detail page: the column default is an
+  // object and legacy rows may hold the ML service's {feature: impact}
+  // dict — convert or degrade to "not recorded", never crash the report
+  // (QA Round 2, cluster 9).
   let shapPayload: { feature: string; value: string | number; impact: number }[] = []
   if (explanation?.shap_payload) {
     try {
-      shapPayload = typeof explanation.shap_payload === "string"
+      const parsed = typeof explanation.shap_payload === "string"
         ? JSON.parse(explanation.shap_payload)
         : explanation.shap_payload
+      if (Array.isArray(parsed)) {
+        shapPayload = parsed
+      } else if (parsed && typeof parsed === "object") {
+        const feats = (prediction.features ?? {}) as Record<string, number>
+        shapPayload = Object.entries(parsed as Record<string, number>)
+          .filter(([, impact]) => Number.isFinite(Number(impact)))
+          .map(([feature, impact]) => ({
+            feature,
+            value: feats[feature] ?? null,
+            impact: Number(impact),
+          }))
+      }
     } catch (e) {
       console.error("Failed to parse SHAP payload", e)
     }
@@ -81,27 +101,34 @@ export default async function PredictionReportPage({ params }: { params: { id: s
   const d = patient?.demographics || {}
   const patientName =
     d.full_name || d.name || `${d.first_name || ""} ${d.last_name || ""}`.trim() || "Unknown Patient"
-  const dobRaw = d.birth_date || d.dob
-  const age = d.age || (
-    dobRaw
-      ? Math.floor((Date.now() - new Date(dobRaw).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-      : null
-  )
-  const gender = d.gender ? d.gender.charAt(0).toUpperCase() + d.gender.slice(1).toLowerCase() : null
 
-  const vitals = patient?.vitals || []
-  const latestOf = (needle: string) =>
-    [...vitals]
-      .filter((v) => v.type?.toLowerCase().includes(needle))
-      .sort((a, b) => new Date(b.recorded_at || 0).getTime() - new Date(a.recorded_at || 0).getTime())[0]
-  const bmiVital = latestOf("bmi")
-  const bpVital = latestOf("systolic") || latestOf("blood pressure")
+  // Scored inputs (QA Round 2, cluster 3): this report prints what the
+  // score was actually computed FROM — the predictions.features snapshot
+  // the run flows store, dated by the prediction — not the latest-ever
+  // vitals on the chart, which may post-date the score. Legacy rows
+  // without a snapshot fall back to a payload re-derived from the
+  // current record, and the section heading says so.
+  const snapshotFeatures = (() => {
+    const raw = prediction.features as Record<string, unknown> | null
+    if (!raw || typeof raw !== "object") return null
+    const out: Record<string, number> = {}
+    for (const name of FEATURE_NAMES) {
+      const v = raw[name]
+      if (typeof v !== "number" || !Number.isFinite(v)) return null
+      out[name] = v
+    }
+    return out
+  })()
+  const derived = patient ? buildMLPayload(patient) : null
+  const scoredPayload: Record<string, number> | null = snapshotFeatures ?? derived?.payload ?? null
+  const recordedFeatures = derived?.recordedFeatures ?? []
 
-  const indicators: { label: string; value: string }[] = []
-  if (bmiVital) indicators.push({ label: "BMI (latest recorded)", value: `${bmiVital.value}${bmiVital.unit ? ` ${bmiVital.unit}` : ""}` })
-  if (bpVital) indicators.push({ label: "Systolic blood pressure (latest recorded)", value: `${bpVital.value}${bpVital.unit ? ` ${bpVital.unit}` : ""}` })
-  if (age != null) indicators.push({ label: "Age", value: `${age} years` })
-  if (gender) indicators.push({ label: "Sex", value: gender })
+  const indicators: { label: string; value: string }[] = scoredPayload
+    ? (["BMI", "HighBP", "Age", "Sex"] as const).map((name) => ({
+        label: featureLabel(name),
+        value: formatFeatureValue(name, scoredPayload[name]),
+      }))
+    : []
 
   // Missing values print as "Not recorded" — never a defaulted 0% or
   // "Low" on a clinical document (QA Round 1, item 90).
@@ -175,9 +202,13 @@ export default async function PredictionReportPage({ params }: { params: { id: s
           </div>
         </section>
 
-        {indicators.length > 0 && (
+        {scoredPayload && (
           <section className="border-b border-border py-5">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical indicators on record</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              {snapshotFeatures
+                ? `Inputs this score was computed from — ${fmtDate(prediction.created_at)}`
+                : "Inputs used for this score"}
+            </h2>
             <dl className="mt-3 grid gap-3 sm:grid-cols-2">
               {indicators.map((ind) => (
                 <div key={ind.label} className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5">
@@ -186,6 +217,13 @@ export default async function PredictionReportPage({ params }: { params: { id: s
                 </div>
               ))}
             </dl>
+            <div className="mt-4">
+              <InputsUsedDisclosure
+                payload={scoredPayload}
+                recordedFeatures={recordedFeatures}
+                fromSnapshot={snapshotFeatures !== null}
+              />
+            </div>
           </section>
         )}
 
