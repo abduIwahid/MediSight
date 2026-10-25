@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
-import { Inter, Poppins } from "next/font/google";
+import { Anton, Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-const poppins = Poppins({
+const archivo = Archivo({ subsets: ['latin'], variable: '--font-sans' });
+const anton = Anton({
   subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
-  variable: '--font-heading',
+  weight: '400',
+  variable: '--font-display',
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['500', '600'],
+  variable: '--font-mono',
 });
 
 export const metadata: Metadata = {
-  title: "MediSight AI",
-  description: "Enterprise Healthcare Decision Support",
+  title: "MediSight",
+  description: "Diabetes risk prediction with explainable machine learning — every score shows its reasons.",
 };
 
 export default function RootLayout({
@@ -21,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable, poppins.variable)}>
+    <html lang="en" className={cn("font-sans", archivo.variable, anton.variable, jetbrainsMono.variable)}>
       <body className="antialiased">
         {children}
       </body>

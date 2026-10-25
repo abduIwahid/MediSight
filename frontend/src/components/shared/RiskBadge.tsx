@@ -5,13 +5,15 @@ export type RiskSeverity = 'Low' | 'Moderate' | 'High' | 'Critical' | 'Unknown'
 
 export function RiskBadge({ severity, className }: { severity: RiskSeverity | string, className?: string }) {
   const safeSeverity = ['Low', 'Moderate', 'High', 'Critical'].includes(severity) ? (severity as RiskSeverity) : 'Unknown'
-  
+
+  /* Semantic data colours only: green = low/positive, amber = moderate,
+     red = high/critical. */
   const colorMap: Record<RiskSeverity | 'Unknown', string> = {
-    Low: "bg-green-100 text-green-800 hover:bg-green-100/80 dark:bg-green-900/30 dark:text-green-400",
-    Moderate: "bg-amber-100 text-amber-800 hover:bg-amber-100/80 dark:bg-amber-900/30 dark:text-amber-400",
-    High: "bg-orange-100 text-orange-800 hover:bg-orange-100/80 dark:bg-orange-900/30 dark:text-orange-400",
-    Critical: "bg-red-100 text-red-800 hover:bg-red-100/80 dark:bg-red-900/30 dark:text-red-400 font-bold",
-    Unknown: "bg-gray-100 text-gray-800 hover:bg-gray-100/80 dark:bg-gray-800 dark:text-gray-400",
+    Low: "bg-[#E2F0E6] text-[#1E7A46] hover:bg-[#E2F0E6]/80 dark:bg-[#1E7A46]/20 dark:text-[#7BC79B]",
+    Moderate: "bg-[#FDF0DC] text-[#B45309] hover:bg-[#FDF0DC]/80 dark:bg-[#D97706]/20 dark:text-[#E8A94E]",
+    High: "bg-[#FAE9E7] text-[#C0392B] hover:bg-[#FAE9E7]/80 dark:bg-[#C0392B]/20 dark:text-[#E88A7E]",
+    Critical: "bg-[#C0392B] text-white hover:bg-[#C0392B]/90 font-bold",
+    Unknown: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
   }
 
   return (

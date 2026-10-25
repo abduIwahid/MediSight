@@ -9,7 +9,9 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        heading: ["var(--font-heading)", "var(--font-sans)", "system-ui", "sans-serif"],
+        heading: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       colors: {
         border: "var(--border)",
@@ -20,6 +22,10 @@ const config: Config = {
         primary: {
           DEFAULT: "var(--primary)",
           foreground: "var(--primary-foreground)",
+        },
+        brand: {
+          DEFAULT: "var(--brand)",
+          foreground: "var(--brand-foreground)",
         },
         secondary: {
           DEFAULT: "var(--secondary)",
@@ -45,43 +51,11 @@ const config: Config = {
           DEFAULT: "var(--card)",
           foreground: "var(--card-foreground)",
         },
-        violet: {
-          DEFAULT: "var(--violet)",
-          foreground: "var(--violet-foreground)",
-        },
-        cyan: {
-          DEFAULT: "var(--cyan)",
-          foreground: "var(--cyan-foreground)",
-        },
-      },
-      backgroundImage: {
-        "gradient-brand": "linear-gradient(135deg, var(--primary) 0%, var(--violet) 100%)",
-        "gradient-brand-radial": "radial-gradient(circle at top left, var(--cyan) 0%, var(--violet) 50%, transparent 100%)",
-        "gradient-mesh": "radial-gradient(at 0% 0%, hsla(199,89%,48%,0.18) 0px, transparent 50%), radial-gradient(at 100% 0%, hsla(262,83%,58%,0.18) 0px, transparent 50%), radial-gradient(at 100% 100%, hsla(190,90%,50%,0.14) 0px, transparent 50%), radial-gradient(at 0% 100%, hsla(262,83%,58%,0.12) 0px, transparent 50%)",
       },
       boxShadow: {
-        glow: "0 0 40px -10px hsla(199,89%,48%,0.45)",
-        "glow-violet": "0 0 40px -10px hsla(262,83%,58%,0.45)",
-        premium: "0 20px 60px -15px rgba(2, 8, 23, 0.35)",
-      },
-      keyframes: {
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-10px)" },
-        },
-        "gradient-x": {
-          "0%, 100%": { backgroundPosition: "0% 50%" },
-          "50%": { backgroundPosition: "100% 50%" },
-        },
-      },
-      animation: {
-        shimmer: "shimmer 2.5s linear infinite",
-        float: "float 6s ease-in-out infinite",
-        "gradient-x": "gradient-x 6s ease infinite",
+        /* Layered soft shadows only — never a coloured glow. */
+        premium: "0 1px 2px rgba(6, 20, 27, 0.06), 0 12px 32px -16px rgba(6, 20, 27, 0.18)",
+        card: "0 1px 2px rgba(6, 20, 27, 0.05), 0 8px 24px -12px rgba(6, 20, 27, 0.12)",
       },
     },
   },
