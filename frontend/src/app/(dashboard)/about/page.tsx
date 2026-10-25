@@ -3,50 +3,50 @@ import { Shield, Brain, Stethoscope, HeartPulse, Activity, Sparkles, ArrowRight,
 
 export default function AboutPage() {
   const departments = [
-    { name: "Cardiology", desc: "AI-assisted ischemic heart disease risk scoring & ECG signal analytics.", icon: HeartPulse, count: "12 Specialists" },
-    { name: "Endocrinology", desc: "Predictive early-onset Diabetes Mellitus modeling & glucose monitoring.", icon: Activity, count: "8 Specialists" },
-    { name: "Nephrology", desc: "Chronic Kidney Disease trajectory modeling and eGFR drift alerts.", icon: Stethoscope, count: "6 Specialists" },
-    { name: "Clinical AI MLOps", desc: "Real-time PSI drift analysis, automated retraining & explainability.", icon: Brain, count: "4 Data Scientists" },
+    { name: "Endocrinology", desc: "The live model: diabetes risk prediction (LightGBM, CDC BRFSS 2015) with a SHAP explanation on every score.", icon: Activity, count: "Live" },
+    { name: "Cardiology", desc: "Heart disease risk modelling is on the roadmap — no trained model yet, and the product says so wherever it appears.", icon: HeartPulse, count: "Roadmap" },
+    { name: "Nephrology", desc: "Chronic kidney disease modelling is on the roadmap; eGFR staging is already computed as a clinical indicator.", icon: Stethoscope, count: "Roadmap" },
+    { name: "Clinical AI MLOps", desc: "Model registry, PSI drift status and retraining — the operational side of the one live model.", icon: Brain, count: "Live" },
   ]
 
   const metrics = [
-    { value: "98.4%", label: "Model Predictive Accuracy" },
-    { value: "50,000+", label: "Patient Records Analyzed" },
-    { value: "< 200ms", label: "Real-time Inference Speed" },
-    { value: "24 / 7", label: "Automated Clinical Alerting" },
+    { value: "0.8307", label: "Diabetes model AUC-ROC (held-out test split)" },
+    { value: "21", label: "BRFSS health indicators per assessment" },
+    { value: "1", label: "Trained model — diabetes (LightGBM)" },
+    { value: "100%", label: "Predictions shipped with a SHAP explanation" },
   ]
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto pb-10">
       {/* Novena-inspired Hero Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 p-8 sm:p-12 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl bg-primary p-8 sm:p-12 text-white shadow-card">
         <div className="relative z-10 max-w-2xl space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-3.5 py-1 text-xs font-semibold text-sky-300 backdrop-blur-md">
-            <Sparkles className="h-3.5 w-3.5" /> Total Healthcare & Decision Support Solution
-          </div>
+          <p className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8FC3DC]">
+            <Sparkles className="h-3.5 w-3.5" /> Healthcare & Decision Support
+          </p>
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-            Your Most Trusted Clinical AI Partner
+            Clinical AI that shows its reasons
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-            MediSight AI bridges the gap between traditional clinical care and state-of-the-art predictive machine learning models, empowering doctors with early disease detection and actionable risk insights.
+          <p className="text-sm sm:text-base text-white/75 leading-relaxed">
+            MediSight bridges the gap between traditional clinical care and predictive machine learning, giving doctors early disease detection and risk insights they can inspect — not just trust.
           </p>
           <div className="flex flex-wrap gap-4 pt-2">
-            <Link href="/patients/new" className="uiverse-btn">
+            <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand/90">
               New Patient Risk Assessment <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <Link href="/doctors" className="inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">
+            <Link href="/doctors" className="inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
               Meet Our Doctors
             </Link>
           </div>
         </div>
         <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
-          <Brain className="w-96 h-96 text-sky-400" />
+          <Brain className="w-96 h-96 text-white" />
         </div>
       </div>
 
       {/* Feature & Working Hours Cards (Inspired by Novena Novena-block) */}
       <div className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition uiverse-card flex flex-col justify-between">
+        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
               <Stethoscope className="h-6 w-6" />
@@ -62,7 +62,7 @@ export default function AboutPage() {
           </Link>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition uiverse-card flex flex-col justify-between">
+        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500 mb-4">
               <Clock className="h-6 w-6" />
@@ -77,7 +77,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition uiverse-card flex flex-col justify-between">
+        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 mb-4">
               <Shield className="h-6 w-6" />
@@ -117,7 +117,7 @@ export default function AboutPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {departments.map((dept, idx) => (
-            <div key={idx} className="rounded-xl border bg-card p-5 shadow-sm hover:border-primary/50 transition uiverse-card">
+            <div key={idx} className="rounded-xl border bg-card p-5 shadow-sm hover:border-primary/50 transition">
               <div className="flex items-center justify-between mb-3">
                 <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
                   <dept.icon className="h-5 w-5" />

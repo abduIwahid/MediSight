@@ -117,21 +117,15 @@ function LoginPageInner() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-background px-4 py-10">
-      {/* Decorative gradient blobs */}
-      <div className="blob -left-32 -top-32 h-96 w-96 bg-primary" />
-      <div className="blob -right-24 top-1/3 h-96 w-96 bg-violet" />
-      <div className="blob bottom-0 left-1/3 h-72 w-72 bg-cyan" />
-
-      <div className="relative z-10 grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-3xl border border-border/60 shadow-premium md:grid-cols-2">
+    <div className="relative flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
+      <div className="relative z-10 grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-2xl border border-border shadow-premium md:grid-cols-2">
         {/* Brand / marketing panel */}
-        <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-brand p-10 text-white md:flex">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_60%)]" />
+        <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-white md:flex">
           <div className="relative z-10 flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-md">
-              <span className="text-xs font-bold tracking-wider">MAI</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+              <span className="font-display text-sm tracking-wider">M</span>
             </div>
-            <span className="font-heading text-lg font-bold">MediSight AI</span>
+            <span className="font-heading text-lg font-bold">MediSight</span>
           </div>
           <div className="relative z-10 space-y-5">
             <h2 className="font-heading text-3xl font-bold leading-tight">
@@ -141,19 +135,19 @@ function LoginPageInner() {
               Predictive risk models, explainable AI, and real-time patient insights — all in one secure workspace built for modern care teams.
             </p>
             <ul className="space-y-3 text-sm text-white/85">
-              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-cyan" /> Early disease risk prediction</li>
-              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-cyan" /> SHAP-powered explainability</li>
-              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-cyan" /> HIPAA-minded, enterprise-grade security</li>
+              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> Early disease risk prediction</li>
+              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> SHAP-powered explainability</li>
+              <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand" /> Row-level security on every record</li>
             </ul>
           </div>
-          <p className="relative z-10 text-xs text-white/60">Trusted by clinical teams to make faster, safer decisions.</p>
+          <p className="relative z-10 text-xs text-white/60">One workspace for patients, doctors and admins.</p>
         </div>
 
         {/* Form panel */}
-        <div className="glass-panel flex flex-col justify-center bg-card/95 px-8 py-10 md:px-12 md:py-12">
+        <div className="flex flex-col justify-center bg-card px-8 py-10 md:px-12 md:py-12">
           <div className="space-y-6">
             <div className="space-y-2">
-              <p className="kicker">Welcome back</p>
+              <p className="eyebrow">Welcome back</p>
               <h1 className="font-heading text-3xl font-bold text-foreground">Sign in to your workspace</h1>
               <p className="max-w-xl text-sm leading-6 text-muted-foreground">
                 Securely access your AI healthcare workspace and resume your patient insights in one place.
@@ -256,7 +250,7 @@ function LoginPageInner() {
               {callbackError && <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">⚠️ {callbackError}</div>}
               {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
-              <Button type="submit" variant="gradient" className="w-full py-3" disabled={loading}>
+              <Button type="submit" className="w-full py-3" disabled={loading}>
                 {loading ? "Signing in..." : portal === "doctor" ? "Sign In as Doctor" : "Sign In"}
               </Button>
             </form>

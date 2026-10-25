@@ -519,7 +519,7 @@ export default function NewPatientPage() {
             <CardFooter className="border-t bg-muted/20 p-6 sm:px-8">
               <button
                 type="submit"
-                className="w-full h-14 uiverse-btn flex items-center justify-center text-base rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+                className="flex h-14 w-full items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-card transition hover:bg-primary/90 disabled:opacity-50"
                 disabled={loading}
               >
                 {loading ? (

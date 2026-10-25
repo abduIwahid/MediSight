@@ -14,7 +14,6 @@ import {
   Download,
   RotateCcw,
   Stethoscope,
-  Star,
   ShieldAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -172,7 +171,7 @@ export default function PredictPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-16 print:max-w-full">
       <div className="print:hidden">
-        <p className="kicker mb-3">Rule-Based Symptom Screening</p>
+        <p className="eyebrow mb-3">Rule-Based Symptom Screening</p>
         <h1 className="font-heading text-3xl font-bold">Disease Prediction Wizard</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Answer a few questions and get an instant rule-based symptom screening, plus a matched specialist. This checker uses fixed symptom rules — it is not the trained prediction model.
@@ -251,7 +250,7 @@ export default function PredictPage() {
 
             <div className="mt-6 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{selectedSymptoms.size} selected</span>
-              <Button variant="gradient" onClick={goNext} disabled={selectedSymptoms.size === 0}>
+              <Button onClick={goNext} disabled={selectedSymptoms.size === 0}>
                 Continue <ArrowRight className="ml-1.5 h-4 w-4" />
               </Button>
             </div>
@@ -325,7 +324,7 @@ export default function PredictPage() {
 
             <div className="mt-6 flex items-center justify-between">
               <Button variant="outline" onClick={goBack}><ArrowLeft className="mr-1.5 h-4 w-4" /> Back</Button>
-              <Button variant="gradient" onClick={runPrediction} disabled={isPredicting || !patient.name || !patient.age}>
+              <Button onClick={runPrediction} disabled={isPredicting || !patient.name || !patient.age}>
                 {isPredicting ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Predicting...</> : <>Predict Disease <ArrowRight className="ml-1.5 h-4 w-4" /></>}
               </Button>
             </div>
@@ -338,7 +337,7 @@ export default function PredictPage() {
             <div id="report" className="rounded-2xl border border-border bg-card p-7 shadow-premium">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="kicker mb-3">Screening Result</p>
+                  <p className="eyebrow mb-3">Screening Result</p>
                   <h2 className="font-heading text-2xl font-bold">{result.disease}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">for {patient.name}, {patient.age} yrs</p>
                 </div>
@@ -350,9 +349,9 @@ export default function PredictPage() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-secondary/50 p-4">
                   <div className="text-xs font-medium text-muted-foreground">Confidence Score</div>
-                  <div className="mt-1 font-heading text-3xl font-extrabold gradient-text">{result.confidence}%</div>
+                  <div className="mt-1 font-display text-3xl text-primary">{result.confidence}%</div>
                   <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
-                    <div className="h-full bg-gradient-brand" style={{ width: `${result.confidence}%` }} />
+                    <div className="h-full bg-brand" style={{ width: `${result.confidence}%` }} />
                   </div>
                 </div>
                 <div className="rounded-xl bg-secondary/50 p-4">
@@ -390,7 +389,7 @@ export default function PredictPage() {
               <Button variant="outline" onClick={resetWizard}><RotateCcw className="mr-1.5 h-4 w-4" /> Predict Again</Button>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={downloadReport}><Download className="mr-1.5 h-4 w-4" /> Download Report</Button>
-                <Button variant="gradient" onClick={goNext}>Find a Doctor <ArrowRight className="ml-1.5 h-4 w-4" /></Button>
+                <Button onClick={goNext}>Find a Doctor <ArrowRight className="ml-1.5 h-4 w-4" /></Button>
               </div>
             </div>
           </motion.div>
@@ -415,12 +414,12 @@ export default function PredictPage() {
             ) : (
               <div className="grid gap-5 sm:grid-cols-2">
                 {doctors.map((doc) => (
-                  <div key={doc.id} className="flex gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-premium">
+                  <div key={doc.id} className="flex gap-4 rounded-xl border border-border bg-card p-5 shadow-sm transition hover:shadow-card">
                     <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-secondary">
                       {doc.avatar_url ? (
                         <Image src={doc.avatar_url} alt={doc.full_name} fill className="object-cover" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-brand text-sm font-bold text-white">
+                        <div className="flex h-full w-full items-center justify-center bg-brand text-sm font-bold text-white">
                           {doc.full_name?.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                         </div>
                       )}
@@ -432,9 +431,6 @@ export default function PredictPage() {
                       </div>
                       <p className="text-xs text-primary">{doc.specialty}</p>
                       {doc.hospitals?.name && <p className="mt-0.5 text-xs text-muted-foreground">{doc.hospitals.name}</p>}
-                      <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-500">
-                        {Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-3 w-3 fill-current" />)}
-                      </div>
                       {doc.bio && <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{doc.bio}</p>}
                       <div className="mt-3 flex items-center justify-between">
                         {doc.consultation_fee ? <span className="text-xs font-semibold">${doc.consultation_fee}</span> : <span />}
@@ -442,7 +438,7 @@ export default function PredictPage() {
                           <Link href={`/doctors/${doc.id}`} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-muted">
                             View Profile
                           </Link>
-                          <Link href={`/doctors/${doc.id}`} className="btn-premium rounded-lg px-3 py-1.5 text-xs font-medium text-white">
+                          <Link href={`/doctors/${doc.id}`} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:bg-primary/90">
                             Book
                           </Link>
                         </div>

@@ -36,27 +36,25 @@ export function DashboardClientView({
       className="space-y-8 max-w-7xl mx-auto pb-8"
     >
       {/* Hero Banner */}
-      <motion.div variants={itemVariants} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 p-6 sm:p-10 text-white shadow-lg">
-        <div className="absolute top-0 right-0 -mt-4 -mr-4 h-32 w-32 rounded-full bg-sky-500/20 blur-3xl" />
-        <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
+      <motion.div variants={itemVariants} className="relative overflow-hidden rounded-xl bg-primary p-6 sm:p-10 text-white shadow-card">
         <div className="relative z-10 max-w-3xl space-y-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-            className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-4 py-1 text-xs font-semibold text-sky-300 backdrop-blur-md"
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8FC3DC]"
           >
-            <Sparkles className="h-4 w-4" /> MediSight AI — Clinical Intelligence Platform
-          </motion.div>
+            <Sparkles className="h-4 w-4" /> MediSight — Clinical Intelligence Platform
+          </motion.p>
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Hospital Command Centre</h1>
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
+          <p className="text-sm sm:text-base text-white/75 leading-relaxed max-w-2xl">
             Real-time monitoring of patient risk levels, critical alerts, and clinical AI predictions across your entire facility.
           </p>
           <div className="flex flex-wrap items-center gap-4 pt-4">
-            <Link href="/patients/new" className="uiverse-btn text-sm px-6 py-3">
+            <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand/90">
               New Risk Assessment <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <Link href="/alerts" className="inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 px-6 py-3 text-sm font-semibold text-slate-200 transition-all hover:bg-slate-700 hover:shadow-lg">
+            <Link href="/alerts" className="inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
               View All Alerts
             </Link>
           </div>
@@ -66,16 +64,15 @@ export function DashboardClientView({
       {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
-          { label: "Total Patients", value: totalPatients, icon: Users, color: "text-sky-500", bg: "bg-sky-500/10", href: "/patients" },
-          { label: "Active Doctors", value: totalDoctors, icon: Stethoscope, color: "text-violet-500", bg: "bg-violet-500/10", href: "/doctors" },
-          { label: "AI Predictions", value: totalPredictions, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10", href: "/analytics" },
-          { label: "Unread Alerts", value: totalAlerts, icon: Bell, color: "text-amber-500", bg: "bg-amber-500/10", href: "/alerts" },
-          { label: "Critical Alerts", value: criticalAlerts, icon: AlertTriangle, color: "text-red-500", bg: "bg-red-500/10", href: "/alerts" },
+          { label: "Total Patients", value: totalPatients, icon: Users, color: "text-[#2E7FA8]", bg: "bg-[#2E7FA8]/10", href: "/patients" },
+          { label: "Active Doctors", value: totalDoctors, icon: Stethoscope, color: "text-primary", bg: "bg-secondary", href: "/doctors" },
+          { label: "AI Predictions", value: totalPredictions, icon: Activity, color: "text-[#1E7A46]", bg: "bg-[#1E7A46]/10", href: "/analytics" },
+          { label: "Unread Alerts", value: totalAlerts, icon: Bell, color: "text-[#D97706]", bg: "bg-[#D97706]/10", href: "/alerts" },
+          { label: "Critical Alerts", value: criticalAlerts, icon: AlertTriangle, color: "text-[#C0392B]", bg: "bg-[#C0392B]/10", href: "/alerts" },
         ].map((stat, i) => (
           <Link key={i} href={stat.href}>
             <motion.div
-              whileHover={{ scale: 1.03, y: -2 }}
-              className="group bg-card border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+              className="group bg-card border rounded-xl p-5 shadow-sm hover:shadow-card transition-shadow duration-200 cursor-pointer"
             >
               <div className={`inline-flex p-2 rounded-xl ${stat.bg} mb-3 group-hover:scale-110 transition-transform`}>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
@@ -96,12 +93,12 @@ export function DashboardClientView({
           </h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Add Patient", desc: "Register & run AI prediction", href: "/patients/new", icon: Users, color: "bg-sky-500/10 text-sky-600 group-hover:bg-sky-500 group-hover:text-white" },
-              { label: "Patient Registry", desc: "Browse all patient records", href: "/patients", icon: Activity, color: "bg-violet-500/10 text-violet-600 group-hover:bg-violet-500 group-hover:text-white" },
-              { label: "Doctor Directory", desc: "View available specialists", href: "/doctors", icon: Stethoscope, color: "bg-emerald-500/10 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white" },
-              { label: "Analytics", desc: "Population-level insights", href: "/analytics", icon: TrendingUp, color: "bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white" },
-              { label: "AI Assistant", desc: "Clinical copilot chat", href: "/assistant", icon: Sparkles, color: "bg-pink-500/10 text-pink-600 group-hover:bg-pink-500 group-hover:text-white" },
-              { label: "Alerts Centre", desc: "Critical & high risk alerts", href: "/alerts", icon: Bell, color: "bg-red-500/10 text-red-600 group-hover:bg-red-500 group-hover:text-white" },
+              { label: "Add Patient", desc: "Register & run AI prediction", href: "/patients/new", icon: Users, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "Patient Registry", desc: "Browse all patient records", href: "/patients", icon: Activity, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "Doctor Directory", desc: "View available specialists", href: "/doctors", icon: Stethoscope, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "Analytics", desc: "Population-level insights", href: "/analytics", icon: TrendingUp, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "AI Assistant", desc: "Clinical copilot chat", href: "/assistant", icon: Sparkles, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
+              { label: "Alerts Centre", desc: "Critical & high risk alerts", href: "/alerts", icon: Bell, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
             ].map((action, i) => (
               <Link key={i} href={action.href}>
                 <div className="group flex items-start gap-3 p-3 rounded-xl border bg-background hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer h-full">
@@ -134,7 +131,7 @@ export function DashboardClientView({
 
           {!recentAlerts || recentAlerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 py-12 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
-              <ShieldCheck className="h-10 w-10 mb-3 text-emerald-500 opacity-60" />
+              <ShieldCheck className="h-10 w-10 mb-3 text-[#1E7A46] opacity-60" />
               <p className="text-sm font-medium text-foreground">All Clear</p>
               <p className="text-xs mt-1 text-center max-w-[200px]">No active critical or high risk alerts at this time.</p>
             </div>

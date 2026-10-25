@@ -22,10 +22,10 @@ export default async function AdminOverviewPage() {
     ])
 
   const stats = [
-    { label: "Total Patients", value: totalPatients ?? 0, icon: Users, accent: "text-blue-500 bg-blue-500/10" },
-    { label: "Total Doctors", value: totalDoctors ?? 0, icon: Stethoscope, accent: "text-emerald-500 bg-emerald-500/10" },
-    { label: "Pending Approvals", value: pendingDoctors ?? 0, icon: Clock, accent: "text-amber-500 bg-amber-500/10" },
-    { label: "Total Appointments", value: totalAppointments ?? 0, icon: Activity, accent: "text-violet-500 bg-violet-500/10" },
+    { label: "Total Patients", value: totalPatients ?? 0, icon: Users, accent: "text-[#2E7FA8] bg-[#2E7FA8]/10" },
+    { label: "Total Doctors", value: totalDoctors ?? 0, icon: Stethoscope, accent: "text-primary bg-secondary" },
+    { label: "Pending Approvals", value: pendingDoctors ?? 0, icon: Clock, accent: "text-[#D97706] bg-[#D97706]/10" },
+    { label: "Total Appointments", value: totalAppointments ?? 0, icon: Activity, accent: "text-[#1E7A46] bg-[#1E7A46]/10" },
   ]
 
   return (

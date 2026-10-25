@@ -197,7 +197,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           </Link>
           <div>
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center flex-shrink-0 shadow-inner">
+              <div className="h-14 w-14 rounded-xl bg-secondary border border-border flex items-center justify-center flex-shrink-0">
                 <span className="text-xl font-bold text-primary">
                   {name !== "Unknown Patient" ? name.charAt(0).toUpperCase() : "?"}
                 </span>

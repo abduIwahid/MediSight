@@ -116,7 +116,7 @@ export default function ContactPage() {
               />
             </div>
 
-            <button type="submit" className="uiverse-btn w-full sm:w-auto">
+            <button type="submit" className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 sm:w-auto">
               <Send className="mr-2 h-4 w-4" /> Send Message
             </button>
           </form>
