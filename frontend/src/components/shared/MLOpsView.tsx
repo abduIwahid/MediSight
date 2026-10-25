@@ -32,6 +32,7 @@ export function MLOpsView({
   modelStatus,
   predictionTrend,
   serviceConnected = false,
+  viewerRole,
 }: {
   driftData: DriftData | null
   modelStatus: MlModelStatus | null
@@ -39,9 +40,16 @@ export function MLOpsView({
   serviceConnected?: boolean
   /** Accepted for call-site compatibility; the offline banner no longer prints the service address to end users. */
   mlServiceUrl?: string
+  /** The viewing admin's role. Retraining is super-admin only (the API
+   *  route enforces the same rule) — other roles see why the control
+   *  is unavailable instead of a button that would 403 (QA Round 2,
+   *  SA-1). */
+  viewerRole?: string
 }) {
   const [retraining, setRetraining] = useState(false)
   const [retrainMsg, setRetrainMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [confirmingRetrain, setConfirmingRetrain] = useState(false)
+  const canRetrain = viewerRole === "super_admin"
 
   // Aggregate daily prediction volume + avg probability from raw prediction rows
   const dailyTrend = useMemo(() => {
@@ -160,6 +168,11 @@ export function MLOpsView({
             <p className="text-sm text-muted-foreground mt-1">
               Starts a background retraining job on the ML service using the full training dataset.
             </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Note: a retrained model keeps the service&apos;s &ldquo;1.0.0&rdquo; version label, and the model
+              registry is not updated automatically — after a retrain, check the Retrain Status and Last
+              trained fields rather than the version number.
+            </p>
             {modelStatus?.last_trained && (
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <Clock className="h-3 w-3" />
@@ -167,18 +180,47 @@ export function MLOpsView({
               </p>
             )}
           </div>
-          <Button
-            onClick={handleRetrain}
-            disabled={retraining || !serviceConnected || modelStatus?.status === 'training'}
-            className="ml-4 flex-shrink-0"
-          >
-            {retraining ? (
-              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Triggering...</>
-            ) : (
-              <><Zap className="h-4 w-4 mr-2" /> Retrain Now</>
-            )}
-          </Button>
+          {canRetrain ? (
+            <Button
+              onClick={() => { setRetrainMsg(null); setConfirmingRetrain(true) }}
+              disabled={retraining || !serviceConnected || modelStatus?.status === 'training'}
+              className="ml-4 flex-shrink-0"
+            >
+              {retraining ? (
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Triggering...</>
+              ) : (
+                <><Zap className="h-4 w-4 mr-2" /> Retrain Now</>
+              )}
+            </Button>
+          ) : (
+            <p className="ml-4 flex-shrink-0 max-w-[220px] text-xs text-muted-foreground">
+              Retraining changes the model for every hospital and is restricted to super admins.
+            </p>
+          )}
         </div>
+        {confirmingRetrain && (
+          <div role="alertdialog" aria-label="Confirm retraining" className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] px-4 py-3 text-sm">
+            <p className="text-[#A85008]">
+              Retrain the production model? Once training completes, the new model serves predictions for <strong>every hospital</strong>. This action is recorded in the audit log.
+            </p>
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setConfirmingRetrain(false); handleRetrain() }}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Confirm retrain
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingRetrain(false)}
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         {retrainMsg && (
           <div role={retrainMsg.type === 'error' ? "alert" : "status"} className={`mt-4 p-3 rounded-lg text-sm ${
             retrainMsg.type === 'success'

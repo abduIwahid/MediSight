@@ -89,7 +89,11 @@ export interface ProfileRow {
   full_name?: string | null
   email?: string | null
   role?: string | null
-  phone?: string | null
+  /** The one profile phone column (QA Round 2, cluster 21). The
+   *  legacy profiles.phone column is retired — nothing reads or
+   *  writes it any more; existing values are backfilled into this
+   *  column by migration 20261025230000. */
+  contact_number?: string | null
   department?: string | null
   specialty?: string | null
   bio?: string | null

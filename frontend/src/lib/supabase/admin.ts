@@ -35,6 +35,42 @@ export async function requireSuperAdmin() {
 }
 
 /**
+ * Records an admin-API action in the audit trail, attributed to the
+ * acting admin. The DB audit triggers (log_phi_access) capture
+ * auth.uid(), which is NULL under the service-role client — so actions
+ * performed through these routes (password resets, email changes,
+ * deletions, retrains) would otherwise be attributed to "System" or
+ * leave no trace at all (QA Round 2, SA-3). Best-effort by design: the
+ * action itself has already succeeded when this runs, so a failed
+ * audit write is logged server-side, never surfaced as a failed action.
+ */
+export async function logAdminAction(entry: {
+  actorId: string
+  action: "INSERT" | "UPDATE" | "DELETE"
+  tableName: string
+  rowId: string
+  oldValues?: Record<string, unknown> | null
+  newValues?: Record<string, unknown> | null
+}) {
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.from("audit_logs").insert({
+      actor_id: entry.actorId,
+      action: entry.action,
+      table_name: entry.tableName,
+      row_id: entry.rowId,
+      old_values: entry.oldValues ?? null,
+      new_values: entry.newValues ?? null,
+    })
+    if (error) {
+      console.error("[admin] Audit write failed:", error.message)
+    }
+  } catch (err) {
+    console.error("[admin] Audit write failed:", err)
+  }
+}
+
+/**
  * A privileged Supabase client authenticated with the service_role key.
  * NEVER expose this client or the key to the browser — it bypasses RLS
  * entirely and can manage auth.users directly. Only ever import/use this

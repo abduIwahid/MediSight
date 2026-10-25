@@ -17,15 +17,29 @@ const ALL_ROLES = ['super_admin', 'hospital_admin', 'doctor', 'nurse', 'data_sci
 // verification instead.
 const ASSIGNABLE_ROLES = ['super_admin', 'hospital_admin', 'nurse', 'data_scientist', 'patient']
 
-export function UserManagementView({ profiles, hospitals, viewerRole }: { profiles: ProfileRow[], hospitals: { id: string; name: string }[], viewerRole: string }) {
+export function UserManagementView({ profiles, hospitals, viewerRole, viewerId, viewerHospitalId }: {
+  profiles: ProfileRow[]
+  hospitals: { id: string; name: string }[]
+  viewerRole: string
+  /** The signed-in admin's own profile id + hospital — needed for the
+   *  self-demotion guard and for telling a successful out-of-scope
+   *  hospital move apart from a failed write (QA Round 2, 20b/20c). */
+  viewerId?: string
+  viewerHospitalId?: string | null
+}) {
   const [query, setQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [localProfiles, setLocalProfiles] = useState(profiles)
   // A role change is confirmed before it is written (QA Round 1, item 26):
   // picking a new role in the dropdown only stages it here.
   const [pendingRoleChange, setPendingRoleChange] = useState<{ profileId: string; name: string; from: string; to: string } | null>(null)
+  // Hospital reassignment is staged + confirmed the same way (QA
+  // Round 2, 20c): it re-scopes everything the user can see, so it
+  // must not fire on a stray dropdown pick.
+  const [pendingHospitalChange, setPendingHospitalChange] = useState<{ profileId: string; name: string; fromName: string; toId: string; toName: string } | null>(null)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -45,6 +59,29 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
   // is how admins end up believing a change happened when it did not.
   const stageRoleChange = (profile: ProfileRow, newRole: string) => {
     if (!profile.role || newRole === profile.role) return
+    setActionError(null)
+    setActionSuccess(null)
+    // Guards (QA Round 2, SA-5 / hospital-admin #7): demoting yourself
+    // can lock you out of the admin area entirely; a hospital_admin
+    // must not demote a super_admin (the grant direction was already
+    // blocked — the demote direction was not); and the LAST super
+    // admin can never be demoted. The admin API route enforces the
+    // same rules for its callers.
+    if (viewerId && profile.id === viewerId) {
+      setActionError("You can't change your own role — that could lock you out of the admin area. Ask another super admin to make this change.")
+      return
+    }
+    if (profile.role === 'super_admin' && newRole !== 'super_admin') {
+      if (viewerRole === 'hospital_admin') {
+        setActionError("Only a super admin can change a super admin's role.")
+        return
+      }
+      const superAdminCount = localProfiles.filter(p => p.role === 'super_admin').length
+      if (superAdminCount <= 1) {
+        setActionError("This is the only super admin account. Promote another user to super admin before changing this role.")
+        return
+      }
+    }
     setPendingRoleChange({ profileId: profile.id, name: profile.full_name || "This user", from: profile.role, to: newRole })
   }
 
@@ -52,6 +89,7 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
     setPendingRoleChange(null)
     setUpdatingId(profileId)
     setActionError(null)
+    setActionSuccess(null)
     const { data, error } = await supabase
       .from('profiles')
       .update({ role: newRole })
@@ -61,21 +99,47 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
       setActionError("The role change could not be saved. You may not have permission to change this user's role.")
     } else {
       setLocalProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role: newRole } : p))
+      const target = localProfiles.find(p => p.id === profileId)
+      setActionSuccess(`Role updated for ${target?.full_name || "the user"} — now ${roleLabel(newRole)}.`)
     }
     setUpdatingId(null)
   }
 
-  const handleHospitalChange = async (profileId: string, newHospitalId: string) => {
+  const stageHospitalChange = (profile: ProfileRow, newHospitalId: string) => {
+    if ((profile.hospital_id || "") === (newHospitalId || "")) return
+    setActionError(null)
+    setActionSuccess(null)
+    setPendingHospitalChange({
+      profileId: profile.id,
+      name: profile.full_name || "This user",
+      fromName: profile.hospitals?.name || "Unassigned",
+      toId: newHospitalId,
+      toName: hospitals.find(h => h.id === newHospitalId)?.name || "Unassigned",
+    })
+  }
+
+  const handleHospitalChange = async (change: { profileId: string; name: string; toId: string; toName: string }) => {
+    const { profileId, name, toId: newHospitalId, toName } = change
+    setPendingHospitalChange(null)
     setUpdatingId(profileId)
     setActionError(null)
+    setActionSuccess(null)
+    // A hospital_admin's profile reads are scoped to their own
+    // hospital, so after they move a user OUT of it the updated row is
+    // no longer visible to them and the verification .select() below
+    // returns zero rows — even though the write landed. That case is
+    // detected up front and reported as what it is, not as a failure
+    // (QA Round 2, hospital-admin #6).
+    const movingOutOfViewerScope =
+      viewerRole === 'hospital_admin' && (newHospitalId || null) !== (viewerHospitalId || null)
     const { data, error } = await supabase
       .from('profiles')
       .update({ hospital_id: newHospitalId || null })
       .eq('id', profileId)
       .select('id')
-    if (error || !data || data.length === 0) {
+    if (error) {
       setActionError("The hospital change could not be saved. You may not have permission to change this user's hospital.")
-    } else {
+    } else if (data && data.length > 0) {
       setLocalProfiles(prev => prev.map(p => {
         if (p.id === profileId) {
           const hospital = hospitals.find(h => h.id === newHospitalId)
@@ -83,6 +147,14 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
         }
         return p
       }))
+      setActionSuccess(`${name} was moved to ${toName}.`)
+    } else if (movingOutOfViewerScope) {
+      // Zero rows back + the destination is outside the viewer's
+      // scope = the move succeeded and the row left their list.
+      setLocalProfiles(prev => prev.filter(p => p.id !== profileId))
+      setActionSuccess(`${name} was moved to ${toName} and no longer appears in your hospital's list.`)
+    } else {
+      setActionError("The hospital change could not be saved. You may not have permission to change this user's hospital.")
     }
     setUpdatingId(null)
   }
@@ -105,6 +177,34 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
       {actionError && (
         <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {actionError}
+        </div>
+      )}
+      {actionSuccess && (
+        <div role="status" className="rounded-xl border border-[#1E7A46]/30 bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">
+          {actionSuccess}
+        </div>
+      )}
+      {pendingHospitalChange && (
+        <div role="alertdialog" aria-label="Confirm hospital change" className="flex flex-wrap items-center gap-3 rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] px-4 py-3 text-sm">
+          <p className="text-[#A85008]">
+            Move <strong>{pendingHospitalChange.name}</strong> from <strong>{pendingHospitalChange.fromName}</strong> to <strong>{pendingHospitalChange.toName}</strong>? This changes which hospital&apos;s patients and colleagues they can see.
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleHospitalChange(pendingHospitalChange)}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Confirm move
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingHospitalChange(null)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       {pendingRoleChange && (
@@ -206,7 +306,7 @@ export function UserManagementView({ profiles, hospitals, viewerRole }: { profil
                   <td className="p-4">
                     <Select
                       value={profile.hospital_id || "none"}
-                      onValueChange={(val) => handleHospitalChange(profile.id, val === "none" ? "" : val)}
+                      onValueChange={(val) => stageHospitalChange(profile, val === "none" ? "" : val)}
                       disabled={updatingId === profile.id}
                     >
                       <SelectTrigger className="w-44 h-8 text-xs">

@@ -18,15 +18,22 @@ const SPECIALTIES = [
   "Emergency Medicine", "Radiology", "Pathology", "Data Science"
 ]
 
-export function ProfileForm({ user, profile, hospitals }: {
+export function ProfileForm({ user, profile, hospitalName }: {
   user: User
   profile: ProfileRow | null
-  hospitals?: { id: string; name: string }[]
+  /** Name of the hospital the profile is assigned to (resolved by the
+   *  settings page). Assignment itself is admin-only — see the
+   *  read-only Hospital Assignment field below. */
+  hospitalName?: string | null
 }) {
   const [fullName, setFullName] = useState(profile?.full_name || "")
   const [department, setDepartment] = useState(profile?.department || "")
   const [specialty, setSpecialty] = useState(profile?.specialty || "")
-  const [phone, setPhone] = useState(profile?.phone || "")
+  // The profile phone number lives in `contact_number` — the column
+  // the admin API writes (QA Round 2, cluster 21). This form used to
+  // read/write the legacy `phone` column, so self-service edits and
+  // admin edits landed in different columns and drifted apart.
+  const [phone, setPhone] = useState(profile?.contact_number || "")
   const [bio, setBio] = useState(profile?.bio || "")
   const [consultationFee, setConsultationFee] = useState(profile?.consultation_fee ? String(profile.consultation_fee) : "")
   const [servicesString, setServicesString] = useState(Array.isArray(profile?.services) ? profile.services.join(", ") : "")
@@ -38,7 +45,6 @@ export function ProfileForm({ user, profile, hospitals }: {
   )
   const isDoctor = profile?.role === "doctor"
 
-  const [hospitalId, setHospitalId] = useState(profile?.hospital_id || "")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,19 +60,25 @@ export function ProfileForm({ user, profile, hospitals }: {
     setSaved(false)
     setError(null)
     try {
+      // hospital_id is deliberately NOT written here: hospital
+      // assignment decides which hospital's patients a user can see,
+      // so it is set by administrators in User Management only. This
+      // form used to offer every signed-in user a picker of all
+      // hospitals — self-service cross-hospital access (QA Round 2,
+      // cluster 12). Migration 20261025230000 adds the matching DB
+      // guard for writes that bypass this form.
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: fullName,
           department,
           specialty,
-          phone,
+          contact_number: phone,
           bio,
           availability_status: availabilityStatus,
           available: availabilityStatus === "available",
           consultation_fee: consultationFee ? Number(consultationFee) : null,
           services: servicesString.split(',').map((item: string) => item.trim()).filter(Boolean),
-          hospital_id: (hospitalId && hospitalId !== 'none') ? hospitalId : null,
           avatar_url: avatarUrl,
         })
         .eq("id", user.id)
@@ -191,22 +203,17 @@ export function ProfileForm({ user, profile, hospitals }: {
               placeholder="e.g. Cardiology Ward B"
             />
           </div>
-          {hospitals && hospitals.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="hospital">Hospital Assignment</Label>
-              <Select value={hospitalId} onValueChange={setHospitalId}>
-                <SelectTrigger id="hospital">
-                  <SelectValue placeholder="Select hospital" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {hospitals.map(h => (
-                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-2">
+            <Label>Hospital Assignment</Label>
+            <div className="flex items-center gap-2 h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5" />
+              {hospitalName || profile?.hospitals?.name || "Unassigned"}
+              <span className="text-xs text-muted-foreground/60 ml-1">(assigned by admin)</span>
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              Your hospital decides which patients you can see. To change it, ask an administrator — they manage assignments in User Management.
+            </p>
+          </div>
         </div>
 
         {isDoctor && (

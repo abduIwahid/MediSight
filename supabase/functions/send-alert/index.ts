@@ -25,14 +25,21 @@ serve(async (req) => {
       throw new Error("Invalid payload missing prediction_id or patient_id")
     }
 
-    // Insert alert into alerts table
+    // Insert alert into alerts table.
+    // Status must be a member of the alert_status enum ('New',
+    // 'Acknowledged', 'Resolved' — initial schema). This used to
+    // insert 'Unacknowledged', which is not in the enum: every insert
+    // threw invalid-enum-input and the whole DB critical-alert
+    // pipeline failed silently (QA Round 2, data-integrity H1).
+    // NOTE: this is a repo-side fix — the function must be redeployed
+    // (`supabase functions deploy send-alert`) before it takes effect.
     const { error } = await supabaseAdmin
       .from('alerts')
       .insert({
         patient_id: patient_id,
         type: 'Critical Prediction',
         severity: 'Critical',
-        status: 'Unacknowledged'
+        status: 'New'
       })
 
     if (error) throw error
