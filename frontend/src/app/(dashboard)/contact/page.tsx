@@ -76,8 +76,8 @@ export default function ContactPage() {
               </div>
               <div>
                 <p className="font-semibold text-xs">Project Repository</p>
-                <Link href="https://github.com/abduIwahid/MediSight" target="_blank" rel="noreferrer" className="text-xs text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
-                  github.com/abduIwahid/MediSight
+                <Link href="https://github.com/abduIwahid/WhyRisk" target="_blank" rel="noreferrer" className="text-xs text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
+                  github.com/abduIwahid/WhyRisk
                 </Link>
                 <p className="text-[10px] text-muted-foreground">Issues and questions live on GitHub</p>
               </div>
