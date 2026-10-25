@@ -3,7 +3,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar } from "lucide-react"
+import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar, HeartPulse } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
@@ -50,6 +50,7 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
       items: [
         { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { name: "Patients", href: "/patients", icon: Users },
+        { name: "Risk Queue", href: "/patients/queue", icon: HeartPulse },
         { name: "Appointments", href: "/appointments", icon: Calendar },
         { name: "Doctors", href: "/doctors", icon: Stethoscope },
         { name: "Alerts Center", href: "/alerts", icon: Bell },
