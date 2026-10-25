@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Anton, Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -19,26 +19,42 @@ const jetbrainsMono = JetBrains_Mono({
 const description =
   "Diabetes risk prediction with explainable machine learning — every score shows its reasons.";
 
+export const viewport: Viewport = {
+  themeColor: "#0D2B3E",
+};
+
 export const metadata: Metadata = {
   // Canonical base for sitemap/OG resolution; NEXT_PUBLIC_SITE_URL is the
   // same variable auth redirects use. Unset locally, which Next tolerates.
   metadataBase: process.env.NEXT_PUBLIC_SITE_URL
     ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
     : undefined,
-  title: "WhyRisk",
+  title: {
+    default: "WhyRisk",
+    template: "%s — WhyRisk",
+  },
   description,
   openGraph: {
     type: "website",
     siteName: "WhyRisk",
     title: "WhyRisk",
     description,
-    images: ["/logo.png"],
+    // The generated /opengraph-image route (src/app/opengraph-image.tsx)
+    // renders a true 1200×630 card, so the declared dimensions are exact.
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "WhyRisk — Know your risk. See exactly why.",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "WhyRisk",
     description,
-    images: ["/logo.png"],
+    images: ["/opengraph-image"],
   },
 };
 

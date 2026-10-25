@@ -1,7 +1,34 @@
 import Link from "next/link"
 import type { CSSProperties } from "react"
+import type { Metadata } from "next"
 import { Activity, ArrowRight, CalendarCheck, ListChecks } from "lucide-react"
 import BrandMark from "@/components/shared/BrandMark"
+
+export const metadata: Metadata = {
+  // Absolute title: the root template would otherwise append "— WhyRisk"
+  // to a title that already starts with the brand name.
+  title: { absolute: "WhyRisk — Know your risk. See exactly why." },
+  description:
+    "WhyRisk estimates diabetes risk with a trained machine-learning model and shows the reasons behind the score — SHAP explanations, stored per prediction.",
+  alternates: { canonical: "/welcome" },
+  openGraph: {
+    url: "/welcome",
+    title: "WhyRisk — Know your risk. See exactly why.",
+    description:
+      "Diabetes risk prediction with explainable machine learning — every score shows its reasons.",
+  },
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "WhyRisk",
+  applicationCategory: "HealthApplication",
+  operatingSystem: "Web",
+  url: "https://whyrisk.vercel.app/welcome",
+  description:
+    "Diabetes risk prediction with explainable machine learning — every score shows its reasons.",
+}
 
 /* ------------------------------------------------------------------ */
 /*  WhyRisk public landing page.                                     */
@@ -51,13 +78,17 @@ const CAPABILITIES = [
 const DEMO_FACTORS = [
   { label: "BMI 29.4", width: "62%", color: "#D97706", value: "+0.14" },
   { label: "High blood pressure", width: "48%", color: "#D97706", value: "+0.10" },
-  { label: "Glucose history", width: "38%", color: "#2E7FA8", value: "+0.08" },
+  { label: "High cholesterol", width: "38%", color: "#2E7FA8", value: "+0.08" },
   { label: "Physically active", width: "30%", color: "#1E7A46", value: "−0.06" },
 ]
 
 export default function WelcomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/95">
         <div className="mx-auto flex max-w-6xl items-center gap-3.5 px-5 py-3.5">
@@ -71,16 +102,16 @@ export default function WelcomePage() {
             </span>
           </Link>
           <nav className="ml-auto hidden items-center gap-6 text-sm font-semibold md:flex">
-            <a href="#model" className="text-foreground/75 transition hover:text-foreground">The model</a>
+            <Link href="/model-card" className="text-foreground/75 transition hover:text-foreground">The model</Link>
             <a href="#how" className="text-foreground/75 transition hover:text-foreground">How it works</a>
             <a href="#scope" className="text-foreground/75 transition hover:text-foreground">Scope</a>
             <Link href="/login" className="text-foreground/75 transition hover:text-foreground">Sign in</Link>
           </nav>
           <Link
             href="/signup"
-            className="ml-4 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 md:ml-6"
+            className="ml-4 inline-flex items-center rounded-lg border-[1.5px] border-primary px-5 py-2.5 text-sm font-bold text-primary transition hover:bg-secondary md:ml-6"
           >
-            Check your risk
+            Create your account
           </Link>
         </div>
       </header>
@@ -112,7 +143,7 @@ export default function WelcomePage() {
                 href="/signup"
                 className="inline-flex items-center rounded-lg bg-brand px-5 py-3 text-sm font-bold text-white transition hover:bg-brand/90"
               >
-                Check diabetes risk <ArrowRight className="ml-2 h-4 w-4" />
+                Create your account <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
               <a
                 href="#how"
@@ -143,7 +174,7 @@ export default function WelcomePage() {
                 Demo data
               </span>
             </div>
-            <h2 className="mt-2 font-sans text-xl font-bold tracking-normal">Ahmed Raza, 47</h2>
+            <p className="mt-2 font-sans text-xl font-bold tracking-normal">Ahmed Raza, 47</p>
             <p className="text-[13px] text-muted-foreground">Sample assessment · LightGBM model</p>
             <div className="mt-2 font-display text-[52px] leading-none">
               0.31{" "}
@@ -180,7 +211,7 @@ export default function WelcomePage() {
         </section>
 
         {/* Honest facts */}
-        <section id="model" className="grid gap-3 pb-2 pt-8 sm:grid-cols-2 lg:grid-cols-4">
+        <section id="model" className="grid scroll-mt-24 gap-3 pb-2 pt-8 sm:grid-cols-2 lg:grid-cols-4">
           {FACTS.map((f) => (
             <div key={f.value} className="rounded-xl bg-primary p-[18px] text-white">
               <span className="block font-display text-[26px] tracking-wide">{f.value}</span>
@@ -190,7 +221,7 @@ export default function WelcomePage() {
         </section>
 
         {/* What it does */}
-        <section id="how" className="pb-2 pt-12">
+        <section id="how" className="scroll-mt-24 pb-2 pt-12">
           <h2 className="font-display text-[30px] uppercase tracking-wide">What it does</h2>
           <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
             Three things, done properly — instead of ten things done with smoke and mirrors.
@@ -209,7 +240,7 @@ export default function WelcomePage() {
         </section>
 
         {/* Honest scope */}
-        <section id="scope" className="pb-2 pt-12">
+        <section id="scope" className="scroll-mt-24 pb-2 pt-12">
           <h2 className="font-display text-[30px] uppercase tracking-wide">What is real, what is next</h2>
           <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
             Most health apps hide this page. We put it on the homepage.
@@ -221,7 +252,7 @@ export default function WelcomePage() {
                 {[
                   ["Diabetes risk model (LightGBM)", "Trained", "bg-[#E2F0E6] text-[#1E7A46]"],
                   ["SHAP explanations", "Stored per prediction", "bg-[#E2F0E6] text-[#1E7A46]"],
-                  ["Symptom screening", "Rule-based · labelled", "bg-[#FDF0DC] text-[#B45309]"],
+                  ["Symptom screening", "Rule-based · labelled", "bg-[#FDF0DC] text-[#A85008]"],
                   ["Patient / doctor portals & appointments", "Live", "bg-[#E2F0E6] text-[#1E7A46]"],
                 ].map(([label, tag, tagClass]) => (
                   <li key={label} className="flex items-center justify-between gap-2 border-b border-foreground/[0.07] py-[7px] last:border-b-0">
@@ -236,9 +267,10 @@ export default function WelcomePage() {
               <ul className="mt-2 text-[14.5px]">
                 {[
                   "Heart disease model",
+                  "Stroke model",
                   "Chronic kidney disease model",
-                  "Stroke & hypertension models",
-                  "Liver disease & breast cancer models",
+                  "Hypertension model",
+                  "Asthma & COPD models",
                 ].map((label) => (
                   <li key={label} className="flex items-center justify-between gap-2 border-b border-foreground/[0.07] py-[7px] last:border-b-0">
                     <span>{label}</span>
@@ -262,7 +294,7 @@ export default function WelcomePage() {
             <div className="hidden bg-foreground p-5 text-[#DCE7EA] md:block">
               <div className="font-display text-[17px] uppercase tracking-wide text-white">WhyRisk</div>
               <ul className="mt-[18px] space-y-1 text-[13.5px]">
-                {["Overview", "Patients", "Doctors", "Appointments", "ML Models", "MLOps", "Audit log"].map((item, i) => (
+                {["Dashboard", "Risk Queue", "Alerts Center", "AI Assistant", "Model Registry", "Audit Logs"].map((item, i) => (
                   <li key={item} className={i === 0 ? "rounded-lg bg-primary px-2.5 py-[9px] font-bold text-white" : "px-2.5 py-[9px] opacity-80"}>
                     {item}
                   </li>
@@ -291,9 +323,14 @@ export default function WelcomePage() {
       <footer className="mt-14 bg-foreground py-[30px] text-[#C8D6DA]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3.5 px-5">
           <span className="font-display text-lg uppercase tracking-wide text-white">WhyRisk</span>
-          <a href="/model-card" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
-            Model card
-          </a>
+          <span className="flex items-center gap-4">
+            <Link href="/login" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
+              Sign in
+            </Link>
+            <a href="/model-card" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
+              Model card
+            </a>
+          </span>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
             WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical
             device and does not replace professional diagnosis. Built during a machine-learning internship at Ezitech

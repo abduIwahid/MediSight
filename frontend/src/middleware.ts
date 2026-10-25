@@ -64,6 +64,30 @@ export async function middleware(request: NextRequest) {
 
   const isOnboardingRoute = request.nextUrl.pathname.startsWith('/onboarding')
 
+  const isPatientArea = request.nextUrl.pathname === '/patient' || request.nextUrl.pathname.startsWith('/patient/')
+  const isClinicalArea =
+    request.nextUrl.pathname.startsWith('/dashboard') ||
+    request.nextUrl.pathname.startsWith('/patients') ||
+    request.nextUrl.pathname.startsWith('/appointments') ||
+    request.nextUrl.pathname.startsWith('/doctors') ||
+    request.nextUrl.pathname.startsWith('/alerts') ||
+    request.nextUrl.pathname.startsWith('/analytics') ||
+    request.nextUrl.pathname.startsWith('/assistant') ||
+    request.nextUrl.pathname.startsWith('/predict') ||
+    request.nextUrl.pathname.startsWith('/settings') ||
+    request.nextUrl.pathname.startsWith('/about') ||
+    request.nextUrl.pathname.startsWith('/contact') ||
+    request.nextUrl.pathname.startsWith('/admin')
+
+  // Only these known protected areas bounce a signed-out visitor to
+  // /login. Anything else (a typo, a stale bookmark) falls through so
+  // the app renders its 404 page instead of a sign-in wall.
+  const isProtectedArea =
+    isClinicalArea ||
+    isPatientArea ||
+    isOnboardingRoute ||
+    request.nextUrl.pathname.startsWith('/pending-approval')
+
   // The former /admin-portal area was retired in favour of the single
   // in-dashboard admin at /admin. Keep old links/bookmarks working with a
   // redirect; the /admin area applies its own role checks from here on.
@@ -74,7 +98,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && !isAuthRoute && !isPublicRoute && !isSessionFlowRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute && !isSessionFlowRoute && isProtectedArea) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -108,19 +132,6 @@ export async function middleware(request: NextRequest) {
     if (r === 'doctor' && doctorStatus !== 'approved') return '/pending-approval'
     return '/dashboard'
   }
-
-  const isPatientArea = request.nextUrl.pathname === '/patient' || request.nextUrl.pathname.startsWith('/patient/')
-  const isClinicalArea =
-    request.nextUrl.pathname.startsWith('/dashboard') ||
-    request.nextUrl.pathname.startsWith('/patients') ||
-    request.nextUrl.pathname.startsWith('/appointments') ||
-    request.nextUrl.pathname.startsWith('/doctors') ||
-    request.nextUrl.pathname.startsWith('/alerts') ||
-    request.nextUrl.pathname.startsWith('/analytics') ||
-    request.nextUrl.pathname.startsWith('/assistant') ||
-    request.nextUrl.pathname.startsWith('/predict') ||
-    request.nextUrl.pathname.startsWith('/settings') ||
-    request.nextUrl.pathname.startsWith('/admin')
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone()

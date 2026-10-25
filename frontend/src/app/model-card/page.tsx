@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import BrandMark from "@/components/shared/BrandMark"
 
 interface LiveStatus {
   live: boolean
@@ -71,19 +71,27 @@ export default function ModelCardPage() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
-          <span className="font-display text-xl uppercase tracking-wide">WhyRisk</span>
-          <Link
-            href="/welcome"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to home
+          <Link href="/welcome" className="flex items-center gap-2.5">
+            <BrandMark className="h-9 w-9 shrink-0" />
+            <span className="text-lg font-bold tracking-tight">WhyRisk</span>
           </Link>
+          <nav className="flex items-center gap-5 text-sm font-medium">
+            <Link href="/login" className="text-muted-foreground transition hover:text-foreground">
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground transition hover:bg-primary/90"
+            >
+              Create account
+            </Link>
+          </nav>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-5 py-12">
         <p className="eyebrow">Model card</p>
-        <h1 className="mt-2 font-display text-4xl uppercase leading-tight sm:text-5xl">
+        <h1 className="mt-2 font-sans text-4xl font-bold leading-tight sm:text-5xl">
           One trained model.
           <br />
           Documented honestly.
@@ -105,7 +113,7 @@ export default function ModelCardPage() {
         </section>
 
         <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live service status</p>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live service status</h2>
           {live === null ? (
             <p className="mt-3 text-sm text-muted-foreground">Checking the ML service…</p>
           ) : !live.live ? (
@@ -154,7 +162,7 @@ export default function ModelCardPage() {
 
         <section className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">What is real today</p>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">What is real today</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
               <li>One trained model: diabetes risk prediction from the 21 BRFSS health indicators.</li>
               <li>SHAP explanations are stored per prediction.</li>
@@ -162,7 +170,7 @@ export default function ModelCardPage() {
             </ul>
           </div>
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Roadmap — not trained models</p>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Roadmap — not trained models</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
               <li>Heart disease, stroke, chronic kidney disease, hypertension, asthma and COPD are planned future models.</li>
               <li>They are listed so the scope is transparent: today, WhyRisk predicts diabetes risk only.</li>
@@ -171,7 +179,7 @@ export default function ModelCardPage() {
         </section>
 
         <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Limitations</p>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Limitations</h2>
           <ul className="mt-3 max-w-[70ch] list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>The model was trained on United States survey data (BRFSS 2015); performance on other populations has not been validated.</li>
             <li>A score is a screening estimate, not a diagnosis. False positives and false negatives occur.</li>
@@ -182,7 +190,18 @@ export default function ModelCardPage() {
 
       <footer className="bg-foreground py-8 text-[#C8D6DA]">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3.5 px-5">
-          <span className="font-display text-lg uppercase tracking-wide text-white">WhyRisk</span>
+          <span className="flex items-center gap-2.5">
+            <BrandMark className="h-9 w-9 shrink-0" />
+            <span className="text-lg font-bold tracking-tight text-white">WhyRisk</span>
+          </span>
+          <span className="flex items-center gap-5 text-sm font-medium">
+            <Link href="/login" className="text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
+              Sign in
+            </Link>
+            <Link href="/signup" className="text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
+              Create account
+            </Link>
+          </span>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
             WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical
             device and does not replace professional diagnosis. Built during a machine-learning internship at Ezitech

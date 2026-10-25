@@ -24,6 +24,8 @@ export default function robots(): MetadataRoute.Robots {
           "/pending-approval",
           "/login",
           "/signup",
+          "/forgot-password",
+          "/update-password",
           "/auth/",
         ],
       },
