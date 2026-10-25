@@ -24,8 +24,6 @@ const SUGGESTED_PROMPTS = [
   "Draft a discharge risk summary."
 ]
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
 async function fetchPatientContext(patientId: string, supabase: any) {
   const { data } = await supabase
     .from("patients")
@@ -152,7 +150,7 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
     if (metrics) {
       return `🤖 **Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (253,680 survey responses).`
     }
-    return `🤖 **Model Performance**\n\nThe MediSight ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nThe FastAPI inference service is running at ${API_URL}.\n\nVisit ${API_URL}/docs to explore all available API endpoints.`
+    return `🤖 **Model Performance**\n\nThe MediSight ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
   }
   if (q.includes("diabetes") || q.includes("disease") || q.includes("predict")) {
     return `🩺 **About MediSight AI Prediction**\n\nMediSight AI detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\n🟢 Low (< 20%) · 🟡 Moderate (20–50%) · 🟠 High (50–80%) · 🔴 Critical (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
@@ -228,7 +226,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
     try {
       const [patientData, modelStatusRes] = await Promise.all([
         patientId ? fetchPatientContext(patientId, supabase) : Promise.resolve(null),
-        fetch(`${API_URL}/model-status`).then(r => r.json()).catch(() => null)
+        fetch("/api/ml/model-status").then(r => r.ok ? r.json() : null).catch(() => null)
       ])
 
       const patientContext = buildPatientSummary(patientData)

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { MLOpsView } from "@/components/shared/MLOpsView"
+import { getMlServiceUrl, mlServiceFetch } from "@/lib/ml-service"
 
 export const dynamic = 'force-dynamic'
 
@@ -16,18 +17,20 @@ export default async function AdminMLOpsPage() {
   let driftData: any = null
   let modelStatus: any = null
   let serviceConnected = false
-  const ML_URL = process.env.ML_SERVICE_URL || process.env.NEXT_PUBLIC_ML_SERVICE_URL || 'http://localhost:8000'
+  const ML_URL = getMlServiceUrl() || 'not configured'
 
   try {
     const [driftRes, statusRes] = await Promise.allSettled([
-      fetch(`${ML_URL}/drift-status`, { cache: 'no-store', signal: AbortSignal.timeout(4000) }),
-      fetch(`${ML_URL}/model-status`, { cache: 'no-store', signal: AbortSignal.timeout(4000) })
+      // /drift-status requires the ML service API key (attached by mlServiceFetch)
+      mlServiceFetch('/drift-status', { cache: 'no-store', signal: AbortSignal.timeout(4000) }),
+      // /model-status is an open endpoint — no key required
+      mlServiceFetch('/model-status', { requireAuth: false, cache: 'no-store', signal: AbortSignal.timeout(4000) })
     ])
-    if (driftRes.status === 'fulfilled' && driftRes.value.ok) {
+    if (driftRes.status === 'fulfilled' && driftRes.value?.ok) {
       driftData = await driftRes.value.json()
       serviceConnected = true
     }
-    if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
+    if (statusRes.status === 'fulfilled' && statusRes.value?.ok) {
       modelStatus = await statusRes.value.json()
       serviceConnected = true
     }

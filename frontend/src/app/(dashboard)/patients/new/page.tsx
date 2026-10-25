@@ -155,7 +155,8 @@ export default function NewPatientPage() {
       })
 
       if (!mlRes.ok) {
-        throw new Error("Prediction request failed")
+        const errBody = await mlRes.json().catch(() => null)
+        throw new Error(errBody?.error || "Prediction request failed")
       }
 
       const prediction = await mlRes.json()

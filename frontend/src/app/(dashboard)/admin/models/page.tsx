@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { ModelRegistryView } from "@/components/shared/ModelRegistryView"
+import { mlServiceFetch } from "@/lib/ml-service"
 
 export const dynamic = 'force-dynamic'
 
@@ -17,15 +18,15 @@ export default async function AdminModelsPage() {
     .select('*')
     .order('created_at', { ascending: false })
 
-  // Fetch live model status from FastAPI
+  // Fetch live model status from FastAPI (open endpoint — no key required)
   let liveStatus: any = null
   try {
-    const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000'
-    const res = await fetch(`${ML_URL}/model-status`, { 
+    const res = await mlServiceFetch('/model-status', {
+      requireAuth: false,
       next: { revalidate: 30 },
       signal: AbortSignal.timeout(5000)
     })
-    if (res.ok) liveStatus = await res.json()
+    if (res?.ok) liveStatus = await res.json()
   } catch (e) {
     // ML service offline - degrade gracefully
   }

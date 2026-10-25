@@ -16,7 +16,7 @@ export function MLOpsView({
   modelStatus,
   predictionTrend,
   serviceConnected = false,
-  mlServiceUrl = 'http://localhost:8000',
+  mlServiceUrl = 'not configured',
 }: {
   driftData: any
   modelStatus: any
@@ -54,12 +54,16 @@ export function MLOpsView({
     setRetraining(true)
     setRetrainMsg(null)
     try {
-      const ML_URL = process.env.NEXT_PUBLIC_ML_SERVICE_URL || 'http://localhost:8000'
-      const res = await fetch(`${ML_URL}/retrain`, { method: 'POST' })
-      const data = await res.json()
+      // Retraining goes through a server-side proxy route — the ML service
+      // requires an API key that must never be exposed to the browser.
+      const res = await fetch('/api/admin/ml/retrain', { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Could not reach the ML service. Ensure FastAPI is running.')
+      }
       setRetrainMsg({ type: 'success', text: data.status || 'Retraining triggered in background.' })
     } catch (e: any) {
-      setRetrainMsg({ type: 'error', text: 'Could not reach the ML service. Ensure FastAPI is running.' })
+      setRetrainMsg({ type: 'error', text: e?.message || 'Could not reach the ML service. Ensure FastAPI is running.' })
     } finally {
       setRetraining(false)
     }
