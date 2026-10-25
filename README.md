@@ -201,6 +201,17 @@ python ml-service/model_training/seed_db.py
 Demo doctor accounts are seeded by the later migrations and by
 `supabase/seed_doctors_via_sql_editor.sql`.
 
+For a fuller, self-contained demo dataset (hospitals, 12 doctors,
+40 patient records with vitals, diagnoses, stored risk assessments
+and appointments), run `supabase/seed-demo.sql` once in the SQL Editor
+after the migrations. It is synthetic demonstration data only - every
+person in it is fictional - and `supabase/seed-demo-teardown.sql`
+removes exactly those rows. Seed structure and distributions follow
+two public synthetic Kaggle datasets ("Multi-Location Healthcare
+Clinic Revenue Dataset" by Nudrat Abbas, CC0; "Synthetic Hospital
+Visits and Billing Records" by Aya A Saad, MIT); all named identities
+in the pack are fictional demo personas created for this project.
+
 ## API endpoints (ML service)
 
 | Method | Endpoint | Auth | Description |
