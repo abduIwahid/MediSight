@@ -1,9 +1,51 @@
 "use client"
 
-import { Mail, ExternalLink, Send, MessageSquare, ShieldCheck, Activity } from "lucide-react"
+import { useState } from "react"
+import { Mail, ExternalLink, Send, MessageSquare, ShieldCheck, Activity, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
 
+const SUBJECT_OPTIONS = ["Platform question", "Model question", "Account and access", "Other"]
+
 export default function ContactPage() {
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [department, setDepartment] = useState("")
+  const [subject, setSubject] = useState(SUBJECT_OPTIONS[0])
+  const [message, setMessage] = useState("")
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (status === "sending") return
+    setStatus("sending")
+    setErrorMessage(null)
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, department, subject, message }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || "Your message could not be sent. Please try again later.")
+      }
+      setStatus("sent")
+      setName("")
+      setEmail("")
+      setDepartment("")
+      setSubject(SUBJECT_OPTIONS[0])
+      setMessage("")
+    } catch (err) {
+      setStatus("error")
+      setErrorMessage(
+        err instanceof Error && err.message
+          ? err.message
+          : "Your message could not be sent. Please try again later."
+      )
+    }
+  }
   return (
     <div className="space-y-10 max-w-5xl mx-auto pb-10">
       <div>
@@ -72,20 +114,32 @@ export default function ContactPage() {
             <h3 className="text-lg font-bold">Send a Message</h3>
           </div>
 
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Full Name</label>
+                <label htmlFor="contact-name" className="text-xs font-medium text-muted-foreground">Full Name</label>
                 <input
+                  id="contact-name"
+                  name="name"
                   type="text"
+                  required
+                  maxLength={100}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Ayesha Khan"
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Email</label>
+                <label htmlFor="contact-email" className="text-xs font-medium text-muted-foreground">Email</label>
                 <input
+                  id="contact-email"
+                  name="email"
                   type="email"
+                  required
+                  maxLength={254}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="doctor@hospital.org"
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -94,39 +148,77 @@ export default function ContactPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Department / Facility</label>
+                <label htmlFor="contact-department" className="text-xs font-medium text-muted-foreground">Department / Facility</label>
                 <input
+                  id="contact-department"
+                  name="department"
                   type="text"
+                  maxLength={120}
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
                   placeholder="Cardiology / Central Hospital"
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Inquiry Subject</label>
-                <select className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-                  <option>Platform question</option>
-                  <option>Model question</option>
-                  <option>Account and access</option>
-                  <option>Other</option>
+                <label htmlFor="contact-subject" className="text-xs font-medium text-muted-foreground">Inquiry Subject</label>
+                <select
+                  id="contact-subject"
+                  name="subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {SUBJECT_OPTIONS.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
                 </select>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Message</label>
+              <label htmlFor="contact-message" className="text-xs font-medium text-muted-foreground">Message</label>
               <textarea
+                id="contact-message"
+                name="message"
                 rows={5}
+                required
+                maxLength={5000}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe your request or technical issue..."
                 className="w-full p-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
 
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              This form is not connected yet — submitting it does not send anything. Please use the email or GitHub link on the left instead.
-            </p>
+            {status === "sent" && (
+              <div className="p-4 bg-primary/10 text-primary rounded-xl border border-primary/20 text-sm font-medium flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <p>Your message has been sent. Replies go to the email address you entered above.</p>
+              </div>
+            )}
 
-            <button type="submit" className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 sm:w-auto">
-              <Send className="mr-2 h-4 w-4" /> Send Message
+            {status === "error" && errorMessage && (
+              <div className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 text-sm font-medium flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <p>{errorMessage}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={status === "sending"}
+              className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60 disabled:pointer-events-none sm:w-auto"
+            >
+              {status === "sending" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" /> Send Message
+                </>
+              )}
             </button>
           </form>
         </div>
