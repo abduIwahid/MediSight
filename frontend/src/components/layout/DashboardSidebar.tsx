@@ -74,6 +74,14 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
     }
   ]
 
+  // Active state: the longest matching href wins, so a nested route
+  // (e.g. /patients/queue) highlights only its own item, not its parent
+  // section (/patients) as well.
+  const activeHref = navGroups
+    .flatMap((group) => group.items.map((item) => item.href))
+    .filter((href) => pathname === href || (href !== "/" && pathname.startsWith(href + "/")))
+    .sort((a, b) => b.length - a.length)[0]
+
   return (
     <motion.div 
       initial={{ x: -20, opacity: 0 }}
@@ -119,7 +127,7 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
                   {group.title}
                 </h4>
                 {group.items.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+                  const isActive = item.href === activeHref;
                   return (
                     <Link
                       key={item.href}

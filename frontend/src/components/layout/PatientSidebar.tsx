@@ -26,11 +26,18 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
 
   const navItems = [
     { name: "Overview", href: "/patient/dashboard", icon: LayoutDashboard },
-    { name: "Book Appointment", href: "/patient/appointments/book", icon: CalendarPlus },
+    { name: "Book an Appointment", href: "/patient/appointments/book", icon: CalendarPlus },
     { name: "My Appointments", href: "/patient/appointments", icon: CalendarClock },
     { name: "AI Assistant", href: "/patient/assistant", icon: Bot },
     { name: "Profile", href: "/patient/profile", icon: User },
   ]
+
+  // Active state: the longest matching href wins, so /patient/appointments/book
+  // highlights only "Book an Appointment", not "My Appointments" as well.
+  const activeHref = navItems
+    .map((item) => item.href)
+    .filter((href) => pathname === href || pathname.startsWith(href + "/"))
+    .sort((a, b) => b.length - a.length)[0]
 
   return (
     <motion.div
@@ -59,7 +66,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 custom-scrollbar">
         <nav className="grid gap-1 px-4">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+            const isActive = item.href === activeHref
             return (
               <Link
                 key={item.href}
