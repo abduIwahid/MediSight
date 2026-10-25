@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
@@ -61,16 +61,17 @@ type Doctor = {
   avatar_url?: string | null
   bio?: string | null
   consultation_fee?: number | null
-  available?: boolean | null
+  availability_status?: string | null
   phone?: string | null
   hospitals?: { name: string } | null
 }
 
+// The canonical RiskBadge palette — the same tints as everywhere else.
 const RISK_STYLES: Record<string, string> = {
-  Low: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-  Moderate: "bg-amber-500/10 text-amber-700 border-amber-500/30",
-  High: "bg-orange-500/10 text-orange-600 border-orange-500/30",
-  Critical: "bg-red-500/10 text-red-600 border-red-500/30",
+  Low: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
+  Moderate: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
+  High: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
+  Critical: "bg-[#C0392B] text-white border-[#C0392B]",
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,6 +81,7 @@ const RISK_STYLES: Record<string, string> = {
 export default function PredictPage() {
   const [step, setStep] = useState(0)
   const [allSymptoms, setAllSymptoms] = useState<string[]>([])
+  const [symptomsState, setSymptomsState] = useState<"loading" | "ready" | "error">("loading")
   const [selectedSymptoms, setSelectedSymptoms] = useState<Set<string>>(new Set())
   const [symptomSearch, setSymptomSearch] = useState("")
   const [patient, setPatient] = useState<PatientDetails>({
@@ -92,12 +94,36 @@ export default function PredictPage() {
   const [error, setError] = useState<string | null>(null)
 
   const supabase = createClient()
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  // Focus management: when the step changes, focus moves to the new
+  // step's heading so keyboard and screen-reader users land on the step
+  // they just moved to (QA Round 1, item 56).
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [step])
+
+  const loadSymptoms = () => {
+    setSymptomsState("loading")
+    fetch("/api/predict-symptoms")
+      .then((r) => {
+        if (!r.ok) throw new Error("symptom list failed")
+        return r.json()
+      })
+      .then((data) => {
+        setAllSymptoms(data.symptoms || [])
+        setSymptomsState("ready")
+      })
+      .catch(() => {
+        // A failed load is an error state — never an empty list that
+        // looks like "there are no symptoms".
+        setAllSymptoms([])
+        setSymptomsState("error")
+      })
+  }
 
   useEffect(() => {
-    fetch("/api/predict-symptoms")
-      .then((r) => r.json())
-      .then((data) => setAllSymptoms(data.symptoms || []))
-      .catch(() => setAllSymptoms([]))
+    loadSymptoms()
   }, [])
 
   const filteredSymptoms = useMemo(() => {
@@ -140,10 +166,13 @@ export default function PredictPage() {
 
   const loadDoctors = async (specialty: string) => {
     setIsLoadingDoctors(true)
+    // Referrals list APPROVED doctors only (QA Round 1, item 31), with
+    // availability from the one source, availability_status.
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, specialty, avatar_url, bio, consultation_fee, available, phone, hospitals(name)")
+      .select("id, full_name, specialty, avatar_url, bio, consultation_fee, availability_status, phone, hospitals(name), doctors!inner(status)")
       .eq("role", "doctor")
+      .eq("doctors.status", "approved")
       .ilike("specialty", `%${specialty.split(" ")[0]}%`)
       .limit(6)
     setDoctors((data as unknown as Doctor[]) || [])
@@ -185,6 +214,7 @@ export default function PredictPage() {
             <div key={label} className="flex flex-1 items-center last:flex-none">
               <div className="flex flex-col items-center gap-2">
                 <div
+                  aria-current={i === step ? "step" : undefined}
                   className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all ${
                     i < step
                       ? "border-primary bg-primary text-white"
@@ -193,7 +223,7 @@ export default function PredictPage() {
                       : "border-border bg-card text-muted-foreground"
                   }`}
                 >
-                  {i < step ? <CheckCircle2 className="h-4.5 w-4.5" /> : i + 1}
+                  {i < step ? <CheckCircle2 className="h-[18px] w-[18px]" /> : i + 1}
                 </div>
                 <span className={`hidden text-xs font-medium sm:block ${i <= step ? "text-foreground" : "text-muted-foreground"}`}>
                   {label}
@@ -211,7 +241,7 @@ export default function PredictPage() {
         {/* ---------------- Step 1: Symptoms ---------------- */}
         {step === 0 && (
           <motion.div key="symptoms" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="font-heading text-lg font-bold">Select Symptoms</h2>
+            <h2 ref={headingRef} tabIndex={-1} className="font-heading text-lg font-bold outline-none">Select Symptoms</h2>
             <p className="mt-1 text-sm text-muted-foreground">Choose everything you&apos;re currently experiencing.</p>
 
             <div className="relative mt-5">
@@ -220,6 +250,7 @@ export default function PredictPage() {
                 value={symptomSearch}
                 onChange={(e) => setSymptomSearch(e.target.value)}
                 placeholder="Search symptoms..."
+                aria-label="Search symptoms"
                 className="pl-9"
               />
             </div>
@@ -243,8 +274,17 @@ export default function PredictPage() {
                   {formatSymptomLabel(s)}
                 </label>
               ))}
-              {allSymptoms.length === 0 && (
+              {symptomsState === "loading" && (
                 <p className="col-span-full text-sm text-muted-foreground">Loading symptoms...</p>
+              )}
+              {symptomsState === "error" && (
+                <div role="alert" className="col-span-full rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  The symptom list could not be loaded.{" "}
+                  <button type="button" onClick={loadSymptoms} className="font-semibold underline">Try again</button>
+                </div>
+              )}
+              {symptomsState === "ready" && filteredSymptoms.length === 0 && (
+                <p className="col-span-full text-sm text-muted-foreground">No symptoms match your search.</p>
               )}
             </div>
 
@@ -260,21 +300,22 @@ export default function PredictPage() {
         {/* ---------------- Step 2: Patient Details ---------------- */}
         {step === 1 && (
           <motion.div key="details" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="font-heading text-lg font-bold">Patient Details</h2>
+            <h2 ref={headingRef} tabIndex={-1} className="font-heading text-lg font-bold outline-none">Patient Details</h2>
             <p className="mt-1 text-sm text-muted-foreground">These help personalize your recommendations.</p>
 
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Full Name</Label>
-                <Input value={patient.name} onChange={(e) => setPatient({ ...patient, name: e.target.value })} placeholder="e.g. Ayesha Khan" />
+                <Label htmlFor="wiz-name">Full Name</Label>
+                <Input id="wiz-name" autoComplete="name" value={patient.name} onChange={(e) => setPatient({ ...patient, name: e.target.value })} placeholder="e.g. Ayesha Khan" />
               </div>
               <div className="space-y-1.5">
-                <Label>Age</Label>
-                <Input type="number" value={patient.age} onChange={(e) => setPatient({ ...patient, age: e.target.value })} placeholder="32" />
+                <Label htmlFor="wiz-age">Age</Label>
+                <Input id="wiz-age" type="number" value={patient.age} onChange={(e) => setPatient({ ...patient, age: e.target.value })} placeholder="32" />
               </div>
               <div className="space-y-1.5">
-                <Label>Gender</Label>
+                <Label htmlFor="wiz-gender">Gender</Label>
                 <select
+                  id="wiz-gender"
                   value={patient.gender}
                   onChange={(e) => setPatient({ ...patient, gender: e.target.value })}
                   className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -286,8 +327,9 @@ export default function PredictPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>Blood Group</Label>
+                <Label htmlFor="wiz-blood-group">Blood Group</Label>
                 <select
+                  id="wiz-blood-group"
                   value={patient.bloodGroup}
                   onChange={(e) => setPatient({ ...patient, bloodGroup: e.target.value })}
                   className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -299,25 +341,25 @@ export default function PredictPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>Weight (kg)</Label>
-                <Input type="number" value={patient.weight} onChange={(e) => setPatient({ ...patient, weight: e.target.value })} placeholder="68" />
+                <Label htmlFor="wiz-weight">Weight (kg)</Label>
+                <Input id="wiz-weight" type="number" value={patient.weight} onChange={(e) => setPatient({ ...patient, weight: e.target.value })} placeholder="68" />
               </div>
               <div className="space-y-1.5">
-                <Label>Height (cm)</Label>
-                <Input type="number" value={patient.height} onChange={(e) => setPatient({ ...patient, height: e.target.value })} placeholder="170" />
+                <Label htmlFor="wiz-height">Height (cm)</Label>
+                <Input id="wiz-height" type="number" value={patient.height} onChange={(e) => setPatient({ ...patient, height: e.target.value })} placeholder="170" />
               </div>
               <div className="space-y-1.5">
-                <Label>Phone</Label>
-                <Input value={patient.phone} onChange={(e) => setPatient({ ...patient, phone: e.target.value })} placeholder="+92 3xx xxxxxxx" />
+                <Label htmlFor="wiz-phone">Phone</Label>
+                <Input id="wiz-phone" autoComplete="tel" value={patient.phone} onChange={(e) => setPatient({ ...patient, phone: e.target.value })} placeholder="+92 3xx xxxxxxx" />
               </div>
               <div className="space-y-1.5">
-                <Label>Email</Label>
-                <Input type="email" value={patient.email} onChange={(e) => setPatient({ ...patient, email: e.target.value })} placeholder="jane@example.com" />
+                <Label htmlFor="wiz-email">Email</Label>
+                <Input id="wiz-email" type="email" autoComplete="email" value={patient.email} onChange={(e) => setPatient({ ...patient, email: e.target.value })} placeholder="you@example.com" />
               </div>
             </div>
 
             {error && (
-              <div className="mt-5 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div role="alert" className="mt-5 flex items-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
               </div>
             )}
@@ -334,25 +376,41 @@ export default function PredictPage() {
         {/* ---------------- Step 3: Screening Result ---------------- */}
         {step === 2 && result && (
           <motion.div key="result" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-6">
-            <div id="report" className="rounded-2xl border border-border bg-card p-7 shadow-premium">
+            <div id="report" className="print-report rounded-2xl border border-border bg-card p-7 shadow-premium">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="eyebrow mb-3">Screening Result</p>
-                  <h2 className="font-heading text-2xl font-bold">{result.disease}</h2>
+                  <h2 ref={headingRef} tabIndex={-1} className="font-heading text-2xl font-bold outline-none">{result.disease}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">for {patient.name}, {patient.age} yrs</p>
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">Rule-based screening result — a symptom-rule match, not a model prediction or a diagnosis.</p>
                 </div>
                 <span className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold ${RISK_STYLES[result.risk]}`}>
                   {result.risk} Risk
                 </span>
               </div>
 
+              {/* Print-only patient block: the printed result carries who
+                  it belongs to and what was reported. */}
+              <div className="mt-6 hidden border-t border-border pt-4 text-sm print:block">
+                <p className="font-semibold">Patient details</p>
+                <p className="mt-1 text-muted-foreground">
+                  {patient.name} · {patient.age} yrs{patient.gender ? ` · ${patient.gender}` : ""}{patient.bloodGroup ? ` · Blood group ${patient.bloodGroup}` : ""}
+                  {patient.weight ? ` · ${patient.weight} kg` : ""}{patient.height ? ` · ${patient.height} cm` : ""}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Symptoms reported: {Array.from(selectedSymptoms).map(formatSymptomLabel).join(", ") || "—"}
+                </p>
+                <p className="mt-1 text-muted-foreground">Screened: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Karachi" })}</p>
+              </div>
+
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-secondary/50 p-4">
-                  <div className="text-xs font-medium text-muted-foreground">Confidence Score</div>
+                  <div className="text-xs font-medium text-muted-foreground">Match</div>
                   <div className="mt-1 font-display text-3xl text-primary">{result.confidence}%</div>
                   <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
                     <div className="h-full bg-brand" style={{ width: `${result.confidence}%` }} />
                   </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">How strongly the reported symptoms match this condition&apos;s rule set.</p>
                 </div>
                 <div className="rounded-xl bg-secondary/50 p-4">
                   <div className="text-xs font-medium text-muted-foreground">Suggested Specialist</div>
@@ -367,7 +425,7 @@ export default function PredictPage() {
                 <ul className="mt-2 space-y-2">
                   {result.recommendations.map((r) => (
                     <li key={r} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> {r}
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1E7A46]" /> {r}
                     </li>
                   ))}
                 </ul>
@@ -375,11 +433,11 @@ export default function PredictPage() {
 
               {result.alternatives && result.alternatives.length > 0 && (
                 <div className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
-                  Other possibilities considered: {result.alternatives.map((a) => `${a.disease} (${a.confidence}%)`).join(", ")}
+                  Other possibilities considered: {result.alternatives.map((a) => `${a.disease} (${a.confidence}% match)`).join(", ")}
                 </div>
               )}
 
-              <div className="mt-6 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400">
+              <div className="mt-6 flex items-start gap-2 rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] p-3.5 text-xs text-[#A85008]">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 This is a rule-based screening tool, not a medical diagnosis. Please consult a licensed doctor to confirm any results.
               </div>
@@ -399,7 +457,7 @@ export default function PredictPage() {
         {step === 3 && (
           <motion.div key="doctors" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-5 print:hidden">
             <div>
-              <h2 className="font-heading text-lg font-bold">
+              <h2 ref={headingRef} tabIndex={-1} className="font-heading text-lg font-bold outline-none">
                 Recommended {result?.specialty}s {result && <span className="text-muted-foreground font-normal">for {result.disease}</span>}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">Doctors matched to your predicted condition.</p>
@@ -417,7 +475,7 @@ export default function PredictPage() {
                   <div key={doc.id} className="flex gap-4 rounded-xl border border-border bg-card p-5 shadow-sm transition hover:shadow-card">
                     <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-secondary">
                       {doc.avatar_url ? (
-                        <Image src={doc.avatar_url} alt={doc.full_name} fill className="object-cover" />
+                        <Image src={doc.avatar_url} alt={doc.full_name} fill sizes="64px" className="object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-brand text-sm font-bold text-white">
                           {doc.full_name?.split(" ").map((n) => n[0]).slice(0, 2).join("")}
@@ -427,13 +485,13 @@ export default function PredictPage() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="font-heading text-sm font-bold">{doc.full_name}</h3>
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${doc.available ? "bg-emerald-500" : "bg-muted-foreground/40"}`} title={doc.available ? "Available" : "Unavailable"} />
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${doc.availability_status === "available" ? "bg-[#1E7A46]" : "bg-muted-foreground/40"}`} title={doc.availability_status === "available" ? "Available" : "Not currently available"} />
                       </div>
                       <p className="text-xs text-primary">{doc.specialty}</p>
                       {doc.hospitals?.name && <p className="mt-0.5 text-xs text-muted-foreground">{doc.hospitals.name}</p>}
                       {doc.bio && <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{doc.bio}</p>}
                       <div className="mt-3 flex items-center justify-between">
-                        {doc.consultation_fee ? <span className="text-xs font-semibold">${doc.consultation_fee}</span> : <span />}
+                        {doc.consultation_fee ? <span className="text-xs font-semibold">Rs. {Number(doc.consultation_fee).toLocaleString()}</span> : <span />}
                         <div className="flex gap-2">
                           <Link href={`/doctors/${doc.id}`} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-muted">
                             View Profile

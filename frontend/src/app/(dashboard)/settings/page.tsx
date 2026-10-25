@@ -26,7 +26,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Profile & Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage your account details, clinical role, and preferences.
+          Manage your account details and profile information. Your role is shown for reference — it is assigned by an admin.
         </p>
       </div>
       <div className="bg-card border rounded-xl p-6 shadow-sm">

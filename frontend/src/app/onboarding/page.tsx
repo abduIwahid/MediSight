@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import BrandMark from "@/components/shared/BrandMark"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 export default function OnboardingPage() {
   const [fullName, setFullName] = useState("")
@@ -83,7 +84,7 @@ export default function OnboardingPage() {
     setSaving(false)
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>
+  if (loading) return <div className="flex h-dvh items-center justify-center"><PulseLoader label="Loading onboarding" /></div>
 
   return (
     <div className="flex min-h-dvh w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">

@@ -1,12 +1,13 @@
 "use client"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar, HeartPulse } from "lucide-react"
-import { createBrowserClient } from "@supabase/ssr"
+import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar, HeartPulse, Wand2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
+import { roleLabel } from "@/lib/roles"
 
 interface DashboardSidebarProps {
   onClose?: () => void
@@ -15,14 +16,14 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) {
   const pathname = usePathname()
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const router = useRouter()
+  const supabase = createClient()
 
+  // Same sign-out implementation as the header account menu:
+  // sign out through the shared client, then route to /login.
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    router.push("/login")
   }
 
   const [isAdmin, setIsAdmin] = useState(false)
@@ -51,6 +52,7 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
         { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { name: "Patients", href: "/patients", icon: Users },
         { name: "Risk Queue", href: "/patients/queue", icon: HeartPulse },
+        { name: "Prediction Wizard", href: "/predict", icon: Wand2 },
         { name: "Appointments", href: "/appointments", icon: Calendar },
         { name: "Doctors", href: "/doctors", icon: Stethoscope },
         { name: "Alerts Center", href: "/alerts", icon: Bell },
@@ -86,7 +88,7 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
     <motion.div 
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className={cn("flex h-full w-full flex-col border-r bg-card/95 backdrop-blur-xl shadow-lg", className)}
+      className={cn("flex h-full w-full flex-col border-r bg-card shadow-lg", className)}
     >
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
@@ -101,9 +103,9 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
           className="border-b px-6 py-3.5 bg-muted/20"
         >
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+            <div className="h-2 w-2 rounded-full bg-[#1E7A46] animate-pulse"></div>
             <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              {role === 'doctor' ? 'Doctor Portal' : role === 'patient' ? 'Patient Portal' : 'Admin Console'}
+              {roleLabel(role)}
             </span>
           </div>
         </motion.div>
@@ -132,7 +134,7 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
                       href={item.href}
                       onClick={() => onClose?.()}
                       className={cn(
-                        "group relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
+                        "group relative flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
                           : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
@@ -164,8 +166,8 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
           className="group flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive hover:shadow-sm"
         >
           <div className="flex items-center gap-3">
-            <LogOut className="h-4.5 w-4.5 transition-transform group-hover:-translate-x-1" />
-            <span>Secure Logout</span>
+            <LogOut className="h-[18px] w-[18px] transition-transform group-hover:-translate-x-1" />
+            <span>Sign out</span>
           </div>
         </button>
       </div>

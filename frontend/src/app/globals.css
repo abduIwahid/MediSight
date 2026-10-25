@@ -196,6 +196,11 @@
     .reveal, .reveal-slow {
       animation: none;
     }
+    /* Tailwind's looping utilities are animations too — the reduced-motion
+       net covers them, not just the brand loader (QA Round 1, item 74). */
+    .animate-pulse, .animate-spin {
+      animation: none;
+    }
     .pulse-beat, .pulse-dot, .pulse-label {
       animation: none;
     }

@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { CalendarPlus, CalendarX2 } from "lucide-react"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { PulseLoader } from "@/components/shared/PulseLoader"
+import { appointmentStatusClass } from "@/lib/status"
+import { fmtDateTime } from "@/lib/dates"
 
 interface Appointment {
   id: string
@@ -19,12 +22,20 @@ export default function MyAppointmentsPage() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming")
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [sessionError, setSessionError] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const supabase = createClient()
 
   const load = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      // Dead session: an honest error state, not an endless spinner
+      // (QA Round 1, item 38).
+      setSessionError(true)
+      setLoading(false)
+      return
+    }
 
     const now = new Date().toISOString()
     let query = supabase
@@ -47,7 +58,15 @@ export default function MyAppointmentsPage() {
   }, [tab])
 
   const handleCancel = async (id: string) => {
-    await supabase.from("appointments").update({ status: "Cancelled" }).eq("id", id)
+    setActionError(null)
+    // The cancel write is verified: a refused write must not look like a
+    // successful cancellation after the reload.
+    const { data, error } = await supabase.from("appointments").update({ status: "Cancelled" }).eq("id", id).select("id")
+    if (error || !data || data.length === 0) {
+      console.error("Cancel appointment failed:", error)
+      setActionError("That appointment could not be cancelled. Please try again.")
+      return
+    }
     load()
   }
 
@@ -81,8 +100,20 @@ export default function MyAppointmentsPage() {
         </button>
       </div>
 
+      {actionError && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {actionError}
+        </div>
+      )}
+
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <PulseLoader label="Loading your appointments" />
+      ) : sessionError ? (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
+          Your session has ended. Please{" "}
+          <Link href="/login" className="font-semibold underline">sign in again</Link>{" "}
+          to see your appointments.
+        </div>
       ) : appointments.length === 0 ? (
         <EmptyState
           icon={CalendarX2}
@@ -98,22 +129,18 @@ export default function MyAppointmentsPage() {
       ) : (
         <div className="space-y-3">
           {appointments.map((a) => (
-            <div key={a.id} className="flex items-center justify-between rounded-2xl border bg-card p-4 shadow-sm">
+            <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
               <div>
                 <p className="font-medium">
-                  Dr. {a.doctor?.full_name || "TBD"}
+                  {a.doctor?.full_name ? `Dr. ${a.doctor.full_name}` : "Doctor to be assigned"}
                   {a.doctor?.specialty ? ` · ${a.doctor.specialty}` : ""}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(a.scheduled_at).toLocaleString()} {a.reason ? `· ${a.reason}` : ""}
+                  {fmtDateTime(a.scheduled_at)} {a.reason ? `· ${a.reason}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  a.status === "Cancelled" ? "bg-destructive/10 text-destructive" :
-                  a.status === "Completed" ? "bg-muted text-muted-foreground" :
-                  "bg-primary/10 text-primary"
-                }`}>
+                <span className={`rounded-full border px-3 py-1 text-xs font-medium ${appointmentStatusClass(a.status)}`}>
                   {a.status}
                 </span>
                 {tab === "upcoming" && a.status !== "Cancelled" && (

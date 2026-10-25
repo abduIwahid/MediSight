@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { PatientSidebar } from "@/components/layout/PatientSidebar"
@@ -33,10 +33,22 @@ export default function PatientLayout({
 }) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [pathname])
+
+  // The drawer closes on Escape, and focus moves into it when it opens.
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    drawerRef.current?.focus()
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [mobileMenuOpen])
 
   return (
     <div className="relative flex h-dvh w-full overflow-hidden bg-background/50">
@@ -57,15 +69,20 @@ export default function PatientLayout({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-40 bg-foreground/40 lg:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div
+              ref={drawerRef}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 z-50 w-72 lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-72 outline-none lg:hidden"
             >
               <PatientSidebar onClose={() => setMobileMenuOpen(false)} className="rounded-r-2xl border-r-0 shadow-2xl" />
             </motion.div>
@@ -74,7 +91,7 @@ export default function PatientLayout({
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 shadow-sm backdrop-blur-md sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 shadow-sm sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
               type="button"

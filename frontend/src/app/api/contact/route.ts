@@ -54,12 +54,12 @@ export async function POST(request: Request) {
 
   const name = cleanField(payload.name, LIMITS.name)
   if (!name) {
-    return NextResponse.json({ error: "name is required." }, { status: 400 })
+    return NextResponse.json({ error: "Please enter your name." }, { status: 400 })
   }
 
   const email = cleanField(payload.email, LIMITS.email)
   if (!email || !EMAIL_PATTERN.test(email)) {
-    return NextResponse.json({ error: "A valid email address is required." }, { status: 400 })
+    return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 })
   }
 
   // Department is optional; an over-long one is rejected, an empty or
@@ -68,18 +68,18 @@ export async function POST(request: Request) {
   if (payload.department !== undefined && payload.department !== null && payload.department !== "") {
     department = cleanField(payload.department, LIMITS.department)
     if (!department) {
-      return NextResponse.json({ error: "department is too long." }, { status: 400 })
+      return NextResponse.json({ error: "Please shorten the department field." }, { status: 400 })
     }
   }
 
   const subject = cleanField(payload.subject, LIMITS.subject)
   if (!subject) {
-    return NextResponse.json({ error: "subject is required." }, { status: 400 })
+    return NextResponse.json({ error: "Please enter a subject." }, { status: 400 })
   }
 
   const message = cleanField(payload.message, LIMITS.message)
   if (!message) {
-    return NextResponse.json({ error: "message is required." }, { status: 400 })
+    return NextResponse.json({ error: "Please enter your message." }, { status: 400 })
   }
 
   if (!isEmailConfigured()) {

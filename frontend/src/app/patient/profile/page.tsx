@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 export default function PatientProfilePage() {
   const [fullName, setFullName] = useState("")
@@ -15,13 +17,22 @@ export default function PatientProfilePage() {
   const [dob, setDob] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
+  const [sessionError, setSessionError] = useState(false)
+  // Success and error are SEPARATE states. They used to share one
+  // message rendered in a green success box, so a failed save displayed
+  // its raw database error styled as success (QA Round 1, item 42).
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setSessionError(true)
+        setLoading(false)
+        return
+      }
 
       const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", user.id).single()
       if (profile) {
@@ -48,9 +59,16 @@ export default function PatientProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    setMsg(null)
+    setSaveError(null)
+    setSaved(false)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      // The old code returned here without clearing `saving`, leaving
+      // the button stuck on "Saving..." forever.
+      setSessionError(true)
+      setSaving(false)
+      return
+    }
 
     const [{ error: profileError }, { error: patientError }] = await Promise.all([
       supabase.from("profiles").update({ full_name: fullName }).eq("id", user.id),
@@ -62,11 +80,26 @@ export default function PatientProfilePage() {
       }),
     ])
 
-    setMsg(profileError?.message || patientError?.message || "Profile updated.")
+    if (profileError || patientError) {
+      console.error("Profile save failed:", profileError || patientError)
+      setSaveError("Your changes could not be saved. Please check your connection and try again.")
+    } else {
+      setSaved(true)
+    }
     setSaving(false)
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading...</p>
+  if (loading) return <PulseLoader label="Loading your profile" />
+
+  if (sessionError) {
+    return (
+      <div role="alert" className="mx-auto max-w-xl rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
+        Your session has ended. Please{" "}
+        <Link href="/login" className="font-semibold underline">sign in again</Link>{" "}
+        to manage your profile.
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
@@ -78,13 +111,13 @@ export default function PatientProfilePage() {
       <form onSubmit={handleSave} className="space-y-5 rounded-2xl border bg-card p-6 shadow-sm">
         <div className="space-y-2">
           <Label htmlFor="fullName">Full name</Label>
-          <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <Input id="fullName" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
+            <Input id="phone" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dob">Date of birth</Label>
@@ -93,9 +126,9 @@ export default function PatientProfilePage() {
         </div>
 
         <div className="space-y-2">
-          <Label>Gender</Label>
+          <Label htmlFor="gender-select">Gender</Label>
           <Select value={gender} onValueChange={setGender}>
-            <SelectTrigger>
+            <SelectTrigger id="gender-select">
               <SelectValue placeholder="Select (optional)" />
             </SelectTrigger>
             <SelectContent>
@@ -110,10 +143,11 @@ export default function PatientProfilePage() {
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" value={email} disabled className="opacity-70" />
-          <p className="text-xs text-muted-foreground">Email changes must be made through account security settings.</p>
+          <p className="text-xs text-muted-foreground">Your email is set when your account is created and can&apos;t be changed here.</p>
         </div>
 
-        {msg && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{msg}</div>}
+        {saveError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{saveError}</div>}
+        {saved && <div role="status" className="rounded-xl border border-[#1E7A46]/30 bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">Profile updated.</div>}
 
         <Button type="submit" className="w-full" disabled={saving}>
           {saving ? "Saving..." : "Save Changes"}

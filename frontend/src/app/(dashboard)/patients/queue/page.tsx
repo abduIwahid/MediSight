@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ChevronRight, HeartPulse } from "lucide-react"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { RiskBadge } from "@/components/shared/RiskBadge"
+import { fmtDate } from "@/lib/dates"
 import type { PatientDemographics, PredictionRow } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -24,19 +25,20 @@ function patientName(d?: PatientDemographics | null): string {
   return `${first} ${last}`.trim() || "Unknown Patient"
 }
 
-function fmtDate(iso?: string | null): string {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-}
-
 /**
  * The doctor's high-risk queue: their assigned patients (via
  * doctor_patient_assignments, RLS-scoped) ordered by their latest
- * stored risk score, highest first. Patients without an assessment
- * cannot be ranked and are counted honestly below the list instead of
- * being given an invented position.
+ * stored risk score, highest first. The default view is the High and
+ * Critical patients — the ones who need action; "Show all" lists every
+ * scored patient. Patients without an assessment cannot be ranked and
+ * are counted honestly below the list instead of being given an
+ * invented position.
  */
-export default async function RiskQueuePage() {
+export default async function RiskQueuePage({
+  searchParams,
+}: {
+  searchParams?: { severity?: string }
+}) {
   const cookieStore = cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,11 +46,13 @@ export default async function RiskQueuePage() {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
+  const showAll = searchParams?.severity === "all"
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { data: assignments } = user
+  const { data: assignments, error: assignmentsError } = user
     ? await supabase
         .from("doctor_patient_assignments")
         .select(`
@@ -61,9 +65,9 @@ export default async function RiskQueuePage() {
           )
         `)
         .eq("doctor_id", user.id)
-    : { data: null }
+    : { data: null, error: null }
 
-  const rows: { patient: AssignedPatient; latest: PredictionRow }[] = []
+  const allRows: { patient: AssignedPatient; latest: PredictionRow }[] = []
   let unscored = 0
 
   for (const assignment of assignments || []) {
@@ -76,10 +80,15 @@ export default async function RiskQueuePage() {
       unscored += 1
       continue
     }
-    rows.push({ patient, latest: preds[0] })
+    allRows.push({ patient, latest: preds[0] })
   }
 
-  rows.sort((a, b) => (b.latest.probability ?? 0) - (a.latest.probability ?? 0))
+  allRows.sort((a, b) => (b.latest.probability ?? 0) - (a.latest.probability ?? 0))
+
+  const rows = showAll
+    ? allRows
+    : allRows.filter((r) => r.latest.severity === "High" || r.latest.severity === "Critical")
+  const hiddenByFilter = allRows.length - rows.length
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-8">
@@ -91,11 +100,35 @@ export default async function RiskQueuePage() {
         </p>
       </div>
 
-      {rows.length === 0 ? (
+      <div className="inline-flex rounded-xl border bg-muted/40 p-1" role="group" aria-label="Severity filter">
+        <Link
+          href="/patients/queue"
+          aria-current={!showAll ? "page" : undefined}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${!showAll ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          High &amp; Critical
+        </Link>
+        <Link
+          href="/patients/queue?severity=all"
+          aria-current={showAll ? "page" : undefined}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${showAll ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          Show all
+        </Link>
+      </div>
+
+      {assignmentsError ? (
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
+          <h2 className="font-bold">Your queue could not be loaded</h2>
+          <p className="text-sm">Please reload the page to try again.</p>
+        </div>
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={HeartPulse}
-          title="No scored patients in your queue"
-          description="Patients appear here once they are assigned to you and have at least one risk assessment. Run an assessment from a patient's record to add them to the queue."
+          title={showAll ? "No scored patients in your queue" : "No High or Critical patients right now"}
+          description={showAll
+            ? "Patients appear here once they are assigned to you and have at least one risk assessment. Run an assessment from a patient's record to add them to the queue."
+            : "None of your assigned patients currently has a High or Critical latest score. Switch to Show all to see every scored patient."}
           actionLabel="View patients"
           actionHref="/patients"
         />
@@ -121,14 +154,25 @@ export default async function RiskQueuePage() {
                   </span>
                 </span>
                 <span className="shrink-0 font-display text-2xl">
-                  {((latest.probability ?? 0) * 100).toFixed(0)}
-                  <span className="font-sans text-xs font-semibold text-muted-foreground">%</span>
+                  {latest.probability != null ? (
+                    <>
+                      {(latest.probability * 100).toFixed(0)}
+                      <span className="font-sans text-xs font-semibold text-muted-foreground">%</span>
+                    </>
+                  ) : (
+                    <span className="font-sans text-sm font-medium text-muted-foreground">Not recorded</span>
+                  )}
                 </span>
-                <RiskBadge severity={latest.severity ?? "Low"} />
+                <RiskBadge severity={latest.severity ?? "Unknown"} />
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </Link>
             ))}
           </div>
+          {hiddenByFilter > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {hiddenByFilter} scored patient{hiddenByFilter === 1 ? " is" : "s are"} below High severity and hidden by the filter.
+            </p>
+          )}
           {unscored > 0 && (
             <p className="text-xs text-muted-foreground">
               {unscored} assigned patient{unscored === 1 ? " has" : "s have"} no risk assessment yet and{" "}

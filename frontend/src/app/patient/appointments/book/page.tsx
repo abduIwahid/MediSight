@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 interface Doctor {
   id: string
@@ -20,6 +21,7 @@ export default function BookAppointmentPage() {
   const [date, setDate] = useState("")
   const [reason, setReason] = useState("")
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -28,14 +30,25 @@ export default function BookAppointmentPage() {
 
   useEffect(() => {
     const loadDoctors = async () => {
+      // Booking lists APPROVED doctors only (QA Round 1, item 31), and
+      // availability comes from the one source, availability_status —
+      // not the legacy `available` bool.
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, specialty, department")
+        .select("id, full_name, specialty, department, doctors!inner(status)")
         .eq("role", "doctor")
-        .eq("available", true)
+        .eq("doctors.status", "approved")
+        .eq("availability_status", "available")
         .order("full_name")
 
-      if (!error && data) setDoctors(data)
+      if (error) {
+        // A failed load is NOT "no doctors available" — say so, with a
+        // retry, instead of an empty list that looks final.
+        console.error("Doctor list failed to load:", error)
+        setLoadError(true)
+      } else if (data) {
+        setDoctors(data)
+      }
       setLoading(false)
     }
     loadDoctors()
@@ -68,7 +81,8 @@ export default function BookAppointmentPage() {
     }).select("id").single()
 
     if (insertError) {
-      setError(insertError.message)
+      console.error("Booking failed:", insertError)
+      setError("Your appointment could not be booked. Please check the details and try again — if it keeps failing, the doctor may no longer be available.")
     } else {
       // Fire-and-forget confirmation email. The notify route skips
       // sending when email is not configured, and an email failure never
@@ -86,7 +100,12 @@ export default function BookAppointmentPage() {
     setSubmitting(false)
   }
 
-  const minDateTime = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)
+  // The datetime-local minimum must be in LOCAL time — slicing a UTC ISO
+  // string shifted the earliest bookable slot by the UTC offset (QA
+  // Round 1, item 67).
+  const minDateLocal = new Date(Date.now() + 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const minDateTime = `${minDateLocal.getFullYear()}-${pad(minDateLocal.getMonth() + 1)}-${pad(minDateLocal.getDate())}T${pad(minDateLocal.getHours())}:${pad(minDateLocal.getMinutes())}`
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -97,14 +116,19 @@ export default function BookAppointmentPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border bg-card p-6 shadow-sm">
         <div className="space-y-2">
-          <Label>Doctor</Label>
+          <Label htmlFor="doctor-select">Doctor</Label>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading doctors...</p>
+            <PulseLoader label="Loading doctors" />
+          ) : loadError ? (
+            <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              The doctor list could not be loaded.{" "}
+              <button type="button" onClick={() => window.location.reload()} className="font-semibold underline">Try again</button>
+            </div>
           ) : doctors.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No doctors are currently available for booking.</p>
+            <p className="text-sm text-muted-foreground">No doctors are currently available for booking. Please check back later.</p>
           ) : (
             <Select value={doctorId} onValueChange={setDoctorId}>
-              <SelectTrigger>
+              <SelectTrigger id="doctor-select">
                 <SelectValue placeholder="Select a doctor" />
               </SelectTrigger>
               <SelectContent>
@@ -143,8 +167,8 @@ export default function BookAppointmentPage() {
           />
         </div>
 
-        {error && <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
-        {success && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Appointment requested! Redirecting...</div>}
+        {error && <div role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+        {success && <div role="status" className="rounded-xl border border-[#1E7A46]/30 bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">Appointment requested! Redirecting...</div>}
 
         <Button type="submit" className="w-full" disabled={submitting || doctors.length === 0}>
           {submitting ? "Booking..." : "Request Appointment"}

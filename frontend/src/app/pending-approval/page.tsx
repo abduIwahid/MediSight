@@ -4,11 +4,12 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Clock, XCircle, LogOut } from "lucide-react"
+import { Clock, XCircle, LogOut, HelpCircle } from "lucide-react"
 import BrandMark from "@/components/shared/BrandMark"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 export default function PendingApprovalPage() {
-  const [status, setStatus] = useState<"pending" | "rejected" | null>(null)
+  const [status, setStatus] = useState<"pending" | "rejected" | "none" | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const router = useRouter()
@@ -25,7 +26,10 @@ export default function PendingApprovalPage() {
         router.push("/dashboard")
         return
       }
-      setStatus((doctor?.status as "pending" | "rejected") || "pending")
+      // A missing doctors row is NOT "pending" — this page used to call
+      // every missing row pending, including accounts that never applied
+      // (QA Round 1, item 64).
+      setStatus(doctor ? (doctor.status as "pending" | "rejected") : "none")
       setLoading(false)
     }
     load()
@@ -36,9 +40,10 @@ export default function PendingApprovalPage() {
     router.push("/login")
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">Loading...</div>
+  if (loading) return <div className="flex h-dvh items-center justify-center"><PulseLoader label="Checking your application status" /></div>
 
   const isRejected = status === "rejected"
+  const isNone = status === "none"
 
   return (
     <div className="flex min-h-dvh w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
@@ -47,8 +52,8 @@ export default function PendingApprovalPage() {
         <span className="text-xl font-bold tracking-tight">WhyRisk</span>
       </div>
       <div className="w-full max-w-md space-y-6 rounded-2xl border bg-card p-8 text-center shadow-sm">
-        <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${isRejected ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-600"}`}>
-          {isRejected ? <XCircle className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
+        <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${isRejected ? "bg-destructive/10 text-destructive" : isNone ? "bg-secondary text-primary" : "bg-[#FDF0DC] text-[#A85008]"}`}>
+          {isRejected ? <XCircle className="h-7 w-7" /> : isNone ? <HelpCircle className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
         </div>
 
         {isRejected ? (
@@ -58,12 +63,20 @@ export default function PendingApprovalPage() {
               Your doctor registration has been rejected. Please contact the administrator for more information.
             </p>
           </>
+        ) : isNone ? (
+          <>
+            <h1 className="text-xl font-bold">No Doctor Application Found</h1>
+            <p className="text-sm text-muted-foreground">
+              There is no doctor application linked to this account. If you signed up as a doctor, please contact the
+              administrator so your application can be checked.
+            </p>
+          </>
         ) : (
           <>
             <h1 className="text-xl font-bold">Awaiting Administrator Approval</h1>
             <p className="text-sm text-muted-foreground">
               Your account has been created successfully. It is currently awaiting administrator approval before you can
-              access the Doctor Portal. We&apos;ll notify you once it&apos;s reviewed.
+              access the Doctor Portal. Please sign in again after some time to check your status.
             </p>
           </>
         )}

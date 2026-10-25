@@ -17,19 +17,35 @@ export default async function PatientListPage({
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
+  const search = (searchParams?.search || "").trim()
+
+  // Default view: the 25 most recent records, filtered client-side.
+  // With a search term, the search runs SERVER-side (MRN match, plus the
+  // name stored in demographics) so matches beyond the first 25 rows are
+  // found too — the client filter then refines by its name conventions.
+  let patientsQuery = supabase
+    .from('patients')
+    .select(`
+      id,
+      mrn,
+      demographics,
+      created_at,
+      hospitals(name),
+      predictions(severity, probability, disease, created_at)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (search) {
+    const term = search.replace(/[%_,()]/g, " ").trim()
+    patientsQuery = patientsQuery
+      .or(`mrn.ilike.%${term}%,demographics->>full_name.ilike.%${term}%,demographics->>name.ilike.%${term}%`)
+      .limit(200)
+  } else {
+    patientsQuery = patientsQuery.limit(25)
+  }
+
   const [{ data: patients, error }, { data: userResult }] = await Promise.all([
-    supabase
-      .from('patients')
-      .select(`
-        id, 
-        mrn, 
-        demographics,
-        created_at,
-        hospitals(name),
-        predictions(severity, probability, disease, created_at)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(25),
+    patientsQuery,
     supabase.auth.getUser()
   ])
 
@@ -42,13 +58,12 @@ export default async function PatientListPage({
   if (error) {
     console.error("Supabase Error fetching patients:", error)
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
-        <h2 className="font-bold">Error loading patients</h2>
-        <p className="text-sm">{error.message}</p>
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
+        <h2 className="font-bold">The patient registry could not be loaded</h2>
+        <p className="text-sm">Please reload the page to try again.</p>
       </div>
     )
   }
 
-  return <PatientListView patients={(patients || []) as unknown as PatientRow[]} initialSearch={searchParams?.search || ""} isAdmin={isAdmin} />
+  return <PatientListView patients={(patients || []) as unknown as PatientRow[]} initialSearch={search} isAdmin={isAdmin} />
 }
-

@@ -179,6 +179,19 @@ export default function ModelCardPage() {
         </section>
 
         <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">How scores are banded</h2>
+          <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-muted-foreground">
+            Every score is placed in one of four severity bands — the same bands used everywhere in the app:
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border border-[#1E7A46]/30 bg-[#E2F0E6] px-3 py-1 text-xs font-semibold text-[#1E7A46]">Low — under 0.20</span>
+            <span className="rounded-full border border-[#D97706]/30 bg-[#FDF0DC] px-3 py-1 text-xs font-semibold text-[#A85008]">Moderate — 0.20 to 0.49</span>
+            <span className="rounded-full border border-[#C0392B]/30 bg-[#FAE9E7] px-3 py-1 text-xs font-semibold text-[#C0392B]">High — 0.50 to 0.79</span>
+            <span className="rounded-full border border-[#C0392B] bg-[#C0392B] px-3 py-1 text-xs font-semibold text-white">Critical — 0.80 and above</span>
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Limitations</h2>
           <ul className="mt-3 max-w-[70ch] list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>The model was trained on United States survey data (BRFSS 2015); performance on other populations has not been validated.</li>

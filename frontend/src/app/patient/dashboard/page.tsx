@@ -4,6 +4,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { CalendarPlus, CalendarClock, Bot, ArrowRight } from "lucide-react"
+import { PulseLoader } from "@/components/shared/PulseLoader"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { appointmentStatusClass } from "@/lib/status"
+import { fmtDateTime } from "@/lib/dates"
 
 interface Appointment {
   id: string
@@ -17,12 +21,19 @@ export default function PatientDashboardPage() {
   const [fullName, setFullName] = useState("")
   const [upcoming, setUpcoming] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [sessionError, setSessionError] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        // A dead session used to leave this page on "Loading..." forever
+        // (QA Round 1, item 38). Show an honest error with a way back in.
+        setSessionError(true)
+        setLoading(false)
+        return
+      }
 
       const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single()
       if (profile) setFullName(profile.full_name)
@@ -31,6 +42,8 @@ export default function PatientDashboardPage() {
         .from("appointments")
         .select("id, scheduled_at, status, reason, doctor:doctor_id(full_name, specialty)")
         .eq("patient_id", user.id)
+        // "Upcoming" excludes cancelled bookings (QA Round 1, item 66).
+        .neq("status", "Cancelled")
         .gte("scheduled_at", new Date().toISOString())
         .order("scheduled_at", { ascending: true })
         .limit(3)
@@ -96,26 +109,35 @@ export default function PatientDashboardPage() {
         </div>
 
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        ) : upcoming.length === 0 ? (
-          <div className="rounded-xl border border-dashed bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-            You have no upcoming appointments.{" "}
-            <Link href="/patient/appointments/book" className="text-primary hover:underline">Book one now</Link>.
+          <PulseLoader label="Loading your appointments" />
+        ) : sessionError ? (
+          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
+            Your session has ended. Please{" "}
+            <Link href="/login" className="font-semibold underline">sign in again</Link>{" "}
+            to see your appointments.
           </div>
+        ) : upcoming.length === 0 ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="No upcoming appointments"
+            description="When you book a visit, it will appear here."
+            actionLabel="Book an Appointment"
+            actionHref="/patient/appointments/book"
+          />
         ) : (
           <div className="space-y-3">
             {upcoming.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded-xl border bg-muted/10 px-4 py-3">
+              <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-muted/10 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">
-                    Dr. {a.doctor?.full_name || "TBD"}
+                    {a.doctor?.full_name ? `Dr. ${a.doctor.full_name}` : "Doctor to be assigned"}
                     {a.doctor?.specialty ? ` · ${a.doctor.specialty}` : ""}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(a.scheduled_at).toLocaleString()} {a.reason ? `· ${a.reason}` : ""}
+                    {fmtDateTime(a.scheduled_at)} {a.reason ? `· ${a.reason}` : ""}
                   </p>
                 </div>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">{a.status}</span>
+                <span className={`rounded-full border px-3 py-1 text-xs font-medium ${appointmentStatusClass(a.status)}`}>{a.status}</span>
               </div>
             ))}
           </div>

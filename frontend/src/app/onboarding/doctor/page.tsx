@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import BrandMark from "@/components/shared/BrandMark"
+import { PulseLoader } from "@/components/shared/PulseLoader"
 
 export default function DoctorOnboardingPage() {
   const [checking, setChecking] = useState(true)
@@ -71,7 +72,7 @@ export default function DoctorOnboardingPage() {
     router.refresh()
   }
 
-  if (checking) return <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">Loading...</div>
+  if (checking) return <div className="flex h-dvh items-center justify-center"><PulseLoader label="Checking your application" /></div>
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
