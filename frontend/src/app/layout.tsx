@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Anton, Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { MotionProvider } from "@/components/providers/MotionProvider";
 
 const archivo = Archivo({ subsets: ['latin'], variable: '--font-sans' });
 const anton = Anton({
@@ -49,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("font-sans", archivo.variable, anton.variable, jetbrainsMono.variable)}>
       <body className="antialiased">
-        {children}
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );
