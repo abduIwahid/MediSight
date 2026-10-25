@@ -643,7 +643,7 @@ export default function WelcomePage() {
             <div className="flex gap-6">
               <span className="hover:text-primary cursor-pointer">Terms &amp; Conditions</span>
               <span className="hover:text-primary cursor-pointer">Privacy Policy</span>
-              <Link href="/admin-portal/login" className="text-muted-foreground/50 hover:text-primary">Admin</Link>
+              <Link href="/admin" className="text-muted-foreground/50 hover:text-primary">Admin</Link>
             </div>
           </div>
         </div>

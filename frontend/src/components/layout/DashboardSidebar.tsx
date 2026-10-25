@@ -34,10 +34,10 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
         supabase.from('profiles').select('role').eq('id', user.id).single().then(({ data }) => {
           if (data) {
             setRole(data.role)
-            // super_admin now has a fully separate portal (/admin-portal) —
-            // only hospital_admin/data_scientist still use the panel embedded
-            // here (model registry, MLOps, audit logs).
-            setIsAdmin(['hospital_admin', 'data_scientist'].includes(data.role))
+            // All admin roles use the single in-dashboard admin at /admin
+            // (user management, doctor verification, model registry, MLOps,
+            // audit logs) — the former separate admin portal was retired.
+            setIsAdmin(['super_admin', 'hospital_admin', 'data_scientist'].includes(data.role))
           }
         })
       }

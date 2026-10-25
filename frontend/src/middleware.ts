@@ -56,22 +56,14 @@ export async function middleware(request: NextRequest) {
 
   const isOnboardingRoute = request.nextUrl.pathname.startsWith('/onboarding')
 
-  // The admin portal is a fully separate area with its own login page and
-  // its own server-side role check in admin-portal/(portal)/layout.tsx.
-  // It must never be swept into the doctor/patient role-routing below.
-  const isAdminPortalLogin = request.nextUrl.pathname.startsWith('/admin-portal/login')
-  const isAdminPortalArea = request.nextUrl.pathname.startsWith('/admin-portal')
-
-  if (isAdminPortalArea) {
-    // Let the admin-portal's own layout (and login page) handle auth/role
-    // checks entirely — just make sure unauthenticated visitors land on
-    // the admin login page instead of the doctor/patient one.
-    if (!user && !isAdminPortalLogin) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/admin-portal/login'
-      return NextResponse.redirect(url)
-    }
-    return supabaseResponse
+  // The former /admin-portal area was retired in favour of the single
+  // in-dashboard admin at /admin. Keep old links/bookmarks working with a
+  // redirect; the /admin area applies its own role checks from here on.
+  if (request.nextUrl.pathname.startsWith('/admin-portal')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin'
+    url.search = ''
+    return NextResponse.redirect(url)
   }
 
   if (!user && !isAuthRoute && !isPublicRoute) {

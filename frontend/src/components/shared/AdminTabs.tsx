@@ -2,9 +2,10 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, Brain, Activity, ScrollText, Stethoscope } from "lucide-react"
+import { Users, Brain, Activity, ScrollText, Stethoscope, LayoutDashboard } from "lucide-react"
 
 const tabs = [
+  { name: "Overview", href: "/admin", icon: LayoutDashboard },
   { name: "User Management", href: "/admin/users", icon: Users },
   { name: "Doctor Verification", href: "/admin/doctors", icon: Stethoscope },
   { name: "Model Registry", href: "/admin/models", icon: Brain },
@@ -18,7 +19,7 @@ export function AdminTabs() {
     <div className="border-b border-border">
       <nav className="flex gap-1 -mb-px">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href)
+          const active = tab.href === "/admin" ? pathname === "/admin" : pathname.startsWith(tab.href)
           return (
             <Link
               key={tab.href}
