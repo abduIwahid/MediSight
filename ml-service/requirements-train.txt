@@ -1,0 +1,9 @@
+# Training + seeding dependencies: model_training/train.py (MLflow
+# experiment tracking) and model_training/seed_db.py (PostgreSQL demo
+# data seeder). Installs the production set first.
+#
+#   pip install -r requirements-train.txt
+-r requirements.txt
+mlflow==3.17.2
+psycopg2-binary==2.9.13
+python-dotenv==1.2.4
