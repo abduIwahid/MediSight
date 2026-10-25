@@ -19,12 +19,29 @@ const SUGGESTED_PROMPTS = [
   "I have a mild fever and sore throat — what should I do?",
 ]
 
+// Offline fallback guidance: a small, clearly-framed symptom → specialist
+// map so the patient assistant still answers its most common question
+// while the AI service is unreachable (QA Round 1, item 89). Framed as
+// general guidance, never a diagnosis.
+const SYMPTOM_SPECIALIST_MAP: { keywords: string[]; specialist: string }[] = [
+  { keywords: ["joint", "knee", "back pain", "bone", "arthritis"], specialist: "an Orthopedics or Rheumatology specialist" },
+  { keywords: ["skin", "rash", "acne", "itching"], specialist: "a Dermatologist" },
+  { keywords: ["eye", "vision", "sight"], specialist: "an Ophthalmologist" },
+  { keywords: ["tooth", "teeth", "dental", "gum"], specialist: "a Dentist" },
+  { keywords: ["fever", "flu", "cold", "cough", "sore throat", "headache"], specialist: "a General Physician" },
+  { keywords: ["stomach", "abdomen", "digest", "acidity", "nausea"], specialist: "a Gastroenterologist" },
+]
+
 function generateLocalFallback(message: string): string {
   const q = message.toLowerCase()
   if (q.includes("chest pain") || q.includes("breath") || q.includes("stroke") || q.includes("bleeding")) {
     return "**This could be an emergency.** Please seek immediate medical attention or call your local emergency number right now — don't wait on a chat response.\n\nThis assistant does not replace professional medical advice."
   }
-  return "I'm the WhyRisk Patient Assistant. Tell me a bit about your symptoms — how long you've had them and how they feel — and I'll suggest which specialist to book with.\n\nI can't diagnose you or run clinical predictions; a doctor handles that once you're booked in.\n\n(Note: the AI service isn't reachable right now, so this is a general fallback response.)"
+  const match = SYMPTOM_SPECIALIST_MAP.find((entry) => entry.keywords.some((k) => q.includes(k)))
+  if (match) {
+    return `Based on what you described, patients usually start with **${match.specialist}**. You can book one from the Book an Appointment button below.\n\nThis is general guidance, not a diagnosis — only a doctor who examines you can say what is going on.\n\n(Note: the AI service isn't reachable right now, so this is a general fallback response.)`
+  }
+  return "I'm the WhyRisk AI Assistant. Tell me a bit about your symptoms — how long you've had them and how they feel — and I'll suggest which specialist to book with.\n\nI can't diagnose you or run clinical predictions; a doctor handles that once you're booked in.\n\n(Note: the AI service isn't reachable right now, so this is a general fallback response.)"
 }
 
 export function PatientChatPanel() {
@@ -32,7 +49,7 @@ export function PatientChatPanel() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hi, I'm your **WhyRisk Patient Assistant**. Tell me what symptoms you're experiencing and I'll help point you to the right kind of doctor and get you booked in.\n\nI don't diagnose conditions or replace professional medical advice — for anything urgent, please seek emergency care right away."
+      content: "Hi, I'm the **WhyRisk AI Assistant**. Tell me what symptoms you're experiencing and I'll help point you to the right kind of doctor and get you booked in.\n\nI don't diagnose conditions or replace professional medical advice — for anything urgent, please seek emergency care right away."
     }
   ])
   const [input, setInput] = useState("")
@@ -86,11 +103,11 @@ export function PatientChatPanel() {
     })
 
   return (
-    <Card className="flex flex-col h-[700px] border shadow-sm">
+    <Card className="flex flex-col h-[calc(100dvh-12rem)] border shadow-sm">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <CardTitle>WhyRisk Patient Assistant</CardTitle>
+          <CardTitle>AI Assistant</CardTitle>
         </div>
         <CardDescription>Symptom guidance and specialist recommendations — not a diagnosis.</CardDescription>
       </CardHeader>
@@ -126,7 +143,8 @@ export function PatientChatPanel() {
             <button
               key={p}
               onClick={() => handleSend(p)}
-              className="rounded-full border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              disabled={isLoading}
+              className="rounded-full border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               {p}
             </button>

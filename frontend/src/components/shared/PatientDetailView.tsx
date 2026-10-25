@@ -9,7 +9,8 @@ import { RunPredictionButton } from "@/components/shared/RunPredictionButton"
 import { RiskTrendChart } from "@/components/shared/RiskTrendChart"
 import { EmptyState } from "@/components/shared/EmptyState"
 import Link from "next/link"
-import { ArrowLeft, User, Calendar, Activity, FlaskConical, Stethoscope, Heart, Pencil, Trash2, TrendingUp } from "lucide-react"
+import { ArrowLeft, User, Calendar, Activity, FlaskConical, Stethoscope, Heart, Pencil, Trash2, TrendingUp, ClipboardList } from "lucide-react"
+import { fmtDate as fmtAppDate } from "@/lib/dates"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,8 +30,8 @@ function fmtLabel(str: string): string {
 }
 
 function fmtDate(iso?: string | null): string {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+  // One convention app-wide: Asia/Karachi, via lib/dates.
+  return fmtAppDate(iso)
 }
 
 function getPatientName(patient: PatientRow): string {
@@ -134,7 +135,9 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
       setEditMode(false)
       router.refresh()
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to save patient updates.')
+      // Never render the raw database error — log it, say it plainly.
+      console.error("Patient update failed:", error)
+      setErrorMessage('Unable to save patient updates. Please check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -148,7 +151,8 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
 
     const { error } = await supabase.from('patients').delete().eq('id', patient.id)
     if (error) {
-      setErrorMessage(error.message)
+      console.error("Patient delete failed:", error)
+      setErrorMessage('This patient record could not be deleted. You may not have permission, or the record is linked to other data.')
       setDeleteLoading(false)
       return
     }
@@ -172,6 +176,17 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
   const sortedPreds = [...allPredictions].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
+
+  // Vitals and labs read newest-first (the record must not depend on
+  // the order the query happened to return), capped at the latest 8 —
+  // and the cap is labelled where it applies.
+  const sortedVitals = [...(patient.vitals || [])].sort((a, b) =>
+    new Date(b.recorded_at || 0).getTime() - new Date(a.recorded_at || 0).getTime()
+  )
+  const sortedLabs = [...(patient.lab_results || [])].sort((a, b) =>
+    new Date(b.recorded_at || 0).getTime() - new Date(a.recorded_at || 0).getTime()
+  )
+  const diagnoses = patient.diagnoses || []
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -228,6 +243,12 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           </div>
         )}
       </motion.div>
+
+      {!editMode && errorMessage && (
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive">
+          {errorMessage}
+        </div>
+      )}
 
       <AnimatePresence>
         {editMode && (
@@ -339,11 +360,12 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
               </div>
 
               {(statusMessage || errorMessage) && (
-                <motion.div 
+                <motion.div
+                  role={errorMessage ? "alert" : "status"}
                   initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-xl p-4 text-sm font-medium flex items-center gap-2 ${statusMessage ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-destructive/10 text-destructive border border-destructive/20'}`}
+                  className={`rounded-xl p-4 text-sm font-medium flex items-center gap-2 ${errorMessage ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-[#E2F0E6] text-[#1E7A46] border border-[#1E7A46]/25'}`}
                 >
-                  {statusMessage || errorMessage}
+                  {errorMessage || statusMessage}
                 </motion.div>
               )}
 
@@ -388,9 +410,9 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
             <motion.div whileHover={{ scale: 1.01 }} className="transition-all">
               <PatientRiskCard
                 disease={latestPrediction.disease ?? "Diabetes"}
-                probability={latestPrediction.probability ?? 0}
-                confidence={latestPrediction.confidence ?? 0}
-                severity={latestPrediction.severity ?? "Low"}
+                probability={latestPrediction.probability ?? null}
+                confidence={latestPrediction.confidence ?? null}
+                severity={latestPrediction.severity ?? "Unknown"}
                 patientId={patient.id}
                 predictionId={latestPrediction.id ?? ""}
               />
@@ -440,13 +462,17 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
               </h3>
               <div className="space-y-3">
                 {sortedPreds.slice(0, 5).map((pred) => (
-                  <div key={pred.id} className="flex items-center justify-between text-sm p-3 rounded-xl border bg-background hover:bg-muted/50 transition-colors">
+                  <Link
+                    key={pred.id}
+                    href={`/patients/${patient.id}/predictions/${pred.id}`}
+                    className="flex items-center justify-between text-sm p-3 rounded-xl border bg-background hover:bg-muted/50 transition-colors"
+                  >
                     <span className="text-muted-foreground font-medium">{fmtDate(pred.created_at)}</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-bold">{((pred.probability ?? 0) * 100).toFixed(0)}%</span>
-                      <RiskBadge severity={pred.severity ?? "Low"} />
+                      <span className="font-bold">{pred.probability != null ? `${(pred.probability * 100).toFixed(0)}%` : "Not recorded"}</span>
+                      <RiskBadge severity={pred.severity ?? "Unknown"} />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -462,14 +488,21 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
               Recent Vitals
             </h2>
             <div className="flex-1 overflow-x-auto custom-scrollbar -mx-2 px-2 pb-2">
-              <div className="min-w-[400px]">
-                {patient.vitals && patient.vitals.length > 0 ? (
-                  <DataTable columns={vitalsColumns} data={patient.vitals.slice(0, 8)} />
+              <div className="min-w-0 sm:min-w-[400px]">
+                {sortedVitals.length > 0 ? (
+                  <>
+                    <DataTable columns={vitalsColumns} data={sortedVitals.slice(0, 8)} />
+                    {sortedVitals.length > 8 && (
+                      <p className="mt-2 text-xs text-muted-foreground">Latest 8 of {sortedVitals.length} recorded vitals.</p>
+                    )}
+                  </>
                 ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-xl border border-dashed">
-                    <Activity className="h-8 w-8 opacity-20 mb-3" />
-                    <p className="text-sm font-medium text-foreground">No Vitals Recorded</p>
-                  </div>
+                  <EmptyState
+                    icon={Activity}
+                    title="No vitals recorded"
+                    description="Vitals recorded for this patient will appear here, newest first."
+                    className="border-none bg-transparent px-2 py-8"
+                  />
                 )}
               </div>
             </div>
@@ -483,17 +516,50 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
               Laboratory Results
             </h2>
             <div className="flex-1 overflow-x-auto custom-scrollbar -mx-2 px-2 pb-2">
-              <div className="min-w-[400px]">
-                {patient.lab_results && patient.lab_results.length > 0 ? (
-                  <DataTable columns={labsColumns} data={patient.lab_results.slice(0, 8)} />
+              <div className="min-w-0 sm:min-w-[400px]">
+                {sortedLabs.length > 0 ? (
+                  <>
+                    <DataTable columns={labsColumns} data={sortedLabs.slice(0, 8)} />
+                    {sortedLabs.length > 8 && (
+                      <p className="mt-2 text-xs text-muted-foreground">Latest 8 of {sortedLabs.length} recorded results.</p>
+                    )}
+                  </>
                 ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-xl border border-dashed">
-                    <FlaskConical className="h-8 w-8 opacity-20 mb-3" />
-                    <p className="text-sm font-medium text-foreground">No Laboratory Results</p>
-                  </div>
+                  <EmptyState
+                    icon={FlaskConical}
+                    title="No laboratory results"
+                    description="Lab results recorded for this patient will appear here, newest first."
+                    className="border-none bg-transparent px-2 py-8"
+                  />
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="bg-card border rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+            <h2 className="text-lg font-bold mb-5 flex items-center gap-3 tracking-tight">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <ClipboardList className="h-5 w-5 text-primary" />
+              </div>
+              Diagnoses
+            </h2>
+            {diagnoses.length > 0 ? (
+              <ul className="space-y-2">
+                {diagnoses.map((dx) => (
+                  <li key={dx.id || dx.condition} className="flex items-center justify-between gap-4 rounded-xl border bg-background px-4 py-3 text-sm">
+                    <span className="font-medium">{dx.condition}</span>
+                    <span className="text-xs text-muted-foreground">{dx.diagnosed_at ? `Diagnosed ${fmtDate(dx.diagnosed_at)}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                icon={ClipboardList}
+                title="No diagnoses on record"
+                description="Diagnoses recorded for this patient will appear here."
+                className="border-none bg-transparent px-2 py-8"
+              />
+            )}
           </div>
         </div>
       </motion.div>

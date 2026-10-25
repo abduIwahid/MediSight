@@ -4,6 +4,17 @@ import Link from "next/link"
 import { DataTable } from "@/components/shared/DataTable"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { Stethoscope, MapPin, Phone, Mail } from "lucide-react"
+import { availabilityInfo } from "@/lib/status"
+
+function doctorName(doctor: DoctorListRow): string {
+  if (doctor.first_name && doctor.last_name) return `${doctor.first_name} ${doctor.last_name}`
+  return doctor.full_name || 'Doctor'
+}
+
+function doctorInitials(doctor: DoctorListRow): string {
+  const parts = doctorName(doctor).split(" ").filter(Boolean)
+  return (parts.map((p) => p[0]).slice(0, 2).join("") || "D").toUpperCase()
+}
 
 interface DoctorListRow {
   id: string
@@ -31,11 +42,18 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
       header: "Doctor",
       cell: (doctor: DoctorListRow) => (
         <div className="flex items-center gap-3">
-          <img
-            src={doctor.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent((doctor.first_name || doctor.full_name || 'D') + ' ' + (doctor.last_name || ''))}&background=1d4ed8&color=fff&size=64&rounded=true`}
-            alt={doctor.full_name || 'Doctor'}
-            className="h-9 w-9 rounded-full object-cover border border-border flex-shrink-0"
-          />
+          {doctor.avatar_url ? (
+            <img
+              src={doctor.avatar_url}
+              alt={doctor.full_name || 'Doctor'}
+              className="h-9 w-9 rounded-full object-cover border border-border flex-shrink-0"
+            />
+          ) : (
+            // Brand initials tile — no third-party avatar hot-links.
+            <div aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+              {doctorInitials(doctor)}
+            </div>
+          )}
           <div className="space-y-0.5">
             <div className="font-semibold text-sm">
               {doctor.first_name && doctor.last_name
@@ -53,20 +71,16 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
       header: "Hospital",
       cell: (doctor: DoctorListRow) => (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5" /> {doctor.hospitals?.name || "Independent"}
+          <MapPin className="h-3.5 w-3.5" /> {doctor.hospitals?.name || "No hospital on file"}
         </div>
       )
     },
     {
       header: "Status",
       cell: (doctor: DoctorListRow) => {
-        const status = doctor.availability_status || (doctor.available ? 'available' : 'busy')
-        const map: Record<string, { label: string; className: string }> = {
-          available: { label: 'Available', className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
-          busy:      { label: 'Busy',      className: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
-          on_leave:  { label: 'On Leave',  className: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
-        }
-        const s = map[status] || map['busy']
+        // ONE availability source: availability_status. An unset status
+        // is labelled "Not set" — never an invented state.
+        const s = availabilityInfo(doctor.availability_status)
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${s.className}`}>
             {s.label}
@@ -77,7 +91,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     {
       header: "Fee (PKR)",
       cell: (doctor: DoctorListRow) => (
-        <span className="text-sm font-medium">{doctor.consultation_fee ? `Rs. ${Number(doctor.consultation_fee).toLocaleString()}` : "TBD"}</span>
+        <span className="text-sm font-medium">{doctor.consultation_fee ? `Rs. ${Number(doctor.consultation_fee).toLocaleString()}` : "Not set"}</span>
       )
     },
     {

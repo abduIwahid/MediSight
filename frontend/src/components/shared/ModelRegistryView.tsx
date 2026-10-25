@@ -1,6 +1,7 @@
 "use client"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, AlertCircle, TrendingUp, Cpu } from "lucide-react"
+import { fmtDateTime } from "@/lib/dates"
 
 const METRIC_LABELS: Record<string, string> = {
   auc_roc: "AUC-ROC",
@@ -12,7 +13,7 @@ const METRIC_LABELS: Record<string, string> = {
 
 function MetricBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value * 100)
-  const color = pct >= 80 ? "bg-green-500" : pct >= 70 ? "bg-amber-500" : "bg-red-500"
+  const color = pct >= 80 ? "bg-[#1E7A46]" : pct >= 70 ? "bg-[#D97706]" : "bg-[#C0392B]"
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
@@ -56,15 +57,15 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
             </div>
             <div>
               <h2 className="font-semibold text-base">Live Production Model</h2>
-              <p className="text-xs text-muted-foreground">Real-time status from FastAPI inference service</p>
+              <p className="text-xs text-muted-foreground">Status reported by the ML service when it was last reached</p>
             </div>
           </div>
           {liveStatus ? (
-            <Badge className="bg-green-500/10 text-green-600 border-green-500/20 border">
+            <Badge className="bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30 border">
               <CheckCircle2 className="h-3 w-3 mr-1" /> Service Online
             </Badge>
           ) : (
-            <Badge className="bg-red-500/10 text-red-600 border-red-500/20 border">
+            <Badge className="bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30 border">
               <AlertCircle className="h-3 w-3 mr-1" /> Service Offline
             </Badge>
           )}
@@ -89,7 +90,7 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
                 <div>
                   <p className="text-xs text-muted-foreground">Last Trained</p>
                   <p className="font-semibold text-xs">
-                    {liveStatus.last_trained ? new Date(liveStatus.last_trained).toLocaleString() : "—"}
+                    {liveStatus.last_trained ? fmtDateTime(liveStatus.last_trained) : "—"}
                   </p>
                 </div>
               </div>
@@ -104,7 +105,7 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {liveStatus ? "Model not loaded. Train the model first via MLOps tab." : "FastAPI service is not reachable. Start the ML service to view live status."}
+            {liveStatus ? "The ML service is reachable but has no model loaded. Predictions are paused until a trained model is deployed with the ML service." : "The ML service is offline, so live model status is unavailable right now. Predictions are paused while it is offline."}
           </p>
         )}
       </div>
@@ -132,7 +133,7 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
               {models.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">
-                    No models in registry yet. Train and register a model via the MLOps tab.
+                    No models are registered yet. Models appear here once a trained model is deployed with the ML service.
                   </td>
                 </tr>
               ) : models.map((m) => (
@@ -140,9 +141,9 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
                   <td className="p-4 font-medium">{m.name}</td>
                   <td className="p-4 font-mono text-xs">{m.version}</td>
                   <td className="p-4">
-                    <Badge className={m.stage === 'Production' 
-                      ? "bg-green-500/10 text-green-600 border-green-500/20 border" 
-                      : "bg-amber-500/10 text-amber-700 border-amber-500/20 border"
+                    <Badge className={m.stage === 'Production'
+                      ? "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30 border"
+                      : "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30 border"
                     }>
                       {m.stage}
                     </Badge>
@@ -154,7 +155,7 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
                     {m.metrics?.f1_score != null ? (m.metrics.f1_score * 100).toFixed(1) + "%" : "—"}
                   </td>
                   <td className="p-4 text-muted-foreground text-xs">
-                    {new Date(m.created_at).toLocaleString()}
+                    {fmtDateTime(m.created_at)}
                   </td>
                 </tr>
               ))}

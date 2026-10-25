@@ -4,6 +4,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, XCircle, Stethoscope } from "lucide-react"
+import { EmptyState } from "@/components/shared/EmptyState"
 
 export interface DoctorRow {
   user_id: string
@@ -18,9 +19,9 @@ export interface DoctorRow {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-500/10 text-amber-700 border-amber-500/20",
-  approved: "bg-green-500/10 text-green-600 border-green-500/20",
-  rejected: "bg-red-500/10 text-red-600 border-red-500/20",
+  pending: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
+  approved: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
+  rejected: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
 }
 
 export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
@@ -28,12 +29,15 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  // Rejection is confirmed before it is written (QA Round 1, item 26).
+  const [pendingRejection, setPendingRejection] = useState<{ userId: string; name: string } | null>(null)
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
   const handleDecision = async (userId: string, status: "approved" | "rejected") => {
+    setPendingRejection(null)
     setUpdatingId(userId)
     setActionError(null)
     const { data: { user } } = await supabase.auth.getUser()
@@ -71,8 +75,31 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
   return (
     <div className="space-y-6">
       {actionError && (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {actionError}
+        </div>
+      )}
+      {pendingRejection && (
+        <div role="alertdialog" aria-label="Confirm rejection" className="flex flex-wrap items-center gap-3 rounded-xl border border-[#C0392B]/30 bg-[#FAE9E7] px-4 py-3 text-sm">
+          <p className="text-[#C0392B]">
+            Reject <strong>{pendingRejection.name}</strong>&apos;s doctor application? This decision is recorded with your name.
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleDecision(pendingRejection.userId, "rejected")}
+              className="rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-white hover:bg-destructive/90"
+            >
+              Confirm rejection
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingRejection(null)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -80,7 +107,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
           <Stethoscope className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">Doctor Verification</h2>
           {pendingCount > 0 && (
-            <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20">{pendingCount} pending</Badge>
+            <Badge className="bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30">{pendingCount} pending</Badge>
           )}
         </div>
         <div className="inline-flex rounded-xl border bg-muted/40 p-1">
@@ -99,9 +126,13 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-muted/20 p-10 text-center text-sm text-muted-foreground">
-          No {filter !== "all" ? filter : ""} doctor applications.
-        </div>
+        <EmptyState
+          icon={Stethoscope}
+          title={filter === "pending" ? "No applications waiting" : "No applications here"}
+          description={filter === "pending"
+            ? "New doctor applications will appear here for review."
+            : `There are no ${filter === "all" ? "" : `${filter} `}doctor applications to show.`}
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map((d) => (
@@ -137,7 +168,7 @@ export function DoctorVerificationView({ doctors }: { doctors: DoctorRow[] }) {
                       variant="outline"
                       className="gap-1.5 text-destructive hover:text-destructive"
                       disabled={updatingId === d.user_id}
-                      onClick={() => handleDecision(d.user_id, "rejected")}
+                      onClick={() => setPendingRejection({ userId: d.user_id, name: d.profile?.full_name || "this doctor" })}
                     >
                       <XCircle className="h-4 w-4" />
                       Reject

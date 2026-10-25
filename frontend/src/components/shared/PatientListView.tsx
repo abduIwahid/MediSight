@@ -79,7 +79,8 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
 
     const { error } = await supabase.from('patients').delete().eq('id', patientId)
     if (error) {
-      setDeleteError(error.message)
+      console.error("Patient delete failed:", error)
+      setDeleteError("This patient record could not be deleted. You may not have permission, or the record is linked to other data.")
       setDeletingId(null)
       return
     }
@@ -180,19 +181,14 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
             View
           </Link>
           {isAdmin && (
-            <>
-              <Link href={`/patients/${p.id}`} className="text-sm text-foreground/80 hover:text-foreground underline">
-                Edit
-              </Link>
-              <button
-                type="button"
-                onClick={() => handleDeletePatient(p.id)}
-                disabled={deletingId === p.id}
-                className="text-sm text-destructive underline disabled:cursor-not-allowed disabled:text-destructive/50"
-              >
-                {deletingId === p.id ? 'Deleting…' : 'Delete'}
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => handleDeletePatient(p.id)}
+              disabled={deletingId === p.id}
+              className="text-sm text-destructive underline disabled:cursor-not-allowed disabled:text-destructive/50"
+            >
+              {deletingId === p.id ? 'Deleting…' : 'Delete'}
+            </button>
           )}
         </div>
       )
@@ -217,7 +213,8 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
       className="space-y-6 max-w-7xl mx-auto pb-8"
     >
       {deleteError && (
-        <motion.div 
+        <motion.div
+          role="alert"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive shadow-sm flex items-center gap-3"
