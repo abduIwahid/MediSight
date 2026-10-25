@@ -129,7 +129,7 @@ export default function DashboardLayout({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 mt-2 w-72 rounded-2xl border bg-card/95 backdrop-blur-xl p-4 shadow-2xl z-50"
+                    className="absolute right-0 top-12 mt-2 w-72 rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 z-50"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-semibold">Notifications</p>
@@ -162,7 +162,7 @@ export default function DashboardLayout({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 mt-2 w-56 rounded-2xl border bg-card/95 backdrop-blur-xl p-2 shadow-2xl z-50"
+                    className="absolute right-0 top-12 mt-2 w-56 rounded-2xl border border-border bg-card p-2 shadow-2xl ring-1 ring-black/5 z-50"
                   >
                     <div className="px-3 py-2 mb-2 border-b">
                       <p className="text-sm font-medium">Account Info</p>
