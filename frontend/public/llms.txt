@@ -1,0 +1,27 @@
+# MediSight AI
+
+> MediSight AI is a healthcare risk-prediction and clinical decision-support platform built during a machine-learning internship at Ezitech Institute (Eziline Software House), Islamabad. It combines a Next.js web application, a FastAPI machine-learning service, and a Supabase (PostgreSQL) backend with row-level security.
+
+## What it does
+
+- Predicts diabetes risk with a trained LightGBM model and explains every score with SHAP feature attributions, so the factors behind a score can be inspected instead of trusted blindly.
+- Holds patient and doctor records, appointments, and stored risk assessments, with role-based access (patient / doctor / admin) enforced by middleware and database row-level security.
+- Computes clinical indicators in code alongside the model score: BMI classification, blood-pressure categorisation, eGFR staging, and cholesterol ratios.
+- Includes a symptom checker that is a rule-based heuristic, labelled as such in the product. It is not a trained model.
+
+## The model
+
+- Task: diabetes risk (binary classification) — the only trained model in the system today.
+- Dataset: CDC BRFSS 2015 health indicators, balanced 50/50 split file (70,692 records, 21 features, target Diabetes_binary).
+- Selected model: LightGBM, AUC-ROC 0.8307 on a stratified held-out test split (80/20). Logistic Regression, Random Forest, and XGBoost were benchmarked against it, with MLflow experiment tracking.
+- The 0.8307 figure describes the diabetes task only; it does not generalise to other conditions.
+- Not yet implemented: trained models for heart disease, chronic kidney disease, stroke, liver disease, breast cancer, and hypertension. These are roadmap items — no model exists for them today.
+
+## Pages
+
+- [Welcome](/welcome): what MediSight is, what is real today, and what is roadmap.
+- [Model card](/model-card): the model's dataset, measured performance, live service status, and limitations, stated in full.
+
+## Disclaimer
+
+MediSight AI is an experimental clinical decision-support and research tool. It is not a certified medical device and is not a substitute for professional medical diagnosis, treatment, or clinical judgment. Predictions must be reviewed by qualified healthcare professionals.

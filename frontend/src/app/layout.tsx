@@ -15,9 +15,30 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
 });
 
+const description =
+  "Diabetes risk prediction with explainable machine learning — every score shows its reasons.";
+
 export const metadata: Metadata = {
+  // Canonical base for sitemap/OG resolution; NEXT_PUBLIC_SITE_URL is the
+  // same variable auth redirects use. Unset locally, which Next tolerates.
+  metadataBase: process.env.NEXT_PUBLIC_SITE_URL
+    ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
+    : undefined,
   title: "MediSight",
-  description: "Diabetes risk prediction with explainable machine learning — every score shows its reasons.",
+  description,
+  openGraph: {
+    type: "website",
+    siteName: "MediSight",
+    title: "MediSight",
+    description,
+    images: ["/logo.png"],
+  },
+  twitter: {
+    card: "summary",
+    title: "MediSight",
+    description,
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({
