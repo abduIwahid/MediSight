@@ -151,20 +151,24 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
     },
     {
       header: "MRN",
+      hideOnMobile: true,
       cell: (p: PatientRow) => (
         <span className="font-mono text-xs text-muted-foreground">{p.mrn}</span>
       )
     },
     {
       header: "Age",
+      hideOnMobile: true,
       cell: (p: PatientRow) => <span className="text-sm">{getAge(p)}</span>
     },
     {
       header: "Gender",
+      hideOnMobile: true,
       cell: (p: PatientRow) => <span className="text-sm">{getGender(p)}</span>
     },
     {
       header: "Hospital",
+      hideOnMobile: true,
       cell: (p: PatientRow) => (
         <span className="text-xs text-muted-foreground">{p.hospitals?.name || "—"}</span>
       )
@@ -305,9 +309,11 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
               exit={{ opacity: 0 }}
               className="overflow-x-auto custom-scrollbar"
             >
-              <div className="min-w-[800px]">
-                <DataTable columns={columns} data={filtered} />
-              </div>
+              {/* No min-w wrapper (QA Round 2, cluster 28): the table
+                  fits 360px because low-priority columns hide below sm
+                  (see hideOnMobile on the column defs) — Patient Name,
+                  Risk Status and Actions stay visible. */}
+              <DataTable columns={columns} data={filtered} />
             </motion.div>
           )}
         </AnimatePresence>

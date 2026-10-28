@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { CheckCircle2, XCircle, Stethoscope } from "lucide-react"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { fmtDateTime } from "@/lib/dates"
+import { doctorStatusClass } from "@/lib/status"
 
 export interface DoctorRow {
   user_id: string
@@ -25,11 +26,8 @@ export interface DoctorRow {
   reviewer?: { full_name: string } | null
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
-  approved: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
-  rejected: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
-}
+// Status chip colours live in lib/status.ts (the one palette).
+const STATUS_STYLES = doctorStatusClass
 
 export function DoctorVerificationView({ doctors, viewerName }: {
   doctors: DoctorRow[]

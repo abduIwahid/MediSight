@@ -6,6 +6,7 @@ import { RefreshCw, Zap, AlertTriangle, CheckCircle2, Clock, TrendingDown, Activ
 import type { PredictionRow } from "@/lib/types"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { dayKey, fmtDateTime } from "@/lib/dates"
+import { SEVERITY_HEX } from "@/lib/status"
 
 export interface DriftData {
   psi_history?: { date: string; psi: number }[]
@@ -69,16 +70,25 @@ export function MLOpsView({
       .map(d => ({ ...d, avgProb: +(d.probSum / d.count).toFixed(3), date: formatDate(d.date) }))
   }, [predictionTrend])
 
-  // The drift verdict comes from the ML service's own response (QA Round 1,
-  // item 57) — not a threshold hard-coded in the frontend. The threshold is
-  // only used to draw the reference line, from the service's value when it
-  // provides one.
-  const psiHistory = driftData?.psi_history || []
+  // The drift verdict comes ONLY from the ML service's own response
+  // (QA Round 1, item 57; QA Round 2, R2-DS-7): when the service omits
+  // its boolean, the frontend does not silently re-become the judge
+  // with a hard-coded threshold — no verdict is shown. The threshold
+  // fallback is used only to draw the chart's reference line.
+  //
+  // What this "drift" actually is (QA Round 2, cluster 23): the service
+  // computes PSI between two slices of the TRAINING dataset — a
+  // baseline self-check, not monitoring of live production traffic.
+  // The service also labels its history windows with fabricated recent
+  // calendar dates; the chart below plots them as numbered windows
+  // instead, so no fake dates reach the screen.
+  const psiHistory = (driftData?.psi_history || []).map((point, i) => ({
+    window: `Window ${i + 1}`,
+    psi: point.psi,
+  }))
   const currentPsi = driftData?.current_psi ?? null
   const driftThreshold = driftData?.drift_threshold ?? 0.10
-  const driftDetected = typeof driftData?.drift_detected === "boolean"
-    ? driftData.drift_detected
-    : currentPsi !== null && currentPsi > driftThreshold
+  const driftDetected = driftData?.drift_detected === true
 
   const handleRetrain = async () => {
     setRetraining(true)
@@ -134,8 +144,8 @@ export function MLOpsView({
           <p className="font-semibold text-sm mt-1 capitalize">{modelStatus?.status || "—"}</p>
         </div>
         <div className="bg-card border rounded-xl p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">Current PSI</p>
-          <p className={`font-semibold text-sm mt-1 ${driftDetected ? 'text-[#C0392B]' : 'text-[#1E7A46]'}`}>
+          <p className="text-xs text-muted-foreground">Baseline PSI (training data)</p>
+          <p className={`font-semibold text-sm mt-1 ${currentPsi === null ? '' : driftDetected ? 'text-[#C0392B]' : 'text-[#1E7A46]'}`}>
             {currentPsi !== null ? currentPsi.toFixed(4) : "N/A"}
           </p>
         </div>
@@ -152,9 +162,9 @@ export function MLOpsView({
         <div role="alert" className="flex items-center gap-3 p-4 bg-[#FAE9E7] border border-[#C0392B]/30 rounded-xl text-sm">
           <TrendingDown className="h-5 w-5 text-[#C0392B] flex-shrink-0" />
           <div>
-            <p className="font-semibold text-[#C0392B]">Data Drift Detected</p>
+            <p className="font-semibold text-[#C0392B]">Drift Baseline Above Threshold</p>
             <p className="text-muted-foreground">
-              The ML service reports drift{currentPsi !== null ? ` (PSI ${currentPsi.toFixed(4)}, threshold ${driftThreshold})` : ""}. Consider triggering a retrain below.
+              The ML service&apos;s training-data baseline reports drift{currentPsi !== null ? ` (PSI ${currentPsi.toFixed(4)}, threshold ${driftThreshold})` : ""}. This compares slices of the training dataset — it is not drift measured on live patient traffic, which is not monitored yet.
             </p>
           </div>
         </div>
@@ -268,17 +278,23 @@ export function MLOpsView({
         )}
       </div>
 
-      {/* PSI Drift History Chart */}
+      {/* PSI Drift Baseline Chart — training-data windows, not dates:
+          the service computes each point from a slice of the training
+          dataset (QA Round 2, cluster 23). */}
       {psiHistory.length > 0 && (
         <div className="bg-card border rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold mb-4">Feature Drift (PSI) History</h2>
+          <h2 className="font-semibold mb-1">Drift Baseline (Training Data) — PSI by Window</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Each point compares one slice of the training dataset against the training reference window.
+            This is a baseline self-check — live drift monitoring on production predictions is not yet wired up.
+          </p>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={psiHistory} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+              <XAxis dataKey="window" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
               <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-              <ReferenceLine y={driftThreshold} stroke="#C0392B" strokeDasharray="4 4" label={{ value: 'Threshold', fill: '#C0392B', fontSize: 11 }} />
+              <ReferenceLine y={driftThreshold} stroke={SEVERITY_HEX.High} strokeDasharray="4 4" label={{ value: 'Threshold', fill: SEVERITY_HEX.High, fontSize: 11 }} />
               <Line type="monotone" dataKey="psi" name="PSI" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -295,8 +311,11 @@ export function MLOpsView({
               <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
               <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-              <Bar dataKey="high" name="High" fill="#D97706" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="critical" name="Critical" fill="#C0392B" radius={[2, 2, 0, 0]} />
+              {/* Series colours from lib/status.ts. The High series uses
+                  the Moderate fill amber so it stays distinguishable
+                  from Critical red in the same chart. */}
+              <Bar dataKey="high" name="High" fill={SEVERITY_HEX.Moderate} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="critical" name="Critical" fill={SEVERITY_HEX.Critical} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

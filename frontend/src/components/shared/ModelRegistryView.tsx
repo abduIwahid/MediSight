@@ -101,6 +101,15 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
                   <MetricBar key={key} label={METRIC_LABELS[key]} value={value as number} />
                 ) : null
               )}
+              {/* Metric provenance (QA Round 2, R2-DS-11): these bars are
+                  held-out test metrics on a balanced split — without the
+                  note, "Accuracy" reads as real-world field accuracy. */}
+              {liveStatus.metrics && (
+                <p className="text-xs text-muted-foreground">
+                  Held-out test metrics, measured on the balanced (50/50) BRFSS 2015 test split —
+                  not field accuracy on a real-world population.
+                </p>
+              )}
             </div>
           </div>
         ) : (
