@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -17,14 +17,18 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
-  // null = still checking, true = valid recovery session, false = no session
+  // null = still checking, true = a session exists, false = no session
   const [hasSession, setHasSession] = useState<boolean | null>(null)
+  // A session is a RECOVERY session only if it arrived through a one-time
+  // email link: either the in-page PASSWORD_RECOVERY event, or the marker
+  // cookie the server callback sets on a recovery exchange (QA Round 3,
+  // auth H2). Any other live session must re-prove the current password
+  // below — a session alone must not be enough to take over the account.
+  const [isRecovery, setIsRecovery] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState("")
   const router = useRouter()
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   useEffect(() => {
     // The recovery link carries either session tokens (parsed by the
@@ -33,10 +37,14 @@ export default function UpdatePasswordPage() {
       setHasSession(false)
       return
     }
+    if (document.cookie.split("; ").some((c) => c === "whyrisk_recovery=1")) {
+      setIsRecovery(true)
+    }
     supabase.auth.getSession().then(({ data }) => {
       setHasSession(!!data.session)
     })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setIsRecovery(true)
       if (session) setHasSession(true)
     })
     return () => listener.subscription.unsubscribe()
@@ -64,6 +72,27 @@ export default function UpdatePasswordPage() {
     setLoading(true)
     setError(null)
 
+    // Step-up for non-recovery sessions (QA Round 3, auth H2): verify the
+    // current password before allowing the change, so momentary access
+    // to a signed-in browser cannot become a permanent takeover.
+    if (!isRecovery) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) {
+        setHasSession(false)
+        setLoading(false)
+        return
+      }
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+      if (reauthError) {
+        setError("Your current password was not recognised. The password was not changed.")
+        setLoading(false)
+        return
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
@@ -80,6 +109,14 @@ export default function UpdatePasswordPage() {
       }
     } else {
       setDone(true)
+      // The recovery marker is single-purpose — clear it, and revoke the
+      // user's OTHER sessions so a reset actually locks out whoever
+      // prompted it (QA Round 3, auth H2).
+      document.cookie = "whyrisk_recovery=; path=/update-password; max-age=0"
+      await supabase.auth.signOut({ scope: "others" })
+      // Destination mirrors the auth callback's canonical mapping
+      // (QA Round 3, auth L3): no profile → onboarding, unapproved
+      // doctor → pending-approval, patient → patient home.
       const { data: { user } } = await supabase.auth.getUser()
       let destination = "/dashboard"
       if (user) {
@@ -88,7 +125,18 @@ export default function UpdatePasswordPage() {
           .select("role")
           .eq("id", user.id)
           .single()
-        if (profile?.role === "patient") destination = "/patient/dashboard"
+        if (!profile) {
+          destination = "/onboarding"
+        } else if (profile.role === "patient") {
+          destination = "/patient/dashboard"
+        } else if (profile.role === "doctor") {
+          const { data: doctor } = await supabase
+            .from("doctors")
+            .select("status")
+            .eq("user_id", user.id)
+            .single()
+          if (doctor?.status !== "approved") destination = "/pending-approval"
+        }
       }
       setTimeout(() => router.push(destination), 2500)
     }
@@ -101,7 +149,7 @@ export default function UpdatePasswordPage() {
         <BrandMark className="h-10 w-10 shrink-0" />
         <span className="text-xl font-bold tracking-tight">WhyRisk</span>
       </div>
-      <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-sm">
+      <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-card">
         {hasSession === null ? (
           <p className="py-4 text-center text-sm text-muted-foreground">Checking your link…</p>
         ) : hasSession === false ? (
@@ -118,11 +166,11 @@ export default function UpdatePasswordPage() {
           </div>
         ) : done ? (
           <div role="status" className="flex flex-col items-center text-center space-y-4 py-4">
-            <CheckCircle2 className="h-14 w-14 text-green-500" />
+            <CheckCircle2 className="h-14 w-14 text-[#1E7A46]" />
             <div>
               <h1 className="text-2xl font-bold">Password updated!</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Your password has been changed. Redirecting you to your workspace…
+                Your password has been changed, and your other devices have been signed out. Redirecting you to your workspace…
               </p>
             </div>
           </div>
@@ -136,6 +184,23 @@ export default function UpdatePasswordPage() {
             </div>
 
             <form onSubmit={handleUpdate} className="space-y-4">
+              {!isRecovery && (
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="Enter your current password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    You are signed in, so we ask for your current password before making this change. If you arrived from a password reset email, this step is skipped.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="password">New Password</Label>
                 <div className="relative">
@@ -186,7 +251,7 @@ export default function UpdatePasswordPage() {
               {error && <div role="alert" className="text-destructive text-sm">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Updating..." : "Update Password"}
+                {loading ? "Updating…" : "Update Password"}
               </Button>
             </form>
           </>

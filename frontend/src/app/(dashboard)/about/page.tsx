@@ -46,7 +46,7 @@ export default function AboutPage() {
 
       {/* Feature & Working Hours Cards (Inspired by Novena Novena-block) */}
       <div className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+        <div className="rounded-xl border bg-card p-6 shadow-card transition flex flex-col justify-between">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
               <Stethoscope className="h-6 w-6" />
@@ -54,7 +54,7 @@ export default function AboutPage() {
             <span className="text-xs uppercase tracking-wider font-semibold text-primary">Explainable AI</span>
             <h3 className="text-lg font-bold mt-1">Predictive Risk Assessment</h3>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-              Instant diabetes risk calculation powered by a trained ML model (LightGBM, CDC BRFSS 2015), plus a rule-based symptom screening wizard for triage. Models for further conditions are on the roadmap.
+              Diabetes risk calculation powered by a trained ML model (LightGBM, CDC BRFSS 2015), plus a rule-based symptom screening wizard for triage. Models for further conditions are on the roadmap.
             </p>
           </div>
           <Link href="/patients/new" className="text-xs font-semibold text-primary hover:underline mt-4 inline-flex items-center">
@@ -62,7 +62,7 @@ export default function AboutPage() {
           </Link>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+        <div className="rounded-xl border bg-card p-6 shadow-card transition flex flex-col justify-between">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2E7FA8]/10 text-[#2E7FA8] mb-4">
               <Clock className="h-6 w-6" />
@@ -77,7 +77,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+        <div className="rounded-xl border bg-card p-6 shadow-card transition flex flex-col justify-between">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#E2F0E6] text-[#1E7A46] mb-4">
               <Shield className="h-6 w-6" />
@@ -95,7 +95,7 @@ export default function AboutPage() {
       </div>
 
       {/* Metrics Banner */}
-      <div className="rounded-xl border bg-card p-8 shadow-sm">
+      <div className="rounded-xl border bg-card p-8 shadow-card">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {metrics.map((m, i) => (
             <div key={i} className="space-y-1">
@@ -105,6 +105,12 @@ export default function AboutPage() {
           ))}
         </div>
       </div>
+
+      {/* Standing disclaimer (QA Round 3, ml-honesty M6): the same
+          sentence the patient-facing risk card carries. */}
+      <p className="rounded-xl border bg-card p-5 text-sm leading-relaxed text-muted-foreground shadow-card">
+        WhyRisk is an experimental screening aid. It does not diagnose, and it is not a certified medical device.
+      </p>
 
       {/* Departments Grid (Novena Specialization section) */}
       <div className="space-y-6">
@@ -117,12 +123,12 @@ export default function AboutPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {departments.map((dept, idx) => (
-            <div key={idx} className="rounded-xl border bg-card p-5 shadow-sm hover:border-primary/50 transition">
+            <div key={idx} className="rounded-xl border bg-card p-5 shadow-card hover:border-primary/50 transition">
               <div className="flex items-center justify-between mb-3">
                 <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
                   <dept.icon className="h-5 w-5" />
                 </div>
-                <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{dept.count}</span>
+                <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{dept.count}</span>
               </div>
               <h3 className="font-bold text-base">{dept.name}</h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{dept.desc}</p>

@@ -21,7 +21,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex min-h-dvh items-center justify-center bg-background">
           <PulseLoader />
         </div>
       }
@@ -114,15 +114,18 @@ function LoginPageInner() {
       return
     }
 
+    // scope: 'local' (QA Round 3, auth M2): the default signOut scope is
+    // 'global', which revoked the user's sessions on EVERY device as a
+    // side effect of picking the wrong portal tab in this browser.
     if (portal === "doctor" && !staffRoles.includes(actualRole)) {
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: "local" })
       setError("This account is registered as a Patient. Please sign in through the Patient Portal.")
       setLoading(false)
       return
     }
 
     if (portal === "patient" && actualRole !== "patient") {
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: "local" })
       setError("This account is registered as a staff account. Use the Doctor Portal to sign in.")
       setLoading(false)
       return
@@ -135,21 +138,36 @@ function LoginPageInner() {
         .eq("user_id", data.user.id)
         .single()
 
-      if (doctor?.status === "pending") {
-        await supabase.auth.signOut()
-        setError("Your account is awaiting administrator approval.")
-        setLoading(false)
-        return
-      }
-      if (doctor?.status === "rejected") {
-        await supabase.auth.signOut()
-        setError("Your doctor registration has been rejected. Please contact the administrator.")
+      // One policy at every door (QA Round 3, auth M4 / onboarding O-9):
+      // middleware and the auth callback KEEP the session and route an
+      // unapproved doctor to /pending-approval, whose page needs the
+      // session to show the status. Signing out here made that page
+      // unreachable via the primary sign-in flow. Any status other than
+      // "approved" — including a missing doctors row — routes the same
+      // way, matching middleware.
+      if (doctor?.status !== "approved") {
+        router.push("/pending-approval")
+        router.refresh()
         setLoading(false)
         return
       }
     }
 
-    router.push(actualRole === "patient" ? "/patient/dashboard" : "/dashboard")
+    // Honour the deep link the middleware bounce preserved (QA Round 3,
+    // auth L1) — but only inside the signed-in role's own area, and only
+    // as a clean same-site path.
+    const nextParam = searchParams.get("next")
+    let destination = actualRole === "patient" ? "/patient/dashboard" : "/dashboard"
+    if (
+      nextParam &&
+      nextParam.startsWith("/") &&
+      !nextParam.startsWith("//") &&
+      !/[\u0000-\u0020\\]/.test(nextParam) &&
+      (actualRole === "patient" ? nextParam.startsWith("/patient") : !nextParam.startsWith("/patient"))
+    ) {
+      destination = nextParam
+    }
+    router.push(destination)
     router.refresh()
     setLoading(false)
   }
@@ -198,7 +216,7 @@ function LoginPageInner() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }} className="relative flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
+    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }} className="relative flex min-h-dvh w-full items-center justify-center bg-background px-4 py-10">
       <div className="relative z-10 grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-2xl border border-border shadow-premium md:grid-cols-2">
         {/* Brand / marketing panel */}
         <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-white md:flex">
@@ -270,6 +288,8 @@ function LoginPageInner() {
                   <Input
                     id="identifier"
                     type="email"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "login-error" : undefined}
                     autoComplete="email"
                     value={identifier}
                     onChange={e => setIdentifier(e.target.value)}
@@ -292,6 +312,8 @@ function LoginPageInner() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "login-error" : undefined}
                     autoComplete="current-password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -310,9 +332,9 @@ function LoginPageInner() {
                 </div>
               </div>
 
-              {callbackError && <div role="alert" className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">{callbackError}</div>}
+              {callbackError && <div role="alert" className="rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] px-4 py-3 text-sm text-[#A85008]">{callbackError}</div>}
               {error && (
-                <div role="alert" className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div id="login-error" role="alert" className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
                   <span>{error}</span>
                   <Link href="/forgot-password" className="shrink-0 font-medium underline underline-offset-2">
                     Forgot password?
@@ -328,14 +350,14 @@ function LoginPageInner() {
                     disabled={resendBusy}
                     className="mt-1 font-medium text-primary hover:underline disabled:opacity-60"
                   >
-                    {resendBusy ? "Sending..." : "Resend confirmation email"}
+                    {resendBusy ? "Sending…" : "Resend confirmation email"}
                   </button>
                   {resendMsg && <p role="status" className="mt-1 text-muted-foreground">{resendMsg}</p>}
                 </div>
               )}
 
               <Button type="submit" className="w-full py-3" disabled={loading}>
-                {loading ? "Signing in..." : portal === "doctor" ? "Sign In as Doctor" : "Sign In"}
+                {loading ? "Signing in…" : portal === "doctor" ? "Sign In as Doctor" : "Sign In"}
               </Button>
             </form>
 
@@ -349,9 +371,9 @@ function LoginPageInner() {
                     type="button"
                     onClick={() => handleOAuth("google")}
                     disabled={oauthLoading !== null}
-                    className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-px hover:bg-muted hover:shadow-md disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-px hover:bg-muted hover:shadow-md disabled:opacity-60"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.05l3.66 2.85C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.05l3.66 2.85C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
                     Google
                   </button>
                 </div>

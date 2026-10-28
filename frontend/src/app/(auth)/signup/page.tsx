@@ -1,5 +1,6 @@
 "use client"
 import { useState, type FormEvent } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -15,6 +16,7 @@ import BrandMark from "@/components/shared/BrandMark"
 const GOOGLE_OAUTH_ENABLED = false
 
 export default function SignupPage() {
+  const router = useRouter()
   const [portal, setPortal] = useState<"patient" | "doctor">("patient")
   const [fullName, setFullName] = useState("")
   const [phone, setPhone] = useState("")
@@ -47,6 +49,15 @@ export default function SignupPage() {
       return
     }
 
+    // Whole years only (QA Round 3, onboarding O-8): the signup trigger
+    // casts this value to integer, so a fractional entry like 5.5 made
+    // the whole signup fail inside the database with a raw error.
+    if (portal === "doctor" && experience !== "" && (!Number.isInteger(Number(experience)) || Number(experience) < 0)) {
+      setError("Years of experience must be a whole number (0 or more).")
+      setLoading(false)
+      return
+    }
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     // No top-level `phone` argument: the project's phone auth provider
     // is disabled, and the number is profile metadata only (collected
@@ -54,7 +65,7 @@ export default function SignupPage() {
     // patient_profiles / doctors rows). Passing it as a credential
     // made the auth user phone-keyed against a disabled provider
     // (QA Round 2, security L2 / edge-cases).
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -86,6 +97,17 @@ export default function SignupPage() {
         console.error("Sign-up failed:", error.message)
         setError("Sign-up failed. Please try again.")
       }
+    } else if (signUpData.session) {
+      // Email confirmation is disabled in the project right now, so the
+      // account is already signed in (QA Round 3, auth L5): route by
+      // role like login does instead of telling the user to wait for an
+      // email that will never arrive.
+      if (portal === "doctor") {
+        router.push("/pending-approval")
+      } else {
+        router.push("/patient/dashboard")
+      }
+      router.refresh()
     } else if (portal === "doctor") {
       setMsg("Check your email to confirm your account. Once confirmed, your doctor application will be reviewed by an administrator before you can access the Doctor Portal. Check your spam folder if you don't see it.")
     } else {
@@ -116,8 +138,8 @@ export default function SignupPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }} className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-premium">
+    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: "easeOut" }} className="flex min-h-dvh w-full items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-xl overflow-hidden rounded-xl border border-border bg-card shadow-premium">
         <div className="grid gap-8 px-8 py-10 grid-cols-1 md:px-12 md:py-12">
           <div className="space-y-6">
             <div className="space-y-2">
@@ -157,7 +179,7 @@ export default function SignupPage() {
             </div>
 
             {portal === "doctor" && (
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+              <div className="rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] px-4 py-3 text-xs text-[#A85008]">
                 Doctor accounts require administrator approval before the Doctor Portal becomes accessible.
               </div>
             )}
@@ -168,6 +190,8 @@ export default function SignupPage() {
                 <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="fullName"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "signup-error" : undefined}
                     type="text"
                     autoComplete="name"
                     value={fullName}
@@ -250,6 +274,7 @@ export default function SignupPage() {
                           id="experience"
                           type="number"
                           min={0}
+                          step={1}
                           value={experience}
                           onChange={e => setExperience(e.target.value)}
                           placeholder="e.g. 6"
@@ -267,6 +292,8 @@ export default function SignupPage() {
                 <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="email"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "signup-error" : undefined}
                     type="email"
                     autoComplete="email"
                     value={email}
@@ -283,6 +310,8 @@ export default function SignupPage() {
                 <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-muted/60 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
                   <input
                     id="password"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "signup-error" : undefined}
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     value={password}
@@ -303,11 +332,11 @@ export default function SignupPage() {
                 <p className="text-xs text-muted-foreground">Use at least 6 characters.</p>
               </div>
 
-              {error && <div role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+              {error && <div id="signup-error" role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive-text">{error}</div>}
               {msg && <div role="status" className="rounded-2xl bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">{msg}</div>}
 
               <Button type="submit" className="w-full py-3" disabled={loading}>
-                {loading ? "Signing up..." : portal === "doctor" ? "Apply as Doctor" : "Sign Up"}
+                {loading ? "Signing up…" : portal === "doctor" ? "Apply as Doctor" : "Sign Up"}
               </Button>
             </form>
 
@@ -321,9 +350,9 @@ export default function SignupPage() {
                     type="button"
                     onClick={() => handleOAuth("google")}
                     disabled={oauthLoading !== null}
-                    className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-px hover:bg-muted hover:shadow-md disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-px hover:bg-muted hover:shadow-md disabled:opacity-60"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.05l3.66 2.85C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.05l3.66 2.85C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
                     Google
                   </button>
                 </div>
@@ -355,15 +384,15 @@ export default function SignupPage() {
               <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                  Secure AI-powered patient insights
+                  Diabetes risk scores with the factors behind each score (SHAP)
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                  Clinical risk prediction dashboards
+                  Patient registry, risk queue and alerts in one workspace
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                  Fast onboarding with healthcare workflows
+                  Administrator-reviewed registration, then full Doctor Portal access
                 </li>
               </ul>
             ) : (
