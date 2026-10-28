@@ -41,10 +41,20 @@
     --accent-foreground: #0D2B3E;
     --destructive: #C0392B;
     --destructive-foreground: #FFFFFF;
+    /* Text on destructive TINTS (bg-destructive/10) uses this deeper
+       red (QA Round 3, accessibility A4): the fill red measures
+       3.99–4.34:1 on its own tints, below the 4.5:1 small-text floor. */
+    --destructive-text: #A93226;
     --border: #CCD0CF;
-    --input: #CCD0CF;
+    /* Control borders are a SEPARATE token from decorative dividers
+       (QA Round 3, accessibility A2): --border stays light for
+       hairlines, while --input carries the ≥3:1 contrast WCAG 1.4.11
+       requires for the boundary of an interactive control. */
+    --input: #7A8A91;
     --ring: #2E7FA8;
-    --radius: 0.625rem;
+    /* No --radius token: radii are set per component (rounded-xl
+       cards, rounded-lg controls) — the old token was consumed by
+       nothing (QA Round 3, visual V16). */
   }
   .dark {
     --background: #06141B;
@@ -70,9 +80,19 @@
     --accent-foreground: #F4F6F6;
     --destructive: #C0392B;
     --destructive-foreground: #FFFFFF;
+    --destructive-text: #E88A7E;
     --border: #1D3A4A;
-    --input: #1D3A4A;
+    --input: #46626F;
     --ring: #2E7FA8;
+  }
+
+  /* A visible keyboard focus indicator is guaranteed globally
+     (QA Round 3, accessibility A17): components that define their own
+     ring keep it; everything else gets this floor instead of the
+     browser's default or nothing. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 
   html, body {

@@ -1,27 +1,7 @@
-"use client"
-
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import BrandMark from "@/components/shared/BrandMark"
-import { severityPillClass, SEVERITY_HEX } from "@/lib/status"
-
-interface LiveStatus {
-  live: boolean
-  modelLoaded?: boolean
-  modelName?: string | null
-  version?: string | null
-  lastTrained?: string | null
-  diseases?: string[]
-  drift?: {
-    available: boolean
-    currentPsi: number | null
-    driftDetected: boolean
-    threshold: number | null
-    /** The ML service's own reason when no baseline could be computed —
-     *  shown verbatim, never paraphrased (QA Round 2, R2-DS-10). */
-    reason: string | null
-  } | null
-}
+import { ModelCardLiveStatus } from "@/components/shared/ModelCardLiveStatus"
+import { severityPillClass } from "@/lib/status"
 
 const FACTS: { label: string; value: string; note: string }[] = [
   {
@@ -46,33 +26,15 @@ const FACTS: { label: string; value: string; note: string }[] = [
   },
 ]
 
-function fmtDate(iso?: string | null): string {
-  if (!iso) return "—"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-}
-
 export default function ModelCardPage() {
-  const [live, setLive] = useState<LiveStatus | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    fetch("/api/ml/model-card")
-      .then((res) => res.json())
-      .then((data: LiveStatus) => {
-        if (!cancelled) setLive(data)
-      })
-      .catch(() => {
-        if (!cancelled) setLive({ live: false })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to content
+      </a>
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
           <Link href="/welcome" className="flex items-center gap-2.5">
@@ -93,7 +55,7 @@ export default function ModelCardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-5 py-12">
+      <main id="main-content" className="mx-auto max-w-4xl px-5 py-12">
         <p className="eyebrow">Model card</p>
         <h1 className="mt-2 font-sans text-4xl font-bold leading-tight sm:text-5xl">
           One trained model.
@@ -108,69 +70,18 @@ export default function ModelCardPage() {
 
         <section className="mt-10 grid gap-4 sm:grid-cols-2">
           {FACTS.map((fact) => (
-            <div key={fact.label} className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div key={fact.label} className="rounded-xl border bg-card p-5 shadow-card">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{fact.label}</p>
-              <p className="mt-2 font-display text-2xl tracking-wide">{fact.value}</p>
+              <p className="mt-2 font-sans text-2xl font-bold tracking-normal">{fact.value}</p>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{fact.note}</p>
             </div>
           ))}
         </section>
 
-        <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live service status</h2>
-          {live === null ? (
-            <p className="mt-3 text-sm text-muted-foreground">Checking the ML service…</p>
-          ) : !live.live ? (
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Live status unavailable — the ML service could not be reached just now. The facts above are from
-              the project documentation and stand on their own.
-            </p>
-          ) : (
-            <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-              <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5">
-                <dt className="text-muted-foreground">Service</dt>
-                <dd className="font-mono font-semibold" style={{ color: live.modelLoaded ? SEVERITY_HEX.Low : SEVERITY_HEX.High }}>
-                  {live.modelLoaded ? "Model loaded" : "Model not loaded"}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5">
-                <dt className="text-muted-foreground">Model</dt>
-                <dd className="font-mono font-semibold">
-                  {live.modelName || "—"}
-                  {live.version ? ` · ${live.version}` : ""}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5">
-                <dt className="text-muted-foreground">Last trained</dt>
-                <dd className="font-mono font-semibold">{fmtDate(live.lastTrained)}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5">
-                <dt className="text-muted-foreground">Trained conditions served</dt>
-                <dd className="font-mono font-semibold">{(live.diseases || []).join(", ") || "—"}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5 sm:col-span-2">
-                <dt className="text-muted-foreground">Drift baseline (training data, PSI)</dt>
-                <dd className="font-mono font-semibold">
-                  {!live.drift
-                    ? "Status unavailable"
-                    : !live.drift.available
-                      ? (live.drift.reason ?? "Baseline unavailable")
-                      : live.drift.currentPsi == null
-                        ? "—"
-                        : `${live.drift.currentPsi.toFixed(3)}${live.drift.threshold != null ? ` (threshold ${live.drift.threshold.toFixed(2)})` : ""} — ${live.drift.driftDetected ? "drift detected" : "no drift detected"}`}
-                </dd>
-              </div>
-              <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
-                The drift baseline is a self-check the ML service computes between two slices of the
-                training dataset. It is not live monitoring: drift on production traffic is not yet
-                measured.
-              </p>
-            </dl>
-          )}
-        </section>
+        <ModelCardLiveStatus />
 
         <section className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border bg-card p-5 shadow-card">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">What is real today</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
               <li>One trained model: diabetes risk prediction from the 21 BRFSS health indicators.</li>
@@ -178,7 +89,7 @@ export default function ModelCardPage() {
               <li>A separate symptom checker that is a rule-based heuristic — not a trained model, and labelled as such in the product.</li>
             </ul>
           </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border bg-card p-5 shadow-card">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Roadmap — not trained models</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
               <li>Heart disease, stroke, chronic kidney disease, hypertension, asthma and COPD are planned future models.</li>
@@ -187,7 +98,7 @@ export default function ModelCardPage() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
+        <section className="mt-4 rounded-xl border bg-card p-5 shadow-card">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">How scores are banded</h2>
           <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-muted-foreground">
             Every score is placed in one of four severity bands — the same bands used everywhere in the app:
@@ -200,7 +111,7 @@ export default function ModelCardPage() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-2xl border bg-card p-5 shadow-sm">
+        <section className="mt-4 rounded-xl border bg-card p-5 shadow-card">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Limitations</h2>
           <ul className="mt-3 max-w-[70ch] list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>The model was trained on United States survey data (BRFSS 2015); performance on other populations has not been validated.</li>

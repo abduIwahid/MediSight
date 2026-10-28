@@ -7,10 +7,21 @@ export const metadata: Metadata = {
     "What WhyRisk's diabetes model is, the data it was trained and measured on, its live service status, and what it does not do.",
   alternates: { canonical: "/model-card" },
   openGraph: {
+    // Restated in full (QA Round 3, SEO H1) — see welcome/page.tsx.
+    type: "website",
+    siteName: "WhyRisk",
     url: "/model-card",
     title: "Model card — WhyRisk",
     description:
       "The diabetes model's dataset, measured performance, live service status, and limitations, stated in full.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "WhyRisk — Know your risk. See exactly why.",
+      },
+    ],
   },
 }
 

@@ -25,14 +25,18 @@ const description =
 
 export const viewport: Viewport = {
   themeColor: "#0D2B3E",
+  // Edge-to-edge on notched phones; the chat + drawer footers pad
+  // with env(safe-area-inset-bottom) (QA Round 3, mobile #16).
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
   // Canonical base for sitemap/OG resolution; NEXT_PUBLIC_SITE_URL is the
   // same variable auth redirects use. Unset locally, which Next tolerates.
-  metadataBase: process.env.NEXT_PUBLIC_SITE_URL
-    ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
-    : undefined,
+  // The fallback is the production origin, not localhost/undefined
+  // (QA Round 3, SEO L7): a build missing the env var must still
+  // resolve canonical/OG URLs to the real site.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://whyrisk.vercel.app"),
   title: {
     default: "WhyRisk",
     template: "%s — WhyRisk",
@@ -56,8 +60,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "WhyRisk",
-    description,
+    // No title/description here (QA Round 3, SEO L1): page-level
+    // values must win, and Twitter falls back to the page's
+    // OpenGraph tags when its own are absent.
     images: ["/opengraph-image"],
   },
 };

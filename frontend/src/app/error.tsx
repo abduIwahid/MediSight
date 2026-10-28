@@ -1,15 +1,24 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
 import BrandMark from "@/components/shared/BrandMark"
 import { Button } from "@/components/ui/button"
 
 export default function AppError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // The error is logged and its digest shown (QA Round 3, states
+  // F-08): without the digest a user report cannot be matched to the
+  // server log line.
+  useEffect(() => {
+    console.error("Application error:", error)
+  }, [error])
+
   return (
     <div className="flex min-h-dvh w-full items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md space-y-6 text-center">
@@ -22,6 +31,9 @@ export default function AppError({
           <p className="text-sm leading-6 text-muted-foreground">
             An unexpected error occurred. You can try again, or return home.
           </p>
+          {error.digest && (
+            <p className="font-mono text-[11px] text-muted-foreground">Reference: {error.digest}</p>
+          )}
         </div>
         <div className="flex items-center justify-center gap-3">
           <Button onClick={() => reset()}>Try again</Button>
