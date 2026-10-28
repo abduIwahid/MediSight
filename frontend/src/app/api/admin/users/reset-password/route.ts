@@ -9,11 +9,20 @@ export async function POST(request: Request) {
 
   const { userId, newPassword } = await request.json().catch(() => ({}))
 
-  if (!userId || !newPassword) {
-    return NextResponse.json({ error: "userId and newPassword are required." }, { status: 400 })
+  // Type/shape validation first (QA Round 3, api-security L5): a
+  // numeric password used to pass the length check via String()
+  // coercion and then fail opaquely inside the Admin API.
+  if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    return NextResponse.json({ error: "Please choose the user whose password you want to reset." }, { status: 400 })
   }
-  if (String(newPassword).length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 })
+  if (typeof newPassword !== "string" || newPassword.length === 0) {
+    return NextResponse.json({ error: "Please enter the new password." }, { status: 400 })
+  }
+  if (newPassword.length < 8) {
+    return NextResponse.json({ error: "The new password must be at least 8 characters." }, { status: 400 })
+  }
+  if (newPassword.length > 72) {
+    return NextResponse.json({ error: "The new password must be 72 characters or fewer." }, { status: 400 })
   }
 
   const admin = createAdminClient()

@@ -20,6 +20,19 @@ function cleanField(value: unknown, max: number): string | null {
 }
 
 /**
+ * Single-line fields additionally lose CR/LF (QA Round 3, adversarial
+ * F11): a newline in name or subject reaches the maintainer's mail
+ * client inside email headers — a smuggled "Bcc:" line must come out
+ * before the value is stored or mailed. The free-text message keeps
+ * its line breaks.
+ */
+function cleanSingleLine(value: unknown, max: number): string | null {
+  const cleaned = cleanField(value, max)
+  if (cleaned === null) return null
+  return cleaned.replace(/[\r\n]+/g, " ")
+}
+
+/**
  * Accepts a Contact-page inquiry, emails it to the maintainer via
  * Resend, and stores a copy in contact_inquiries.
  *
@@ -60,30 +73,35 @@ export async function POST(request: Request) {
   try {
     payload = await request.json()
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 })
+    return NextResponse.json({ error: "We couldn't read that message. Please try again." }, { status: 400 })
   }
 
-  const name = cleanField(payload.name, LIMITS.name)
+  const name = cleanSingleLine(payload.name, LIMITS.name)
   if (!name) {
     return NextResponse.json({ error: "Please enter your name." }, { status: 400 })
   }
 
-  const email = cleanField(payload.email, LIMITS.email)
+  // The reply-to address is the SESSION's email, never the body's
+  // (QA Round 3, api-security L6): the route is signed-in-only, so a
+  // body-supplied address could only make maintainer replies land in
+  // someone else's inbox. The body value is still validated for the
+  // archive row's shape, but the mailed reply-to uses the account.
+  const email = user.email ?? cleanField(payload.email, LIMITS.email)
   if (!email || !EMAIL_PATTERN.test(email)) {
-    return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 })
+    return NextResponse.json({ error: "Your account has no valid email address on record." }, { status: 400 })
   }
 
   // Department is optional; an over-long one is rejected, an empty or
   // missing one is stored as null.
   let department: string | null = null
   if (payload.department !== undefined && payload.department !== null && payload.department !== "") {
-    department = cleanField(payload.department, LIMITS.department)
+    department = cleanSingleLine(payload.department, LIMITS.department)
     if (!department) {
       return NextResponse.json({ error: "Please shorten the department field." }, { status: 400 })
     }
   }
 
-  const subject = cleanField(payload.subject, LIMITS.subject)
+  const subject = cleanSingleLine(payload.subject, LIMITS.subject)
   if (!subject) {
     return NextResponse.json({ error: "Please enter a subject." }, { status: 400 })
   }

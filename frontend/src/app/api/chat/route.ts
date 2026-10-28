@@ -14,6 +14,14 @@ Rules you must always follow:
 - If asked something outside clinical/administrative scope of this platform, politely redirect back to what you can help with.
 - Never fabricate lab values, vitals, or history that were not given to you in the context.`
 
+const STAFF_SYSTEM_INSTRUCTION = `You are WhyRisk, an internal assistant for hospital staff using the WhyRisk platform.
+
+Rules you must always follow:
+- Help with platform questions: how features work, what a screen or status means, and general administrative guidance.
+- You are not the clinical assistant: do not interpret patient data, discuss differential diagnoses, or comment on model output — those go through the clinical dashboard assistant available to approved doctors.
+- If no patient context is provided, never invent one. If asked about a specific patient, explain that patient-specific clinical questions belong to the patient's doctor.
+- Be concise and plain-spoken.`
+
 const PATIENT_SYSTEM_INSTRUCTION = `You are the WhyRisk Patient Assistant, a friendly triage and booking helper for patients using a hospital's patient portal.
 
 Rules you must always follow:
@@ -74,8 +82,21 @@ export async function POST(request: Request) {
       }
     }
 
+    // The instruction set is chosen by role with least privilege
+    // (QA Round 3, api-security M5): the CLINICAL set — which invites
+    // attaching arbitrary patient context — belongs to approved
+    // doctors only. Other staff roles (nurse, admin, data_scientist)
+    // get the staff set with no patient-context channel, mirroring
+    // the /api/predict authorization model; patients get the patient
+    // set. Previously any non-patient profile received the clinical
+    // instructions plus the context slot.
+    const isApprovedDoctor = profile?.role === "doctor"
     const isPatient = !profile || profile.role === "patient"
-    const SYSTEM_INSTRUCTION = isPatient ? PATIENT_SYSTEM_INSTRUCTION : DOCTOR_SYSTEM_INSTRUCTION
+    const SYSTEM_INSTRUCTION = isApprovedDoctor
+      ? DOCTOR_SYSTEM_INSTRUCTION
+      : isPatient
+        ? PATIENT_SYSTEM_INSTRUCTION
+        : STAFF_SYSTEM_INSTRUCTION
 
     const body = await request.json().catch(() => null)
     const rawMessage = body?.message
@@ -83,15 +104,24 @@ export async function POST(request: Request) {
     const rawHistory = Array.isArray(body?.history) ? body.history : []
 
     if (!rawMessage || typeof rawMessage !== "string") {
-      return NextResponse.json({ error: "Missing 'message' in request body." }, { status: 400 })
+      return NextResponse.json(
+        { error: "Please type a message first.", fallback: true },
+        { status: 400 }
+      )
     }
 
     const message = rawMessage.slice(0, MAX_MESSAGE_CHARS)
-    const patientContext = isPatient ? "" : rawContext.slice(0, MAX_CONTEXT_CHARS)
+    const patientContext = isApprovedDoctor ? rawContext.slice(0, MAX_CONTEXT_CHARS) : ""
+    // Only the caller's own turns are relayed from client history
+    // (QA Round 3, adversarial F10): assistant turns in the request
+    // body are client-supplied text wearing a trusted costume — the
+    // panels' canned fallback replies (and anything else a modified
+    // client invents) must not re-enter the prompt as things the
+    // model "said". User turns keep follow-up questions intelligible.
     const history = rawHistory
       .filter(
         (m: { role?: unknown; content?: unknown }) =>
-          (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string"
+          m?.role === "user" && typeof m?.content === "string"
       )
       .slice(-MAX_HISTORY_ITEMS)
       .map((m: { role: string; content: string }) => ({
@@ -111,38 +141,54 @@ export async function POST(request: Request) {
       )
     }
 
+    // Prior user turns ride inside the single user message as a
+    // labelled recap — with assistant turns dropped, a multi-turn
+    // `contents` array would be consecutive user turns, which the
+    // API does not accept.
+    const historyBlock =
+      history.length > 0
+        ? `Earlier in this conversation, the user said:\n${history
+            .map((m: { content: string }) => `- ${m.content}`)
+            .join("\n")}\n\n`
+        : ""
     const contents = [
-      ...history.map((m: { role: string; content: string }) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
       {
         role: "user",
         parts: [
           {
             text: patientContext
-              ? `Patient context:\n${patientContext}\n\nDoctor's question: ${message}`
-              : message,
+              ? `${historyBlock}Patient context:\n${patientContext}\n\nDoctor's question: ${message}`
+              : `${historyBlock}${message}`,
           },
         ],
       },
     ]
 
-    const geminiResponse = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        contents,
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 800,
+    // A hung upstream must not hold the request (and the panel's
+    // spinner) open indefinitely (QA Round 3, ai-chat L3).
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+    let geminiResponse: Response
+    try {
+      geminiResponse = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
-      }),
-    })
+        signal: controller.signal,
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+          contents,
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 800,
+          },
+        }),
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!geminiResponse.ok) {
       // Upstream error bodies can contain provider internals — log the
@@ -155,9 +201,18 @@ export async function POST(request: Request) {
     }
 
     const data = await geminiResponse.json()
-    const reply =
+    let reply =
       data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text).join("") ||
       "I couldn't generate a response for that. Could you rephrase your question?"
+
+    // The not-a-diagnosis caveat is appended server-side for
+    // patient-mode replies (QA Round 3, ai-chat #6): asking the model
+    // nicely was the only enforcement before, so it landed in
+    // whichever answers the model felt like adding it to.
+    if (isPatient && reply.length > 120 && !/medical advice/i.test(reply)) {
+      reply +=
+        "\n\nPlease note: I can't diagnose or replace professional medical advice — a doctor should confirm anything important."
+    }
 
     return NextResponse.json({ reply })
   } catch (error: unknown) {

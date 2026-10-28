@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { mlServiceFetch } from "@/lib/ml-service"
 import { createClient } from "@/lib/supabase/server"
+import { validateMLPayload } from "@/lib/validate-ml-payload"
 
 const UNAVAILABLE = {
   error: "Explanation service unavailable. No explanation was generated.",
@@ -50,11 +51,23 @@ export async function POST(request: Request) {
     }
   }
 
+  // Same bounded, schema-checked forwarding as /api/predict
+  // (QA Round 3, api-security M2 / adversarial F9).
+  const contentLength = Number(request.headers.get("content-length") || 0)
+  if (contentLength > 16_384) {
+    return NextResponse.json({ error: "That request is too large." }, { status: 413 })
+  }
+
   let payload: unknown
   try {
     payload = await request.json()
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 })
+    return NextResponse.json({ error: "We couldn't read that request. Please try again." }, { status: 400 })
+  }
+
+  const validated = validateMLPayload(payload)
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 })
   }
 
   let response: Response | null
@@ -62,7 +75,7 @@ export async function POST(request: Request) {
     response = await mlServiceFetch("/explain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(validated.value),
     })
   } catch (err) {
     console.error("[api/explain] ML service unreachable:", err)
@@ -77,10 +90,11 @@ export async function POST(request: Request) {
   }
 
   if (response.status === 422) {
-    const data = await response
-      .json()
-      .catch(() => ({ error: "Invalid explanation input." }))
-    return NextResponse.json(data, { status: 422 })
+    console.error("[api/explain] ML service rejected the payload (422).")
+    return NextResponse.json(
+      { error: "The explanation service could not use those inputs. Please review the values and try again." },
+      { status: 422 }
+    )
   }
 
   if (!response.ok) {
