@@ -71,8 +71,12 @@ export default function UpdatePasswordPage() {
       // session error — show the friendly expired state, not the raw text.
       if (/session/i.test(error.message)) {
         setHasSession(false)
+      } else if (/password/i.test(error.message)) {
+        setError("That password doesn't meet the requirements. Use at least 6 characters.")
       } else {
-        setError(error.message)
+        // Never render the raw provider message (QA Round 2, security L1).
+        console.error("Password update failed:", error.message)
+        setError("Your password could not be updated. Please try again.")
       }
     } else {
       setDone(true)
@@ -113,7 +117,7 @@ export default function UpdatePasswordPage() {
             </Link>
           </div>
         ) : done ? (
-          <div className="flex flex-col items-center text-center space-y-4 py-4">
+          <div role="status" className="flex flex-col items-center text-center space-y-4 py-4">
             <CheckCircle2 className="h-14 w-14 text-green-500" />
             <div>
               <h1 className="text-2xl font-bold">Password updated!</h1>
@@ -179,7 +183,7 @@ export default function UpdatePasswordPage() {
                 </div>
               </div>
 
-              {error && <div className="text-destructive text-sm">{error}</div>}
+              {error && <div role="alert" className="text-destructive text-sm">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Updating..." : "Update Password"}

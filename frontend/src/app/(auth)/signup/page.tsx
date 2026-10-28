@@ -74,7 +74,18 @@ export default function SignupPage() {
     })
 
     if (error) {
-      setError(error.message)
+      // Never render the raw provider message (QA Round 2, security
+      // L1) — map the known cases to human sentences, log the rest.
+      if (/already registered|already exists/i.test(error.message)) {
+        setError("An account with this email already exists. Sign in instead, or use a different email.")
+      } else if (/password/i.test(error.message)) {
+        setError("That password doesn't meet the requirements. Use at least 6 characters.")
+      } else if (/email/i.test(error.message)) {
+        setError("That email address doesn't look valid. Please check it and try again.")
+      } else {
+        console.error("Sign-up failed:", error.message)
+        setError("Sign-up failed. Please try again.")
+      }
     } else if (portal === "doctor") {
       setMsg("Check your email to confirm your account. Once confirmed, your doctor application will be reviewed by an administrator before you can access the Doctor Portal. Check your spam folder if you don't see it.")
     } else {
@@ -98,7 +109,8 @@ export default function SignupPage() {
       options: { redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}` },
     })
     if (error) {
-      setError(error.message)
+      console.error("Google sign-up failed:", error.message)
+      setError("Google sign-up could not be started. Please try again, or sign up with your email.")
       setOauthLoading(null)
     }
   }
@@ -115,13 +127,16 @@ export default function SignupPage() {
               </div>
               <h1 className="font-heading text-3xl font-bold text-foreground">Create your account</h1>
               <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                Start your journey with WhyRisk and access secure clinical insights in one place.
+                {portal === "doctor"
+                  ? "Apply for the Doctor Portal — an administrator reviews every application before access opens."
+                  : "Create your patient account to book appointments and manage your profile. Risk assessments are run by your care team, not from this portal."}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-muted/40 p-1">
               <button
                 type="button"
+                aria-pressed={portal === "patient"}
                 onClick={() => { setPortal("patient"); setError(null) }}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                   portal === "patient" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
@@ -131,6 +146,7 @@ export default function SignupPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={portal === "doctor"}
                 onClick={() => { setPortal("doctor"); setError(null) }}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                   portal === "doctor" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
@@ -158,7 +174,7 @@ export default function SignupPage() {
                     onChange={e => setFullName(e.target.value)}
                     placeholder="Enter your full name"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
@@ -174,7 +190,7 @@ export default function SignupPage() {
                     onChange={e => setPhone(e.target.value)}
                     placeholder="Enter your phone number"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
@@ -191,7 +207,7 @@ export default function SignupPage() {
                         onChange={e => setLicenseNumber(e.target.value)}
                         placeholder="e.g. PMC-12345"
                         required
-                        className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                        className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                       />
                     </div>
                   </div>
@@ -206,7 +222,7 @@ export default function SignupPage() {
                         onChange={e => setHospital(e.target.value)}
                         placeholder="Enter your hospital or clinic"
                         required
-                        className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                        className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                       />
                     </div>
                   </div>
@@ -222,7 +238,7 @@ export default function SignupPage() {
                           onChange={e => setSpecialization(e.target.value)}
                           placeholder="e.g. Cardiology"
                           required
-                          className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                          className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                         />
                       </div>
                     </div>
@@ -238,7 +254,7 @@ export default function SignupPage() {
                           onChange={e => setExperience(e.target.value)}
                           placeholder="e.g. 6"
                           required
-                          className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                          className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                         />
                       </div>
                     </div>
@@ -257,7 +273,7 @@ export default function SignupPage() {
                     onChange={e => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
@@ -273,7 +289,7 @@ export default function SignupPage() {
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Create a password"
                     required
-                    className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="flex-1 border-0 bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                   <button
                     type="button"
@@ -287,8 +303,8 @@ export default function SignupPage() {
                 <p className="text-xs text-muted-foreground">Use at least 6 characters.</p>
               </div>
 
-              {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
-              {msg && <div className="rounded-2xl bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">{msg}</div>}
+              {error && <div role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+              {msg && <div role="status" className="rounded-2xl bg-[#E2F0E6] px-4 py-3 text-sm text-[#1E7A46]">{msg}</div>}
 
               <Button type="submit" className="w-full py-3" disabled={loading}>
                 {loading ? "Signing up..." : portal === "doctor" ? "Apply as Doctor" : "Sign Up"}
@@ -330,20 +346,42 @@ export default function SignupPage() {
 
           <div className="rounded-2xl border border-border bg-muted/40 p-6">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">Why join?</p>
-            <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                Secure AI-powered patient insights
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                Clinical risk prediction dashboards
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                Fast onboarding with healthcare workflows
-              </li>
-            </ul>
+            {/* Role-aware bullets (QA Round 2, cluster 31): the patient
+                portal has no dashboards or scores to promise — patients
+                book appointments and manage their profile; assessments
+                are performed by their care team. Staff bullets describe
+                the staff workspace only. */}
+            {portal === "doctor" ? (
+              <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  Secure AI-powered patient insights
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  Clinical risk prediction dashboards
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  Fast onboarding with healthcare workflows
+                </li>
+              </ul>
+            ) : (
+              <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  Book and manage your appointments online
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  Your risk assessments are run by your care team, with the reasons behind every score
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  Keep your profile and contact details up to date
+                </li>
+              </ul>
+            )}
           </div>
         </div>
       </div>

@@ -5,12 +5,12 @@ export default function AboutPage() {
   const departments = [
     { name: "Endocrinology", desc: "The live model: diabetes risk prediction (LightGBM, CDC BRFSS 2015) with a SHAP explanation stored per prediction.", icon: Activity, count: "Live" },
     { name: "Cardiology", desc: "Heart disease risk modelling is on the roadmap — no trained model yet, and the product says so wherever it appears.", icon: HeartPulse, count: "Roadmap" },
-    { name: "Nephrology", desc: "Chronic kidney disease modelling is on the roadmap; eGFR staging is already computed as a clinical indicator.", icon: Stethoscope, count: "Roadmap" },
-    { name: "Clinical AI MLOps", desc: "Model registry, PSI drift status and retraining — the operational side of the one live model.", icon: Brain, count: "Live" },
+    { name: "Nephrology", desc: "Chronic kidney disease modelling is on the roadmap — no trained model yet, and the product says so wherever it appears.", icon: Stethoscope, count: "Roadmap" },
+    { name: "Clinical AI MLOps", desc: "Model registry, PSI drift baseline and retraining — the operational side of the one live model.", icon: Brain, count: "Live" },
   ]
 
   const metrics = [
-    { value: "0.8307", label: "Diabetes model AUC-ROC (held-out test split)" },
+    { value: "0.8222", label: "Diabetes model AUC-ROC (held-out test split of the balanced dataset)" },
     { value: "21", label: "BRFSS health indicators per assessment" },
     { value: "1", label: "Trained model — diabetes (LightGBM)" },
     { value: "SHAP", label: "Explanations stored per prediction" },
