@@ -11,26 +11,17 @@ import type { LucideIcon } from "lucide-react"
 import type { PredictionRow } from "@/lib/types"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { dayKey } from "@/lib/dates"
+import { severityChartColor, ALERT_STATUS_CHART_COLORS } from "@/lib/status"
 
-// Severity colours are the canonical RiskBadge data colours — the same
-// four hues everywhere in the product, never a local rainbow.
-const SEVERITY_COLORS: Record<string, string> = {
-  Low: "#1E7A46",
-  Moderate: "#D97706",
-  High: "#C0392B",
-  Critical: "#C0392B",
-  Unknown: "#5A6B73",
-}
+// Severity + alert-status chart colours come from the ONE palette in
+// lib/status.ts — the same hues everywhere in the product, never a
+// local rainbow (QA Round 2, cluster 26).
+const SEVERITY_COLORS = severityChartColor
+const ALERT_STATUS_COLORS = ALERT_STATUS_CHART_COLORS
 
 // Disease series use a single-hue ramp from the Midnight Clinical
 // palette (navy → steel blue → grey) instead of rainbow chart colours.
 const DISEASE_COLORS = ["#0D2B3E", "#2E7FA8", "#1F6E96", "#5EA8C9", "#3D5A6B", "#7FB3CC", "#123043", "#9FB3B8"]
-
-const ALERT_STATUS_COLORS: Record<string, string> = {
-  New: "#C0392B",
-  Acknowledged: "#D97706",
-  Resolved: "#1E7A46",
-}
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string | number; sub?: string }) {
   return (
@@ -177,7 +168,7 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Clinical Analytics</h1>
         <p className="text-sm text-muted-foreground mt-1">Population-level risk insights across all patients and hospitals.</p>
-        {(predictions.length >= 2000 || alertStats.length >= 2000) && (
+        {(predictions.length >= 2000 || alertStats.length >= 2000 || patientsByHospital.length >= 2000 || recentPredictions.length >= 2000) && (
           <p className="text-xs text-muted-foreground mt-1">Based on the most recent 2,000 records.</p>
         )}
       </div>
@@ -269,6 +260,9 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
                 </AreaChart>
               </ResponsiveContainer>
               <SrOnlyTable caption="Average risk score per day, last 30 days" columns={["Day", "Average risk"]} rows={riskTrend.map((d) => [d.date, `${(d.avgRisk * 100).toFixed(1)}%`])} />
+              {recentPredictions.length >= 2000 && (
+                <p className="text-xs text-muted-foreground mt-2">Based on the most recent 2,000 predictions in the last 30 days.</p>
+              )}
             </>
           )}
         </ChartCard>
@@ -289,6 +283,9 @@ export function AnalyticsDashboard({ predictions, patientsByHospital, alertStats
                 </BarChart>
               </ResponsiveContainer>
               <SrOnlyTable caption="Patients by hospital" columns={["Hospital", "Patients"]} rows={hospitalData.map((d) => [d.name, d.count])} />
+              {patientsByHospital.length >= 2000 && (
+                <p className="text-xs text-muted-foreground mt-2">Counts are based on the most recent 2,000 patient records.</p>
+              )}
             </>
           )}
         </ChartCard>

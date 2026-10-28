@@ -16,6 +16,11 @@ interface DataTableProps<TData> {
     header: string
     accessorKey?: keyof TData
     cell?: (item: TData) => React.ReactNode
+    /** Hide this column below the sm breakpoint — registry tables use
+     *  it for low-priority columns so Name + Risk Status/Fee stay
+     *  visible at 360px without sideways scrolling (QA Round 2,
+     *  cluster 28). */
+    hideOnMobile?: boolean
   }[]
   data: TData[]
   onRowClick?: (item: TData) => void
@@ -28,7 +33,7 @@ export function DataTable<TData>({ columns, data, onRowClick }: DataTableProps<T
         <TableHeader>
           <TableRow>
             {columns.map((col, i) => (
-              <TableHead key={i}>{col.header}</TableHead>
+              <TableHead key={i} className={col.hideOnMobile ? "hidden sm:table-cell" : undefined}>{col.header}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -48,20 +53,30 @@ export function DataTable<TData>({ columns, data, onRowClick }: DataTableProps<T
                   onRowClick ? "cursor-pointer hover:bg-muted hover:shadow-[inset_0px_0px_0px_1px_rgba(0,0,0,0.05)] dark:hover:shadow-[inset_0px_0px_0px_1px_rgba(255,255,255,0.05)]" : "hover:bg-muted/50"
                 )}
                 onClick={() => onRowClick && onRowClick(row)}
-                // Clickable rows are keyboard-operable too (QA Round 1,
-                // item 56): focusable, Enter/Space activates.
-                tabIndex={onRowClick ? 0 : undefined}
-                role={onRowClick ? "button" : undefined}
-                onKeyDown={onRowClick ? (e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault()
-                    onRowClick(row)
-                  }
-                } : undefined}
               >
                 {columns.map((col, j) => (
-                  <TableCell key={j}>
-                    {col.cell ? col.cell(row) : (col.accessorKey ? String(row[col.accessorKey]) : null)}
+                  <TableCell key={j} className={col.hideOnMobile ? "hidden sm:table-cell" : undefined}>
+                    {j === 0 && onRowClick ? (
+                      // First-cell control pattern (QA Round 2, cluster
+                      // 29): the row itself used to carry role="button"
+                      // + tabIndex, which destroys screen-reader table
+                      // semantics and makes every row a tab stop. A real
+                      // button in the first cell keeps the row action
+                      // keyboard- and SR-operable inside an intact
+                      // table; the row's mouse onClick stays.
+                      <button
+                        type="button"
+                        className="rounded-sm text-left font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onRowClick(row)
+                        }}
+                      >
+                        {col.cell ? col.cell(row) : (col.accessorKey ? String(row[col.accessorKey]) : null)}
+                      </button>
+                    ) : (
+                      col.cell ? col.cell(row) : (col.accessorKey ? String(row[col.accessorKey]) : null)
+                    )}
                   </TableCell>
                 ))}
               </TableRow>

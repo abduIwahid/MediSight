@@ -7,13 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Search, ShieldCheck } from "lucide-react"
 import type { AuditLogRow } from "@/lib/types"
 import { roleLabel } from "@/lib/roles"
+import { auditActionClass } from "@/lib/status"
 import { fmtDateTime } from "@/lib/dates"
 
-const ACTION_COLORS: Record<string, string> = {
-  INSERT: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
-  UPDATE: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
-  DELETE: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
-}
+// Action chip colours live in lib/status.ts (the one palette).
+const ACTION_COLORS = auditActionClass
 
 // The database triggers log writes only — a SELECT filter could never
 // match anything, so it is not offered (QA Round 1, item 58).

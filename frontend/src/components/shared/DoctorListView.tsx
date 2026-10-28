@@ -68,6 +68,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     },
     {
       header: "Hospital",
+      hideOnMobile: true,
       cell: (doctor: DoctorListRow) => (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" /> {doctor.hospitals?.name || "No hospital on file"}
@@ -95,6 +96,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
     },
     {
       header: "Contact",
+      hideOnMobile: true,
       cell: (doctor: DoctorListRow) => (
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           {doctor.email && (
@@ -136,9 +138,10 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
         />
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card shadow-sm overflow-x-auto">
-          <div className="min-w-[800px]">
-            <DataTable columns={columns} data={doctors} />
-          </div>
+          {/* No min-w wrapper (QA Round 2, cluster 28): the table fits
+              360px because Hospital + Contact hide below sm — Doctor,
+              Status and Fee stay visible. */}
+          <DataTable columns={columns} data={doctors} />
         </div>
       )}
     </div>
