@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { DataTable } from "@/components/shared/DataTable"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -42,9 +43,11 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
       cell: (doctor: DoctorListRow) => (
         <div className="flex items-center gap-3">
           {doctor.avatar_url ? (
-            <img
+            <Image
               src={doctor.avatar_url}
               alt={doctor.full_name || 'Doctor'}
+              width={36}
+              height={36}
               className="h-9 w-9 rounded-full object-cover border border-border flex-shrink-0"
             />
           ) : (
@@ -137,7 +140,7 @@ export function DoctorListView({ doctors }: DoctorListViewProps) {
           actionHref="/admin/doctors"
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm overflow-x-auto">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-card overflow-x-auto">
           {/* No min-w wrapper (QA Round 2, cluster 28): the table fits
               360px because Hospital + Contact hide below sm — Doctor,
               Status and Fee stay visible. */}

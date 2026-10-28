@@ -6,8 +6,12 @@ interface InputsUsedDisclosureProps {
    *  one exists, otherwise the payload re-derived from the record). */
   payload: Record<string, number>
   /** Features the patient's record supplies — from buildMLPayload.
-   *  Everything else in the payload was an assumed default. */
-  recordedFeatures: readonly string[]
+   *  Everything else in the payload was an assumed default. Omit when
+   *  the payload is a stored snapshot: classification then compares
+   *  values against the defaults (the conservative reading), because
+   *  the set of features the record supplied AT SCORING TIME is not
+   *  recoverable from today's record (QA Round 3, prediction-print H1). */
+  recordedFeatures?: readonly string[]
   /** True when payload is the frozen predictions.features snapshot. */
   fromSnapshot?: boolean
 }

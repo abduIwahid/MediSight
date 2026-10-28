@@ -5,6 +5,7 @@ import { RiskBadge } from "@/components/shared/RiskBadge"
 import { Bell, AlertTriangle, Sparkles, Stethoscope, ArrowRight, ShieldCheck, Users, Activity, TrendingUp } from "lucide-react"
 import { motion, type Variants } from "framer-motion"
 import type { AlertRow } from "@/lib/types"
+import { dayKey } from "@/lib/dates"
 
 interface DashboardClientViewProps {
   recentAlerts: AlertRow[]
@@ -16,15 +17,22 @@ interface DashboardClientViewProps {
   /** True when any of the stat queries failed — the cards then say so
    *  instead of presenting a failed count as a real zero. */
   statsError?: boolean
+  /** The recent-alerts query's OWN error (QA Round 3, dashboard H1):
+   *  when it is set, the alerts panel shows an error state — never
+   *  the green "All Clear". */
+  alertsError?: boolean
+  viewerRole?: string | null
+  hospitalName?: string | null
 }
 
 function alertWhen(iso: string): string {
   const d = new Date(iso)
-  const today = new Date()
-  const sameDay = d.toDateString() === today.toDateString()
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: "Asia/Karachi" })
+  // "Today" means today in Asia/Karachi (the product convention in
+  // lib/dates), not the viewer's device day (QA Round 3, dashboard M7).
+  const sameDay = dayKey(iso) === dayKey(new Date().toISOString())
+  const time = d.toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit', timeZone: "Asia/Karachi" })
   if (sameDay) return time
-  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Karachi" })}, ${time}`
+  return `${d.toLocaleDateString("en-GB", { month: "short", day: "numeric", timeZone: "Asia/Karachi" })}, ${time}`
 }
 
 const containerVariants: Variants = {
@@ -38,8 +46,15 @@ const itemVariants: Variants = {
 }
 
 export function DashboardClientView({
-  recentAlerts, totalPatients, totalAlerts, totalDoctors, criticalAlerts, totalPredictions, statsError = false
+  recentAlerts, totalPatients, totalAlerts, totalDoctors, criticalAlerts, totalPredictions, statsError = false,
+  alertsError = false, viewerRole = null, hospitalName = null
 }: DashboardClientViewProps) {
+  const scopeLabel =
+    viewerRole === "super_admin"
+      ? "Platform-wide — all hospitals"
+      : hospitalName
+        ? `Scoped to ${hospitalName} and the records your role can access`
+        : "Scoped to the records your role can access"
   return (
     <motion.div
       variants={containerVariants}
@@ -63,7 +78,7 @@ export function DashboardClientView({
             Patient risk scores, critical alerts, and model predictions for your facility — each score with the factors behind it.
           </p>
           <div className="flex flex-wrap items-center gap-4 pt-4">
-            <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand/90">
+            <Link href="/patients/new" className="inline-flex items-center justify-center rounded-lg bg-[#1F6E96] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1F6E96]/90">
               New Risk Assessment <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <Link href="/alerts" className="inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
@@ -73,8 +88,10 @@ export function DashboardClientView({
         </div>
       </motion.div>
 
+      <p className="text-xs text-muted-foreground -mt-4">{scopeLabel}</p>
+
       {statsError && (
-        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
           Some dashboard numbers could not be loaded, so the figures below may be incomplete. Reload the page to try again.
         </div>
       )}
@@ -85,12 +102,12 @@ export function DashboardClientView({
           { label: "Total Patients", value: totalPatients, icon: Users, color: "text-[#2E7FA8]", bg: "bg-[#2E7FA8]/10", href: "/patients" },
           { label: "Active Doctors", value: totalDoctors, icon: Stethoscope, color: "text-primary", bg: "bg-secondary", href: "/doctors" },
           { label: "AI Predictions", value: totalPredictions, icon: Activity, color: "text-[#1E7A46]", bg: "bg-[#1E7A46]/10", href: "/analytics" },
-          { label: "Unread Alerts", value: totalAlerts, icon: Bell, color: "text-[#D97706]", bg: "bg-[#D97706]/10", href: "/alerts" },
+          { label: "Unread Alerts", value: totalAlerts, icon: Bell, color: "text-[#A85008]", bg: "bg-[#D97706]/10", href: "/alerts" },
           { label: "Critical Alerts", value: criticalAlerts, icon: AlertTriangle, color: "text-[#C0392B]", bg: "bg-[#C0392B]/10", href: "/alerts" },
         ].map((stat, i) => (
-          <Link key={i} href={stat.href}>
+          <Link key={i} href={stat.href} className={i === 4 ? "col-span-2 sm:col-span-1" : undefined}>
             <motion.div
-              className="group bg-card border rounded-xl p-5 shadow-sm hover:shadow-card transition-shadow duration-200 cursor-pointer"
+              className="group bg-card border rounded-xl p-5 shadow-card transition-shadow duration-200 cursor-pointer"
             >
               <div className={`inline-flex p-2 rounded-xl ${stat.bg} mb-3 group-hover:scale-110 transition-transform`}>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
@@ -105,11 +122,11 @@ export function DashboardClientView({
       {/* Quick Actions + Alerts */}
       <motion.div variants={itemVariants} className="grid gap-6 lg:grid-cols-2">
         {/* Quick Actions */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="bg-card border rounded-xl p-6 shadow-card space-y-4">
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" /> Quick Actions
           </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
             {[
               { label: "New Assessment", desc: "Register & run AI prediction", href: "/patients/new", icon: Users, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
               { label: "Patient Registry", desc: "Browse all patient records", href: "/patients", icon: Activity, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
@@ -119,7 +136,7 @@ export function DashboardClientView({
               { label: "Alerts Center", desc: "Critical & high risk alerts", href: "/alerts", icon: Bell, color: "bg-secondary text-primary group-hover:bg-primary group-hover:text-white" },
             ].map((action, i) => (
               <Link key={i} href={action.href}>
-                <div className="group flex items-start gap-3 p-3 rounded-xl border bg-background hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer h-full">
+                <div className="group flex items-start gap-3 p-3 rounded-xl border bg-background hover:border-primary/30 hover:shadow-card transition-all duration-200 cursor-pointer h-full">
                   <div className={`p-2 rounded-xl transition-all duration-200 flex-shrink-0 ${action.color}`}>
                     <action.icon className="h-4 w-4" />
                   </div>
@@ -134,20 +151,29 @@ export function DashboardClientView({
         </div>
 
         {/* Active Alerts */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm flex flex-col transition-shadow hover:shadow-md">
+        <div className="bg-card border rounded-xl p-6 shadow-card flex flex-col">
           <div className="flex items-center justify-between border-b pb-4 mb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#FAE9E7] rounded-lg">
                 <Bell className="h-4 w-4 text-[#C0392B]" />
               </div>
-              <h2 className="text-lg font-bold tracking-tight">Live Alerts</h2>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight">Recent High &amp; Critical Alerts</h2>
+                <p className="text-xs text-muted-foreground">The newest 8 new alerts. The Alerts Center holds the full list.</p>
+              </div>
             </div>
             <Link href="/alerts" className="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
               All Alerts <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
 
-          {!recentAlerts || recentAlerts.length === 0 ? (
+          {alertsError ? (
+            <div role="alert" className="flex flex-col items-center justify-center flex-1 py-12 rounded-xl border border-destructive/30 bg-destructive/10 px-4 text-center">
+              <AlertTriangle className="h-10 w-10 mb-3 text-destructive" />
+              <p className="text-sm font-medium text-destructive">Alerts could not be loaded</p>
+              <p className="text-xs mt-1 max-w-[240px] text-destructive">This panel can&apos;t tell whether there are active alerts right now. Reload the page, or open the Alerts Center.</p>
+            </div>
+          ) : !recentAlerts || recentAlerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 py-12 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
               <ShieldCheck className="h-10 w-10 mb-3 text-[#1E7A46] opacity-60" />
               <p className="text-sm font-medium text-foreground">All Clear</p>

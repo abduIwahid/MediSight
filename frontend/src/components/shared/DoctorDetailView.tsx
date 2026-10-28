@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -78,10 +79,12 @@ export function DoctorDetailView({ doctor }: DoctorDetailViewProps) {
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center gap-3 pb-4 border-b">
               {doctor.avatar_url ? (
-                <img
+                <Image
                   src={doctor.avatar_url}
                   alt={displayName}
-                  className="h-24 w-24 rounded-full object-cover border-2 border-primary/20 shadow-md"
+                  width={96}
+                  height={96}
+                  className="h-24 w-24 rounded-full object-cover border-2 border-primary/20 shadow-card"
                 />
               ) : (
                 // Brand initials tile — no third-party avatar hot-links.
