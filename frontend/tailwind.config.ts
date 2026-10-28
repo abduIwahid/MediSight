@@ -35,6 +35,7 @@ const config: Config = {
         destructive: {
           DEFAULT: "var(--destructive)",
           foreground: "var(--destructive-foreground)",
+          text: "var(--destructive-text)",
         },
         muted: {
           DEFAULT: "var(--muted)",

@@ -35,6 +35,45 @@ export async function requireSuperAdmin() {
 }
 
 /**
+ * Verifies the caller is a super_admin OR a hospital_admin and returns
+ * their scope (QA Round 3, admin A1). Routes that accept hospital
+ * admins MUST apply the scope constraints themselves (the service-role
+ * client bypasses RLS): a hospital admin may only modify users in
+ * their own hospital, may never touch a super_admin's row, and may
+ * never grant super_admin.
+ */
+export async function requireAdmin() {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { authorized: false as const, status: 401, message: "Not signed in." }
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, hospital_id")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "super_admin" && profile?.role !== "hospital_admin") {
+    return { authorized: false as const, status: 403, message: "Admin access required." }
+  }
+
+  return {
+    authorized: true as const,
+    userId: user.id,
+    role: profile.role as string,
+    hospitalId: (profile.hospital_id as string | null) ?? null,
+  }
+}
+
+/**
  * Records an admin-API action in the audit trail, attributed to the
  * acting admin. The DB audit triggers (log_phi_access) capture
  * auth.uid(), which is NULL under the service-role client — so actions

@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  const supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -16,31 +16,41 @@ export async function middleware(request: NextRequest) {
         get(name: string) {
           return request.cookies.get(name)?.value
         },
+        // Mutate the ONE response object instead of rebuilding it per
+        // cookie (QA Round 3, auth M1): rebuilding discarded cookies set
+        // by earlier calls in the same request, which could truncate
+        // chunked session cookies and corrupt the refreshed session.
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options })
-          supabaseResponse = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
           supabaseResponse.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: '', ...options })
-          supabaseResponse = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
           supabaseResponse.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
+  // No Supabase auth cookie on the request means there is provably no
+  // session — skip the network validation entirely (QA Round 3, perf
+  // P-6). Signed-in requests still validate (and refresh) as before.
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'))
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = hasAuthCookie ? await supabase.auth.getUser() : { data: { user: null } }
+
+  // Redirects must carry the refreshed session cookies with them
+  // (QA Round 3, auth M1): returning a bare NextResponse.redirect after
+  // getUser() rotated the token threw the new cookies away and could
+  // sign the user out on the next request.
+  const redirectWithCookies = (url: URL) => {
+    const res = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c))
+    return res
+  }
 
   // Check if route is related to auth
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
@@ -95,13 +105,19 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/admin'
     url.search = ''
-    return NextResponse.redirect(url)
+    return redirectWithCookies(url)
   }
 
   if (!user && !isAuthRoute && !isPublicRoute && !isSessionFlowRoute && isProtectedArea) {
     const url = request.nextUrl.clone()
+    // Remember the deep link so a successful sign-in can return the user
+    // to the page they actually wanted (QA Round 3, auth L1). The login
+    // page re-validates it against the signed-in role before honouring.
+    const returnTo = request.nextUrl.pathname
     url.pathname = '/login'
-    return NextResponse.redirect(url)
+    url.search = ''
+    if (returnTo && returnTo !== '/') url.searchParams.set('next', returnTo)
+    return redirectWithCookies(url)
   }
 
   // Role-based access control: patients get their own portal under /patient/*,
@@ -117,14 +133,16 @@ export async function middleware(request: NextRequest) {
   // database work for requests that never branch on a role.
   const needsRoleRouting = Boolean(user) && (isAuthRoute || isClinicalArea || isPatientArea)
   let role: string | null = null
+  let profileComplete = false
   let doctorStatus: string | null = null
   if (needsRoleRouting && user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, full_name')
       .eq('id', user.id)
       .single()
     role = profile?.role ?? null
+    profileComplete = Boolean(profile?.full_name && profile.full_name.trim().length > 0)
 
     // Doctor status feeds only the auth-route home redirect and the
     // unapproved-doctor clinical gate — not the patient-area gate.
@@ -144,24 +162,29 @@ export async function middleware(request: NextRequest) {
     return '/dashboard'
   }
 
-  if (user && isAuthRoute) {
+  // /forgot-password stays reachable while signed in (QA Round 3, auth
+  // L2): a browser holding a live session for an account whose password
+  // was forgotten — shared/family device, long-lived session — must be
+  // able to request a reset without first guessing "sign out".
+  const isForgotPassword = request.nextUrl.pathname.startsWith('/forgot-password')
+  if (user && isAuthRoute && !isForgotPassword) {
     const url = request.nextUrl.clone()
     url.pathname = homeForRole(role)
-    return NextResponse.redirect(url)
+    return redirectWithCookies(url)
   }
 
   if (user && role === 'patient' && isClinicalArea) {
     const url = request.nextUrl.clone()
     url.pathname = '/patient/dashboard'
     url.searchParams.set('error', 'This area is for doctors only.')
-    return NextResponse.redirect(url)
+    return redirectWithCookies(url)
   }
 
   if (user && role && role !== 'patient' && isPatientArea) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     url.searchParams.set('error', 'This area is for patients only.')
-    return NextResponse.redirect(url)
+    return redirectWithCookies(url)
   }
 
   // An unapproved doctor account must never reach the clinical workspace,
@@ -169,7 +192,7 @@ export async function middleware(request: NextRequest) {
   if (user && role === 'doctor' && doctorStatus !== 'approved' && isClinicalArea) {
     const url = request.nextUrl.clone()
     url.pathname = '/pending-approval'
-    return NextResponse.redirect(url)
+    return redirectWithCookies(url)
   }
 
   if (user && !role && !isOnboardingRoute && (isClinicalArea || isPatientArea)) {
@@ -178,7 +201,17 @@ export async function middleware(request: NextRequest) {
     // of letting them fall through to a role-gated area with no role.
     const url = request.nextUrl.clone()
     url.pathname = '/onboarding'
-    return NextResponse.redirect(url)
+    return redirectWithCookies(url)
+  }
+
+  if (user && role && !profileComplete && !isOnboardingRoute && (isClinicalArea || isPatientArea)) {
+    // Onboarding is not skippable (QA Round 3, onboarding O-3): a profile
+    // that has a role but no name yet (e.g. an OAuth trigger coalescing
+    // full_name to '') previously reached the full app half-set-up,
+    // because this gate only fired when the role itself was missing.
+    const url = request.nextUrl.clone()
+    url.pathname = '/onboarding'
+    return redirectWithCookies(url)
   }
 
   return supabaseResponse

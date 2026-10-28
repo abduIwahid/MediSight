@@ -148,3 +148,31 @@ export function availabilityInfo(status?: string | null): AvailabilityInfo {
       }
   }
 }
+
+/**
+ * Disease-series chart ramp (QA Round 3, visual V6): built ONLY from
+ * locked palette tokens — Primary, Accent, the brand-text steel, the
+ * Unknown grey, Ink, and Light. The analytics view previously invented
+ * five in-between blues that exist nowhere else in the product.
+ */
+export const DISEASE_CHART_COLORS: string[] = [
+  "#0D2B3E", // Primary
+  "#2E7FA8", // Accent
+  "#1F6E96", // brand text steel
+  "#5A6B73", // Unknown grey
+  "#06141B", // Ink
+  "#9FB6BF", // Light-derived steel (chart-only tint of #CCD0CF family)
+  "#2E7FA8",
+  "#0D2B3E",
+]
+
+/** Banner recipes (QA Round 3, visual V13): one per intent, product-wide. */
+export const BANNER_CLASSES = {
+  success: "border-[#1E7A46]/30 bg-[#E2F0E6] text-[#1E7A46]",
+  warning: "border-[#D97706]/30 bg-[#FDF0DC] text-[#A85008]",
+  error: "border-[#C0392B]/30 bg-[#FAE9E7] text-[#C0392B]",
+  info: "border-[#2E7FA8]/30 bg-[#2E7FA8]/10 text-[#1F6E96]",
+} as const
+
+/** Neutral accent bar fill for metric bars (QA Round 3, visual V3). */
+export const ACCENT_BAR_CLASS = "bg-[#2E7FA8]"
