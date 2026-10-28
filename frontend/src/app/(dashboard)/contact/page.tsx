@@ -8,7 +8,6 @@ const SUBJECT_OPTIONS = ["Platform question", "Model question", "Account and acc
 
 export default function ContactPage() {
   const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
   const [department, setDepartment] = useState("")
   const [subject, setSubject] = useState(SUBJECT_OPTIONS[0])
   const [message, setMessage] = useState("")
@@ -25,7 +24,7 @@ export default function ContactPage() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, department, subject, message }),
+        body: JSON.stringify({ name, department, subject, message }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -33,7 +32,6 @@ export default function ContactPage() {
       }
       setStatus("sent")
       setName("")
-      setEmail("")
       setDepartment("")
       setSubject(SUBJECT_OPTIONS[0])
       setMessage("")
@@ -56,8 +54,8 @@ export default function ContactPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Contact Info Cards */}
         <div className="space-y-4 lg:col-span-1">
-          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
-            <h3 className="font-bold text-base border-b pb-2">Channels</h3>
+          <div className="rounded-xl border bg-card p-5 shadow-card space-y-4">
+            <h2 className="font-bold text-base border-b pb-2">Channels</h2>
 
             <div className="flex items-start gap-3 text-sm">
               <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -66,7 +64,7 @@ export default function ContactPage() {
               <div>
                 <p className="font-semibold text-xs">Email</p>
                 <p className="text-xs text-muted-foreground">contact@abdulwahid.me</p>
-                <p className="text-[10px] text-muted-foreground">The developer&apos;s public contact email</p>
+                <p className="text-[11px] text-muted-foreground">The developer&apos;s public contact email</p>
               </div>
             </div>
 
@@ -79,7 +77,7 @@ export default function ContactPage() {
                 <Link href="https://github.com/abduIwahid/WhyRisk" target="_blank" rel="noreferrer" className="text-xs text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
                   github.com/abduIwahid/WhyRisk
                 </Link>
-                <p className="text-[10px] text-muted-foreground">Issues and questions live on GitHub</p>
+                <p className="text-[11px] text-muted-foreground">Issues and questions live on GitHub</p>
               </div>
             </div>
 
@@ -92,12 +90,12 @@ export default function ContactPage() {
                 <Link href="/model-card" className="text-xs text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
                   Public model card
                 </Link>
-                <p className="text-[10px] text-muted-foreground">Live service status and the model&apos;s documented limits</p>
+                <p className="text-[11px] text-muted-foreground">Live service status and the model&apos;s documented limits</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border bg-muted/40 p-5 shadow-sm space-y-2">
+          <div className="rounded-xl border bg-muted/40 p-5 shadow-card space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-primary">
               <ShieldCheck className="h-4 w-4" /> Before You Write
             </div>
@@ -108,10 +106,10 @@ export default function ContactPage() {
         </div>
 
         {/* Contact Form */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm lg:col-span-2 space-y-4">
+        <div className="rounded-xl border bg-card p-6 shadow-card lg:col-span-2 space-y-4">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-bold">Send a Message</h3>
+            <h2 className="text-lg font-bold">Send a Message</h2>
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -127,22 +125,14 @@ export default function ContactPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Ayesha Khan"
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="contact-email" className="text-xs font-medium text-muted-foreground">Email</label>
-                <input
-                  id="contact-email"
-                  name="email"
-                  type="email"
-                  required
-                  maxLength={254}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="doctor@hospital.org"
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+                <label htmlFor="contact-reply" className="text-xs font-medium text-muted-foreground">Replies go to</label>
+                <div id="contact-reply" className="flex h-10 items-center rounded-xl border bg-muted/40 px-3 text-sm text-muted-foreground">
+                  Your account email address
+                </div>
               </div>
             </div>
 
@@ -157,7 +147,7 @@ export default function ContactPage() {
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   placeholder="Cardiology / Central Hospital"
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -167,7 +157,7 @@ export default function ContactPage() {
                   name="subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   {SUBJECT_OPTIONS.map((option) => (
                     <option key={option}>{option}</option>
@@ -186,20 +176,20 @@ export default function ContactPage() {
                 maxLength={5000}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Describe your request or technical issue..."
-                className="w-full p-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Describe your request or technical issue…"
+                className="w-full p-3 rounded-xl border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
 
             {status === "sent" && (
-              <div className="p-4 bg-primary/10 text-primary rounded-xl border border-primary/20 text-sm font-medium flex items-start gap-3">
+              <div role="status" className="p-4 bg-primary/10 text-primary rounded-xl border border-primary/20 text-sm font-medium flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                <p>Your message has been sent. Replies go to the email address you entered above.</p>
+                <p>Your message has been sent. Replies go to your account email address.</p>
               </div>
             )}
 
             {status === "error" && errorMessage && (
-              <div className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 text-sm font-medium flex items-start gap-3">
+              <div role="alert" className="p-4 bg-destructive/10 text-destructive-text rounded-xl border border-destructive/20 text-sm font-medium flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <p>{errorMessage}</p>
               </div>
@@ -208,11 +198,11 @@ export default function ContactPage() {
             <button
               type="submit"
               disabled={status === "sending"}
-              className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60 disabled:pointer-events-none sm:w-auto"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60 disabled:pointer-events-none sm:w-auto"
             >
               {status === "sending" ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
                 </>
               ) : (
                 <>

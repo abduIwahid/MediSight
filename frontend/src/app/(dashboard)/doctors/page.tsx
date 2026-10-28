@@ -27,7 +27,7 @@ export default async function DoctorsPage() {
   if (error) {
     console.error('Error loading doctors:', error)
     return (
-      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive-text">
         <h2 className="font-bold">The doctor directory could not be loaded</h2>
         <p className="text-sm">Please reload the page to try again.</p>
       </div>

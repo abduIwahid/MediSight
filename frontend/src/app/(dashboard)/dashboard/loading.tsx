@@ -10,9 +10,9 @@ export default function DashboardLoading() {
           <div className="h-11 w-36 animate-pulse rounded-lg bg-white/10" />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="rounded-xl border bg-card p-5">
+          <div key={i} className={`rounded-xl border bg-card p-5 ${i === 4 ? "col-span-2 sm:col-span-1" : ""}`}>
             <div className="flex items-start justify-between">
               <div className="space-y-2.5">
                 <div className="h-3 w-20 animate-pulse rounded bg-secondary" />
@@ -23,8 +23,8 @@ export default function DashboardLoading() {
           </div>
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border bg-card p-6 lg:col-span-2">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border bg-card p-6">
           <div className="h-4 w-40 animate-pulse rounded bg-secondary" />
           <div className="mt-5 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (

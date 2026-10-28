@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { DashboardClientView } from "@/components/shared/DashboardClientView"
+import { getCurrentProfile } from "@/lib/current-profile"
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,21 @@ export default async function DashboardPage() {
   const recentAlerts = alertsRes.data
   const alertsError = alertsRes.error
 
+  // The viewer's scope (QA Round 3, dashboard-analytics H3): the
+  // counts below are RLS-scoped, and the page must SAY which scope —
+  // previously every viewer saw identical unlabelled numbers that
+  // silently meant different things per role.
+  const viewer = await getCurrentProfile()
+  let hospitalName: string | null = null
+  if (viewer?.hospital_id) {
+    const { data: hospital } = await supabase
+      .from('hospitals')
+      .select('name')
+      .eq('id', viewer.hospital_id)
+      .single()
+    hospitalName = hospital?.name ?? null
+  }
+
   const statsError = Boolean(
     alertsError || patientsRes.error || alertsCountRes.error || doctorsRes.error || criticalRes.error || predictionsRes.error
   )
@@ -50,6 +66,9 @@ export default async function DashboardPage() {
       criticalAlerts={criticalRes.count || 0}
       totalPredictions={predictionsRes.count || 0}
       statsError={statsError}
+      alertsError={Boolean(alertsError)}
+      viewerRole={viewer?.role ?? null}
+      hospitalName={hospitalName}
     />
   )
 }
