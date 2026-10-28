@@ -6,12 +6,12 @@ const SEVERITY_DOT = severityChartColor
 
 function fmtShortDate(iso?: string | null): string {
   if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Karachi" })
+  return new Date(iso).toLocaleDateString("en-GB", { month: "short", day: "numeric", timeZone: "Asia/Karachi" })
 }
 
 function fmtFullDate(iso?: string | null): string {
   if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Karachi" })
+  return new Date(iso).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Karachi" })
 }
 
 /**
@@ -33,8 +33,15 @@ export function RiskTrendChart({ predictions }: { predictions: PredictionRow[] }
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 
-  const coords = points.map((p, i) => {
-    const x = PAD.left + (i / (points.length - 1)) * innerW
+  // The x axis is TIME-scaled (QA Round 3, prediction-print M5):
+  // points used to be spaced by index, so two assessments a day apart
+  // and two a month apart sat the same distance apart and same-day
+  // runs overlapped into one dot.
+  const t0 = new Date(points[0].created_at).getTime()
+  const t1 = new Date(points[points.length - 1].created_at).getTime()
+  const span = Math.max(1, t1 - t0)
+  const coords = points.map((p) => {
+    const x = PAD.left + ((new Date(p.created_at).getTime() - t0) / span) * innerW
     const y = PAD.top + (1 - (p.probability ?? 0)) * innerH
     return { x, y, p }
   })
@@ -53,7 +60,7 @@ export function RiskTrendChart({ predictions }: { predictions: PredictionRow[] }
           return (
             <g key={v}>
               <line x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y} stroke="#CCD0CF" strokeWidth={v === 0 ? 1.2 : 0.6} strokeDasharray={v === 0 ? "" : "3 3"} />
-              <text x={PAD.left - 6} y={y + 3} textAnchor="end" fontSize="9" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">
+              <text x={PAD.left - 6} y={y + 3} textAnchor="end" fontSize="11" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">
                 {v * 100}
               </text>
             </g>
@@ -66,10 +73,10 @@ export function RiskTrendChart({ predictions }: { predictions: PredictionRow[] }
             <title>{`${fmtFullDate(c.p.created_at)} — ${((c.p.probability ?? 0) * 100).toFixed(1)}% (${c.p.severity ?? "severity not recorded"})`}</title>
           </circle>
         ))}
-        <text x={PAD.left} y={H - 6} fontSize="9" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">
+        <text x={PAD.left} y={H - 6} fontSize="11" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">
           {fmtShortDate(first.created_at)}
         </text>
-        <text x={PAD.left + innerW} y={H - 6} textAnchor="end" fontSize="9" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">
+        <text x={PAD.left + innerW} y={H - 6} textAnchor="end" fontSize="11" fill="#5A6B73" fontFamily="JetBrains Mono, monospace">
           {fmtShortDate(last.created_at)}
         </text>
       </svg>

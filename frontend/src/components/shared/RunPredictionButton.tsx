@@ -34,7 +34,7 @@ export function RunPredictionButton({ patient, onResult }: RunPredictionButtonPr
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [result, setResult] = useState<RunResult | null>(null)
-  const loadingLabel = useStagedLoadingLabel(loading, "Running AI Model...")
+  const loadingLabel = useStagedLoadingLabel(loading, "Running AI Model…")
   const supabase = createClient()
 
   const handleRunPrediction = async () => {
@@ -73,7 +73,11 @@ export function RunPredictionButton({ patient, onResult }: RunPredictionButtonPr
         .select("id")
         .single()
 
-      if (predErr) throw new Error(`Save error: ${predErr.message}`)
+      if (predErr) {
+        // Plain language, no raw database text (QA Round 3, copy H4).
+        console.error("Prediction save failed:", predErr)
+        throw new Error("The prediction ran, but the result could not be saved. Please try again.")
+      }
 
       // Captured from the in-hand /api/predict + /api/explain payloads
       // so the result below renders immediately — no router.refresh()
@@ -129,12 +133,18 @@ export function RunPredictionButton({ patient, onResult }: RunPredictionButtonPr
           }
         })()
 
-        const [{ error: featuresErr }, explainOk] = await Promise.all([
-          supabase.from("predictions").update({ features: mlPayload }).eq("id", inserted.id),
+        const [featuresRes, explainOk] = await Promise.all([
+          supabase.from("predictions").update({ features: mlPayload }).eq("id", inserted.id).select("id"),
           explainPromise,
         ])
-        if (featuresErr) {
-          console.warn("Prediction feature snapshot was not stored:", featuresErr.message)
+        // Verified (QA Round 3, data-integrity DI3-01): a zero-row
+        // update is a failure too — without the snapshot, the detail
+        // page classifies this score's inputs conservatively.
+        if (featuresRes.error || !featuresRes.data || featuresRes.data.length === 0) {
+          if (featuresRes.error) console.warn("Prediction feature snapshot was not stored:", featuresRes.error.message)
+          runWarnings.push(
+            "The prediction was saved, but its input snapshot could not be stored — the detail page will classify this score's inputs conservatively."
+          )
         }
         if (!explainOk) {
           runWarnings.push(
@@ -150,25 +160,60 @@ export function RunPredictionButton({ patient, onResult }: RunPredictionButtonPr
           data: { user },
         } = await supabase.auth.getUser()
         if (user && patient.hospital_id) {
-          await supabase.from("doctor_patient_assignments").insert({
+          // Only a genuine duplicate (23505) is ignorable (QA Round 3,
+          // data-integrity DI3-11); other failures are logged rather
+          // than silently discarded.
+          const { error: assignmentErr } = await supabase.from("doctor_patient_assignments").insert({
             doctor_id: user.id,
             patient_id: patient.id,
             hospital_id: patient.hospital_id,
           })
+          if (assignmentErr && assignmentErr.code !== "23505") {
+            console.error("Assignment insert failed:", assignmentErr)
+          }
         }
       }
 
       if (prediction.severity === "High" || prediction.severity === "Critical") {
         // Dedupe: one still-open alert per patient is enough — repeat
         // runs used to mint a fresh "New" alert every time, so the bell
-        // and the Alerts Center counted runs instead of patients.
-        const { data: openAlerts } = await supabase
+        // and the Alerts Center counted runs instead of patients. The
+        // dedupe is ESCALATION-AWARE (QA Round 3, dashboard H2 /
+        // data-integrity DI3-06): an open High alert must not swallow
+        // a later Critical — the open alert is upgraded in place. A
+        // failed dedupe check is surfaced, never treated as "no alert
+        // exists" (which would double-alert) or as "alert exists"
+        // (which would swallow silently).
+        const SEVERITY_RANK: Record<string, number> = { Low: 0, Moderate: 1, High: 2, Critical: 3 }
+        const { data: openAlerts, error: dedupeErr } = await supabase
           .from("alerts")
-          .select("id")
+          .select("id, severity")
           .eq("patient_id", patient.id)
           .eq("status", "New")
+          .order("created_at", { ascending: false })
           .limit(1)
-        if (!openAlerts || openAlerts.length === 0) {
+        if (dedupeErr) {
+          console.error("Existing-alert check failed:", dedupeErr)
+          runWarnings.push(
+            "The prediction was saved, but the existing-alert check failed — if no alert appears in the Alerts Center, run the prediction again."
+          )
+        } else if (openAlerts && openAlerts.length > 0) {
+          const open = openAlerts[0]
+          if ((SEVERITY_RANK[prediction.severity] ?? 0) > (SEVERITY_RANK[open.severity || ""] ?? 0)) {
+            const { data: upgraded, error: upgradeErr } = await supabase
+              .from("alerts")
+              .update({ severity: prediction.severity, type: `${prediction.severity} Diabetes Risk` })
+              .eq("id", open.id)
+              .eq("status", "New")
+              .select("id")
+            if (upgradeErr || !upgraded || upgraded.length === 0) {
+              console.error("Alert escalation failed:", upgradeErr)
+              runWarnings.push(
+                "The prediction was saved, but the existing alert could not be raised to the new severity — check the Alerts Center."
+              )
+            }
+          }
+        } else {
           // The insert result is CHECKED — a silently failed alert for a
           // High/Critical score is exactly the failure this flow exists
           // to prevent (patients/new already surfaced it; this flow
@@ -244,7 +289,7 @@ export function RunPredictionButton({ patient, onResult }: RunPredictionButtonPr
         )}
       </button>
       {error && (
-        <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive-text">
           {error}
         </p>
       )}
@@ -270,7 +315,7 @@ export function RunPredictionButton({ patient, onResult }: RunPredictionButtonPr
             />
           )}
           {result.shapPayload.length > 0 && (
-            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="rounded-xl border bg-card p-4 shadow-card">
               <h4 className="mb-3 text-sm font-bold">Why this score — top factors</h4>
               <ShapFactorList data={result.shapPayload} />
               {result.clinicalExplanation && (

@@ -61,20 +61,20 @@ export function PredictionDetailView({
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-wrap items-center gap-4 mb-6">
         <Button variant="ghost" size="icon" asChild>
           <Link href={`/patients/${patientId}`}>
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="eyebrow">Prediction detail</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Why this score</h1>
           <p className="text-muted-foreground">
             Patient: {patientName} | MRN: {patient?.mrn}
           </p>
         </div>
-        <Button variant="outline" asChild>
+        <Button variant="outline" className="shrink-0" asChild>
           <Link href={`/patients/${patientId}/predictions/${prediction.id}/report`}>
             <Printer className="mr-2 h-4 w-4" />
             Download report
@@ -171,13 +171,15 @@ export function PredictionDetailView({
           <CardHeader>
             <CardTitle>Inputs used for this score</CardTitle>
             <CardDescription>
-              Every model input, marked as recorded from this patient or filled with a population default.
+              {snapshot
+                ? "Every model input, marked as recorded from this patient or filled with a population default."
+                : "This prediction has no stored input snapshot, so the values below are derived from the patient's current record — today's record stands in for the scored inputs."}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <InputsUsedDisclosure
               payload={baseline}
-              recordedFeatures={derived?.recordedFeatures ?? []}
+              recordedFeatures={snapshot ? undefined : (derived?.recordedFeatures ?? [])}
               fromSnapshot={snapshot !== null}
             />
           </CardContent>
@@ -186,9 +188,11 @@ export function PredictionDetailView({
 
       {baseline && probability !== null && (
         <WhatIfSimulator
+          key={prediction.id}
           baseline={baseline}
           originalProbability={probability}
           originalSeverity={severity}
+          fromSnapshot={snapshot !== null}
         />
       )}
     </div>
