@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { PatientRiskCard } from "@/components/shared/PatientRiskCard"
 import { DataTable } from "@/components/shared/DataTable"
@@ -48,14 +48,15 @@ interface PatientDetailViewProps {
   patient: PatientRow
   latestPrediction: PredictionRow | null
   isAdmin?: boolean
+  /** Doctors (and admins) may edit demographics; delete stays
+   *  admin-only (QA Round 3, patients-crud M7). */
+  canEdit?: boolean
 }
 
-export function PatientDetailView({ patient, latestPrediction, isAdmin = false }: PatientDetailViewProps) {
+export function PatientDetailView({ patient, latestPrediction, isAdmin = false, canEdit }: PatientDetailViewProps) {
+  const showEdit = canEdit ?? isAdmin
   const router = useRouter()
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -77,30 +78,47 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
     recorded_at: new Date().toISOString().slice(0, 10),
   })
 
-  const [demographics, setDemographics] = useState({
-    first_name: patient.demographics?.first_name || "",
-    last_name: patient.demographics?.last_name || "",
-    age: String(patient.demographics?.age || ""),
-    gender: patient.demographics?.gender || "",
-  })
+  // Prefill goes through the same name resolution the header uses
+  // (QA Round 3, patients-crud M3): a record that stores only
+  // full_name used to open this form BLANK, and saving it overwrote a
+  // good name with the merge of two empty fields.
+  const prefillFrom = (row: PatientRow) => {
+    const d = row.demographics || {}
+    let first = d.first_name || d.firstName || ""
+    let last = d.last_name || d.lastName || ""
+    if (!first && !last) {
+      const full = (d.full_name || d.name || "").trim()
+      if (full) {
+        const parts = full.split(/\s+/)
+        first = parts[0] || ""
+        last = parts.slice(1).join(" ")
+      }
+    }
+    const dobRaw = d.birth_date || d.dob
+    const derivedAge = dobRaw
+      ? Math.floor((Date.now() - new Date(dobRaw).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      : null
+    return {
+      first_name: first,
+      last_name: last,
+      age: String(d.age ?? derivedAge ?? ""),
+      gender: d.gender || "",
+    }
+  }
+  const [demographics, setDemographics] = useState(() => prefillFrom(patient))
 
   useEffect(() => {
-    setDemographics({
-      first_name: patient.demographics?.first_name || "",
-      last_name: patient.demographics?.last_name || "",
-      age: String(patient.demographics?.age || ""),
-      gender: patient.demographics?.gender || "",
-    })
+    setDemographics(prefillFrom(patient))
   }, [patient])
 
   const name = getPatientName(patient)
   const d = patient.demographics || {}
   const dobRaw = d.birth_date || d.dob
-  const age = d.age || (
+  const age = (
     dobRaw
       ? Math.floor((Date.now() - new Date(dobRaw).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
       : null
-  )
+  ) ?? d.age ?? null
   const gender = d.gender ? d.gender.charAt(0).toUpperCase() + d.gender.slice(1).toLowerCase() : "—"
   const dob = dobRaw ? fmtDate(dobRaw) : "—"
 
@@ -109,50 +127,98 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
     setErrorMessage(null)
     setStatusMessage(null)
 
-    try {
-      const updatePayload: { demographics: PatientDemographics } = {
-        demographics: {
-          ...patient.demographics,
-          first_name: demographics.first_name,
-          last_name: demographics.last_name,
-          gender: demographics.gender,
-          age: Number(demographics.age) || null,
-        }
-      }
-
-      const { error } = await supabase
-        .from('patients')
-        .update(updatePayload)
-        .eq('id', patient.id)
-
-      if (error) throw error
-
-      if (newLab.test_name && newLab.value) {
-        const { error: labError } = await supabase.from('lab_results').insert({
-          patient_id: patient.id,
-          test_name: newLab.test_name,
-          value: newLab.value,
-          unit: newLab.unit || "",
-          recorded_at: newLab.recorded_at,
-        })
-        if (labError) throw labError
-      }
-
-      setStatusMessage('Patient record updated successfully.')
-      setNewLab({ test_name: "", value: "", unit: "", recorded_at: new Date().toISOString().slice(0, 10) })
-      setEditMode(false)
-      router.refresh()
-    } catch (error: unknown) {
-      // Never render the raw database error — log it, say it plainly.
-      console.error("Patient update failed:", error)
-      setErrorMessage('Unable to save patient updates. Please check your connection and try again.')
-    } finally {
+    // Validation (QA Round 3, patients-crud L3): names are trimmed,
+    // gender must be one of the offered values, age a plausible number.
+    const firstName = demographics.first_name.trim()
+    const lastName = demographics.last_name.trim()
+    if (!firstName && !lastName) {
+      setErrorMessage('Please enter the patient\'s name.')
       setSaving(false)
+      return
     }
+    if (demographics.gender && !['Male', 'Female', 'Other'].includes(demographics.gender)) {
+      setErrorMessage('Please choose the patient\'s gender from the list.')
+      setSaving(false)
+      return
+    }
+    const ageValue = demographics.age === "" ? null : Number(demographics.age)
+    if (ageValue !== null && (!Number.isFinite(ageValue) || ageValue < 0 || ageValue > 120)) {
+      setErrorMessage('Please enter an age between 0 and 120, or leave it blank.')
+      setSaving(false)
+      return
+    }
+
+    // Re-read the CURRENT demographics before writing (QA Round 3,
+    // data-integrity DI3-05): the merge base used to be the page-load
+    // snapshot, so an intake risk factor recorded after this page
+    // loaded was silently reverted by an unrelated name edit.
+    const { data: freshRow, error: readError } = await supabase
+      .from('patients')
+      .select('demographics')
+      .eq('id', patient.id)
+      .single()
+    if (readError || !freshRow) {
+      console.error("Patient re-read failed:", readError)
+      setErrorMessage('Unable to save patient updates. Please try again.')
+      setSaving(false)
+      return
+    }
+
+    // Part 1 — demographics, verified (DI3-03): a zero-row update is a
+    // failure, and on failure the lab insert is NOT attempted and edit
+    // mode stays open — the old flow reported total success after a
+    // demographics write that had matched nothing.
+    const merged: PatientDemographics = {
+      ...(freshRow.demographics as PatientDemographics),
+      first_name: firstName,
+      last_name: lastName,
+      full_name: `${firstName} ${lastName}`.trim(),
+      gender: demographics.gender,
+      age: ageValue,
+    }
+    const { data: updatedRows, error: demoError } = await supabase
+      .from('patients')
+      .update({ demographics: merged })
+      .eq('id', patient.id)
+      .select('id')
+    if (demoError || !updatedRows || updatedRows.length === 0) {
+      if (demoError) console.error("Patient demographics update failed:", demoError)
+      setErrorMessage('The demographic changes could not be saved. Nothing was changed — please try again.')
+      setSaving(false)
+      return
+    }
+
+    // Part 2 — the optional lab result, reported separately (M4): if
+    // it fails, demographics stay saved and the form stays open with
+    // the lab fields intact so the entry can be retried.
+    if (newLab.test_name.trim() && newLab.value.trim()) {
+      const { error: labError } = await supabase.from('lab_results').insert({
+        patient_id: patient.id,
+        test_name: newLab.test_name.trim(),
+        value: newLab.value,
+        unit: newLab.unit || "",
+        recorded_at: newLab.recorded_at,
+      })
+      if (labError) {
+        console.error("Lab insert failed:", labError)
+        setStatusMessage('Demographics saved. The lab result could not be added — check it and save again.')
+        setSaving(false)
+        router.refresh()
+        return
+      }
+    }
+
+    setStatusMessage('Patient record updated successfully.')
+    setNewLab({ test_name: "", value: "", unit: "", recorded_at: new Date().toISOString().slice(0, 10) })
+    setEditMode(false)
+    setSaving(false)
+    router.refresh()
   }
 
+  const [pendingDelete, setPendingDelete] = useState(false)
+
   const handleDeletePatient = async () => {
-    if (!window.confirm('Delete this patient record? This action cannot be undone.')) return
+    setPendingDelete(false)
     setDeleteLoading(true)
     setErrorMessage(null)
     setStatusMessage(null)
@@ -218,7 +284,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
       animate="show"
       className="space-y-6 max-w-7xl mx-auto pb-8"
     >
-      <motion.div variants={itemVariants} className="flex flex-col gap-6 lg:gap-0 lg:flex-row lg:items-start lg:justify-between bg-card p-6 rounded-2xl border shadow-sm">
+      <motion.div variants={itemVariants} className="flex flex-col gap-6 lg:gap-0 lg:flex-row lg:items-start lg:justify-between bg-card p-6 rounded-xl border shadow-card">
         <div className="flex items-start gap-5">
           <Link href="/patients">
             <button className="mt-1 h-10 w-10 rounded-full border border-border/50 bg-muted/30 flex items-center justify-center hover:bg-muted hover:scale-105 transition-all">
@@ -233,7 +299,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
                 </span>
               </div>
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight">{name}</h1>
+                <h1 className="text-3xl font-bold tracking-tight">{name}</h1>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground mt-1.5">
                   <span className="font-mono text-xs bg-muted/80 px-2.5 py-1 rounded-md border text-foreground font-medium">{patient.mrn}</span>
                   {age != null && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Age {age}</span>}
@@ -245,20 +311,49 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           </div>
         </div>
 
-        {isAdmin && (
+        {(showEdit || isAdmin) && (
           <div className="flex flex-wrap items-center gap-3">
+            {showEdit && (
             <Button variant={editMode ? "default" : "outline"} className="rounded-xl transition-all hover:shadow-md" onClick={() => setEditMode((open) => !open)}>
               <Pencil className="mr-2 h-4 w-4" /> {editMode ? 'Cancel Edit' : 'Update Profile'}
             </Button>
-            <Button variant="destructive" className="rounded-xl transition-all hover:shadow-md" onClick={handleDeletePatient} disabled={deleteLoading}>
+            )}
+            {isAdmin && (
+            <Button variant="destructive" className="rounded-xl transition-all hover:shadow-md" onClick={() => { setErrorMessage(null); setStatusMessage(null); setPendingDelete(true) }} disabled={deleteLoading}>
               <Trash2 className="mr-2 h-4 w-4" /> {deleteLoading ? 'Deleting…' : 'Delete Record'}
             </Button>
+            )}
           </div>
         )}
       </motion.div>
 
+      {pendingDelete && (
+        <div role="alertdialog" aria-label="Confirm patient deletion" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">
+          <p className="text-destructive">
+            Delete <strong>{name}</strong>&apos;s record? This also removes their predictions, vitals, lab results, diagnoses, appointments and alerts. This cannot be undone.
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              autoFocus
+              onClick={handleDeletePatient}
+              className="rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete record
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingDelete(false)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {!editMode && errorMessage && (
-        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive-text">
           {errorMessage}
         </div>
       )}
@@ -271,12 +366,12 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-card border rounded-2xl p-6 shadow-md space-y-5 my-4 relative">
+            <div className="bg-card border rounded-xl p-6 shadow-md space-y-5 my-4 relative">
               <div className="absolute top-0 left-0 w-1 h-full bg-primary rounded-l-2xl"></div>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold">Admin Update Mode</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Edit patient demographics and register new laboratory results.</p>
+                  <h2 className="text-xl font-bold">Update Patient Record</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Edit patient demographics and register new laboratory results. Changes are not saved until you click Save Changes.</p>
                 </div>
               </div>
 
@@ -376,7 +471,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
                 <motion.div
                   role={errorMessage ? "alert" : "status"}
                   initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-xl p-4 text-sm font-medium flex items-center gap-2 ${errorMessage ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-[#E2F0E6] text-[#1E7A46] border border-[#1E7A46]/25'}`}
+                  className={`rounded-xl p-4 text-sm font-medium flex items-center gap-2 ${errorMessage ? 'bg-destructive/10 text-destructive-text border border-destructive/20' : 'bg-[#E2F0E6] text-[#1E7A46] border border-[#1E7A46]/25'}`}
                 >
                   {errorMessage || statusMessage}
                 </motion.div>
@@ -386,7 +481,20 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
                 <Button onClick={handleSaveUpdates} disabled={saving} className="rounded-xl h-11 px-6 shadow-md transition-all hover:shadow-lg">
                   {saving ? 'Saving changes…' : 'Save Changes'}
                 </Button>
-                <Button variant="outline" onClick={() => setEditMode(false)} className="rounded-xl h-11 px-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Discard means discard (QA Round 3, patients-crud
+                    // L2): the typed values used to survive closing and
+                    // silently reappear — and re-save — next time.
+                    setDemographics(prefillFrom(patient))
+                    setNewLab({ test_name: "", value: "", unit: "", recorded_at: new Date().toISOString().slice(0, 10) })
+                    setErrorMessage(null)
+                    setStatusMessage(null)
+                    setEditMode(false)
+                  }}
+                  className="rounded-xl h-11 px-6"
+                >
                   Discard
                 </Button>
               </div>
@@ -402,7 +510,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           { label: "Vitals Tracked", icon: Activity, value: `${patient.vitals?.length || 0} records` },
           { label: "Lab Results", icon: FlaskConical, value: `${patient.lab_results?.length || 0} results` },
         ].map((stat, i) => (
-          <div key={i} className="group bg-card border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-start gap-2 relative overflow-hidden">
+          <div key={i} className="group bg-card border rounded-xl p-5 shadow-card hover:shadow-md transition-all duration-300 flex flex-col items-start gap-2 relative overflow-hidden">
             <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-150 transition-transform duration-500">
               <stat.icon className="h-24 w-24" />
             </div>
@@ -431,7 +539,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
               />
             </motion.div>
           ) : (
-            <div className="bg-card border rounded-2xl p-8 shadow-sm flex flex-col items-center text-center space-y-5">
+            <div className="bg-card border rounded-xl p-8 shadow-card flex flex-col items-center text-center space-y-5">
               <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center">
                 <Stethoscope className="h-10 w-10 text-muted-foreground/40" />
               </div>
@@ -444,14 +552,14 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           )}
 
           {currentPrediction && (
-            <div className="bg-card border rounded-2xl p-5 shadow-sm">
+            <div className="bg-card border rounded-xl p-5 shadow-card">
               <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-4">Run Updated Assessment</h3>
               <RunPredictionButton patient={patient} onResult={setFreshPrediction} />
             </div>
           )}
 
           {sortedPreds.length >= 1 && (
-            <div className="bg-card border rounded-2xl p-5 shadow-sm">
+            <div className="bg-card border rounded-xl p-5 shadow-card">
               <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-primary" /> Risk Trend
               </h3>
@@ -469,7 +577,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
           )}
 
           {sortedPreds.length > 1 && (
-            <div className="bg-card border rounded-2xl p-5 shadow-sm">
+            <div className="bg-card border rounded-xl p-5 shadow-card">
               <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
                 <Heart className="h-4 w-4 text-primary" /> Prediction History
               </h3>
@@ -493,7 +601,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-card border rounded-xl p-6 shadow-card overflow-hidden flex flex-col">
             <h2 className="text-lg font-bold mb-5 flex items-center gap-3 tracking-tight">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Activity className="h-5 w-5 text-primary" />
@@ -521,7 +629,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
             </div>
           </div>
 
-          <div className="bg-card border rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-card border rounded-xl p-6 shadow-card overflow-hidden flex flex-col">
             <h2 className="text-lg font-bold mb-5 flex items-center gap-3 tracking-tight">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <FlaskConical className="h-5 w-5 text-primary" />
@@ -549,7 +657,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false }
             </div>
           </div>
 
-          <div className="bg-card border rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-card border rounded-xl p-6 shadow-card overflow-hidden flex flex-col">
             <h2 className="text-lg font-bold mb-5 flex items-center gap-3 tracking-tight">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <ClipboardList className="h-5 w-5 text-primary" />

@@ -25,22 +25,32 @@ export interface MlModelStatus {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Karachi' })
+  return new Date(iso).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', timeZone: 'Asia/Karachi' })
 }
 
 export function MLOpsView({
   driftData,
   modelStatus,
   predictionTrend,
+  trendError = false,
+  trendTruncated = false,
   serviceConnected = false,
+  driftConnected = false,
+  statusConnected = false,
   viewerRole,
 }: {
   driftData: DriftData | null
   modelStatus: MlModelStatus | null
   predictionTrend: PredictionRow[]
+  /** The trend query failed (QA Round 3, states F-20): the cards and
+   *  chart say so instead of showing a confident 0 / empty state. */
+  trendError?: boolean
+  /** The trend query hit its row cap — counts are lower bounds. */
+  trendTruncated?: boolean
   serviceConnected?: boolean
-  /** Accepted for call-site compatibility; the offline banner no longer prints the service address to end users. */
-  mlServiceUrl?: string
+  /** Per-capability probes (QA Round 3, admin A5). */
+  driftConnected?: boolean
+  statusConnected?: boolean
   /** The viewing admin's role. Retraining is super-admin only (the API
    *  route enforces the same rule) — other roles see why the control
    *  is unavailable instead of a button that would 403 (QA Round 2,
@@ -79,9 +89,11 @@ export function MLOpsView({
   // What this "drift" actually is (QA Round 2, cluster 23): the service
   // computes PSI between two slices of the TRAINING dataset — a
   // baseline self-check, not monitoring of live production traffic.
-  // The service also labels its history windows with fabricated recent
-  // calendar dates; the chart below plots them as numbered windows
-  // instead, so no fake dates reach the screen.
+  // Windows are plotted as numbered windows, never calendar dates:
+  // the service used to fabricate recent dates for them; it now
+  // labels windows by index itself (QA Round 3, ml-honesty H1), and
+  // this mapping keeps the display honest regardless of the label
+  // the service sends.
   const psiHistory = (driftData?.psi_history || []).map((point, i) => ({
     window: `Window ${i + 1}`,
     psi: point.psi,
@@ -129,31 +141,41 @@ export function MLOpsView({
 
       {/* Header cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card border rounded-xl p-4 shadow-sm">
+        <div className="bg-card border rounded-xl p-4 shadow-card">
           <p className="text-xs text-muted-foreground">Service Status</p>
-          <div className="flex items-center gap-2 mt-1">
-            {serviceConnected
-              ? <CheckCircle2 className="h-4 w-4 text-[#1E7A46]" />
-              : <AlertTriangle className="h-4 w-4 text-[#A85008]" />
-            }
-            <p className="font-semibold text-sm">{serviceConnected ? "Connected" : "Not Connected"}</p>
+          <div className="mt-1 space-y-1 text-sm font-medium">
+            <p className="flex items-center gap-2">
+              {statusConnected
+                ? <CheckCircle2 className="h-4 w-4 text-[#1E7A46]" />
+                : <AlertTriangle className="h-4 w-4 text-[#A85008]" />}
+              Model status: {statusConnected ? "Connected" : "Offline"}
+            </p>
+            <p className="flex items-center gap-2">
+              {driftConnected
+                ? <CheckCircle2 className="h-4 w-4 text-[#1E7A46]" />
+                : <AlertTriangle className="h-4 w-4 text-[#A85008]" />}
+              Drift baseline: {driftConnected ? "Connected" : "Offline"}
+            </p>
           </div>
         </div>
-        <div className="bg-card border rounded-xl p-4 shadow-sm">
+        <div className="bg-card border rounded-xl p-4 shadow-card">
           <p className="text-xs text-muted-foreground">Retrain Status</p>
           <p className="font-semibold text-sm mt-1 capitalize">{modelStatus?.status || "—"}</p>
         </div>
-        <div className="bg-card border rounded-xl p-4 shadow-sm">
+        <div className="bg-card border rounded-xl p-4 shadow-card">
           <p className="text-xs text-muted-foreground">Baseline PSI (training data)</p>
           <p className={`font-semibold text-sm mt-1 ${currentPsi === null ? '' : driftDetected ? 'text-[#C0392B]' : 'text-[#1E7A46]'}`}>
             {currentPsi !== null ? currentPsi.toFixed(4) : "N/A"}
           </p>
         </div>
-        <div className="bg-card border rounded-xl p-4 shadow-sm">
+        <div className="bg-card border rounded-xl p-4 shadow-card">
           <p className="text-xs text-muted-foreground">14-Day Predictions</p>
           <p className="font-semibold text-sm mt-1">
-            {predictionTrend.length.toLocaleString()}
+            {trendError ? "—" : trendTruncated ? `${predictionTrend.length.toLocaleString()}+` : predictionTrend.length.toLocaleString()}
           </p>
+          {trendTruncated && !trendError && (
+            <p className="text-[11px] text-muted-foreground">Capped at the most recent 2,000 in the window shown</p>
+          )}
         </div>
       </div>
 
@@ -171,9 +193,9 @@ export function MLOpsView({
       )}
 
       {/* Retraining Panel */}
-      <div className="bg-card border rounded-xl p-6 shadow-sm">
-        <div className="flex items-start justify-between">
-          <div>
+      <div className="bg-card border rounded-xl p-6 shadow-card">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h2 className="font-semibold">Trigger Model Retraining</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Starts a background retraining job on the ML service using the full training dataset.
@@ -194,16 +216,16 @@ export function MLOpsView({
             <Button
               onClick={() => { setRetrainMsg(null); setConfirmingRetrain(true) }}
               disabled={retraining || !serviceConnected || modelStatus?.status === 'training'}
-              className="ml-4 flex-shrink-0"
+              className="flex-shrink-0 sm:ml-4"
             >
               {retraining ? (
-                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Triggering...</>
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Triggering…</>
               ) : (
                 <><Zap className="h-4 w-4 mr-2" /> Retrain Now</>
               )}
             </Button>
           ) : (
-            <p className="ml-4 flex-shrink-0 max-w-[220px] text-xs text-muted-foreground">
+            <p className="flex-shrink-0 max-w-[220px] text-xs text-muted-foreground sm:ml-4">
               Retraining changes the model for every hospital and is restricted to super admins.
             </p>
           )}
@@ -216,6 +238,7 @@ export function MLOpsView({
             <div className="ml-auto flex gap-2">
               <button
                 type="button"
+                autoFocus
                 onClick={() => { setConfirmingRetrain(false); handleRetrain() }}
                 className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
               >
@@ -248,9 +271,13 @@ export function MLOpsView({
       </div>
 
       {/* 14-Day Prediction Volume Chart */}
-      <div className="bg-card border rounded-xl p-6 shadow-sm">
+      <div className="bg-card border rounded-xl p-6 shadow-card">
         <h2 className="font-semibold mb-4">14-Day Prediction Volume & Avg Risk Score</h2>
-        {dailyTrend.length === 0 ? (
+        {trendError ? (
+          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-6 text-center text-sm text-destructive-text">
+            The prediction trend could not be loaded. Please reload the page to try again.
+          </div>
+        ) : dailyTrend.length === 0 ? (
           <EmptyState
             icon={Activity}
             title="No prediction data"
@@ -266,12 +293,14 @@ export function MLOpsView({
             <AreaChart data={dailyTrend} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-              <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+              <YAxis yAxisId="left" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+              <YAxis yAxisId="right" orientation="right" domain={[0, 1]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
               <Tooltip
                 contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
                 labelStyle={{ fontWeight: 600 }}
               />
-              <Area type="monotone" dataKey="count" name="Predictions" stroke="#2E7FA8" fill="#2E7FA8" fillOpacity={0.12} strokeWidth={2} />
+              <Area yAxisId="left" type="monotone" dataKey="count" name="Predictions" stroke="#2E7FA8" fill="#2E7FA8" fillOpacity={0.12} strokeWidth={2} />
+              <Area yAxisId="right" type="monotone" dataKey="avgProb" name="Avg risk score" stroke="#0D2B3E" fill="#0D2B3E" fillOpacity={0.06} strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
           </>
@@ -282,7 +311,7 @@ export function MLOpsView({
           the service computes each point from a slice of the training
           dataset (QA Round 2, cluster 23). */}
       {psiHistory.length > 0 && (
-        <div className="bg-card border rounded-xl p-6 shadow-sm">
+        <div className="bg-card border rounded-xl p-6 shadow-card">
           <h2 className="font-semibold mb-1">Drift Baseline (Training Data) — PSI by Window</h2>
           <p className="text-xs text-muted-foreground mb-4">
             Each point compares one slice of the training dataset against the training reference window.
@@ -303,7 +332,7 @@ export function MLOpsView({
 
       {/* Critical/High breakdown bar chart */}
       {dailyTrend.length > 0 && (
-        <div className="bg-card border rounded-xl p-6 shadow-sm">
+        <div className="bg-card border rounded-xl p-6 shadow-card">
           <h2 className="font-semibold mb-4">High & Critical Predictions per Day</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={dailyTrend} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>

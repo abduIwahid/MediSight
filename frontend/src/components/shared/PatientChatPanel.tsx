@@ -11,6 +11,10 @@ interface Message {
   id: string
   role: "user" | "assistant"
   content: string
+  /** Template-fallback replies carry the same visible badge the staff
+   *  panel uses (QA Round 3, ai-chat L6) — previously only a small
+   *  parenthetical in the text marked them. */
+  fallback?: boolean
 }
 
 const SUGGESTED_PROMPTS = [
@@ -32,10 +36,44 @@ const SYMPTOM_SPECIALIST_MAP: { keywords: string[]; specialist: string }[] = [
   { keywords: ["stomach", "abdomen", "digest", "acidity", "nausea"], specialist: "a Gastroenterologist" },
 ]
 
+const EMERGENCY_REPLY =
+  "**This could be an emergency.** Please seek immediate medical attention or call your local emergency number right now — don't wait on a chat response.\n\nThis assistant does not replace professional medical advice."
+
+// Emergency screen (QA Round 3, ai-chat M5 / patient F8): whole-phrase
+// matching with a negation guard, wider than the old four substrings —
+// "breath" alone missed "can't breathe" phrasing variants in some
+// orders and fired on "no chest pain". Runs BEFORE the API call and
+// short-circuits it.
+const EMERGENCY_PATTERNS: RegExp[] = [
+  /chest (pain|tightness|pressure)/,
+  /heart attack/,
+  /can'?t breathe|cannot breathe|difficulty breathing|short(ness)? of breath|struggling to breathe/,
+  /stroke|face drooping|slurred speech/,
+  /(severe|heavy|won'?t stop) bleeding|bleeding (heavily|a lot)/,
+  /seizure|convulsion/,
+  /unconscious|passed out|fainted and/,
+  /suicid|kill myself|end my life/,
+  /overdose|took too many pills/,
+  /severe allergic|throat (is )?(swelling|closing)|anaphyla/,
+  /choking/,
+]
+
+function detectEmergency(message: string): boolean {
+  const q = ` ${message.toLowerCase()} `
+  return EMERGENCY_PATTERNS.some((pattern) => {
+    const match = pattern.exec(q)
+    if (!match) return false
+    // Negation guard: "no chest pain", "not having a heart attack",
+    // "don't have difficulty breathing" must not trigger the alarm.
+    const before = q.slice(Math.max(0, match.index - 24), match.index)
+    return !/\b(no|not|don'?t|doesn'?t|never|without)\b[^.]*$/.test(before)
+  })
+}
+
 function generateLocalFallback(message: string): string {
   const q = message.toLowerCase()
-  if (q.includes("chest pain") || q.includes("breath") || q.includes("stroke") || q.includes("bleeding")) {
-    return "**This could be an emergency.** Please seek immediate medical attention or call your local emergency number right now — don't wait on a chat response.\n\nThis assistant does not replace professional medical advice."
+  if (detectEmergency(message)) {
+    return EMERGENCY_REPLY
   }
   const match = SYMPTOM_SPECIALIST_MAP.find((entry) => entry.keywords.some((k) => q.includes(k)))
   if (match) {
@@ -68,12 +106,24 @@ export function PatientChatPanel() {
     setIsLoading(true)
 
     try {
-      const recentHistory = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }))
+      // Emergency wording short-circuits before any network call
+      // (QA Round 3, ai-chat M5): the alert must not depend on the AI
+      // service being up, slow, or in the mood to escalate.
+      if (detectEmergency(text)) {
+        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: EMERGENCY_REPLY }])
+        return
+      }
+      const recentHistory = messages
+        .filter((m) => !m.fallback && m.id !== "welcome")
+        .slice(-8)
+        .map((m) => ({ role: m.role, content: m.content }))
       let reply: string | null = null
+      let usedFallback = false
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(35_000),
           body: JSON.stringify({ message: text, history: recentHistory, mode: "patient" }),
         })
         if (res.ok) {
@@ -83,9 +133,21 @@ export function PatientChatPanel() {
       } catch {
         // fall through to local fallback
       }
-      if (!reply) reply = generateLocalFallback(text)
+      if (!reply) {
+        reply = generateLocalFallback(text)
+        usedFallback = true
+      }
 
-      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: reply! }])
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: reply!, fallback: usedFallback }])
+    } catch (error) {
+      // Nothing in the send path may throw uncaught (QA Round 3,
+      // ai-chat M2).
+      console.error("Patient chat send failed:", error)
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Something went wrong while generating a response. Please try again.",
+      }])
     } finally {
       setIsLoading(false)
     }
@@ -103,7 +165,7 @@ export function PatientChatPanel() {
     })
 
   return (
-    <Card className="flex flex-col h-[calc(100dvh-12rem)] border shadow-sm">
+    <Card className="flex flex-col h-[calc(100dvh-12rem)] min-h-[420px] border shadow-card">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
@@ -119,6 +181,11 @@ export function PatientChatPanel() {
               {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
             </div>
             <div className={`px-4 py-3 rounded-xl text-sm leading-relaxed ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+              {msg.fallback && (
+                <span className="mb-2 inline-block rounded-full border border-[#D97706]/30 bg-[#FDF0DC] px-2 py-0.5 text-[11px] font-semibold text-[#A85008]">
+                  Built-in template response — the AI service is unavailable
+                </span>
+              )}
               {renderContent(msg.content)}
             </div>
           </div>
@@ -130,7 +197,7 @@ export function PatientChatPanel() {
             </div>
             <div className="px-4 py-3 rounded-xl bg-muted flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm text-muted-foreground">Thinking...</span>
+              <span className="text-sm text-muted-foreground">Thinking…</span>
             </div>
           </div>
         )}
@@ -144,7 +211,7 @@ export function PatientChatPanel() {
               key={p}
               onClick={() => handleSend(p)}
               disabled={isLoading}
-              className="rounded-full border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-10 items-center rounded-full border bg-muted/30 px-3 py-1.5 text-left text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               {p}
             </button>
@@ -160,7 +227,7 @@ export function PatientChatPanel() {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Describe how you're feeling..."
+            placeholder="Describe how you're feeling…"
             disabled={isLoading}
             aria-label="Message"
           />

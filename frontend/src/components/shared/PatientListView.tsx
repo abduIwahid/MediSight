@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import { DataTable } from "@/components/shared/DataTable"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { RiskBadge } from "@/components/shared/RiskBadge"
@@ -29,14 +29,16 @@ function getPatientName(p: PatientRow): string {
 function getAge(p: PatientRow): string {
   const d = p.demographics
   if (!d) return "—"
-  if (d.age) return String(d.age)
-  // Derive from birth_date if age missing
+  // A recorded date of birth wins (QA Round 3, patients-crud M2): it
+  // ages with the patient, while a stored age froze at intake.
   const dobRaw = d.birth_date || d.dob
   if (dobRaw) {
     const dob = new Date(dobRaw)
-    const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-    return String(age)
+    if (!Number.isNaN(dob.getTime())) {
+      return String(Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
+    }
   }
+  if (d.age) return String(d.age)
   return "—"
 }
 
@@ -60,20 +62,27 @@ interface PatientListViewProps {
   patients: PatientRow[]
   initialSearch?: string
   isAdmin?: boolean
+  /** Exact in-scope patient total from the page's count query
+   *  (QA Round 3, patients-crud M5): the header must not present the
+   *  loaded window (25 recent / 200 search) as the registry's size. */
+  totalCount?: number
+  canCreate?: boolean
+  canDelete?: boolean
 }
 
-export function PatientListView({ patients, initialSearch = "", isAdmin = false }: PatientListViewProps) {
+export function PatientListView({ patients, initialSearch = "", isAdmin = false, totalCount, canCreate = true, canDelete }: PatientListViewProps) {
+  const showDelete = canDelete ?? isAdmin
   const [query, setQuery] = useState(initialSearch)
   const router = useRouter()
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // Inline confirmation naming the patient and the cascade
+  // (QA Round 3, patients-crud M6) — window.confirm named neither.
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
 
   const handleDeletePatient = async (patientId: string) => {
-    if (!window.confirm('Delete this patient record? This action cannot be undone.')) return
+    setPendingDelete(null)
     setDeleteError(null)
     setDeletingId(patientId)
 
@@ -185,7 +194,7 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
           return (
             <div className="flex flex-col gap-0.5">
               <RiskBadge severity={severity} />
-              {latest?.disease && <span className="text-[10px] text-muted-foreground">{latest.disease}</span>}
+              {latest?.disease && <span className="text-[11px] text-muted-foreground">{latest.disease}</span>}
             </div>
           )
         }
@@ -203,10 +212,10 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
           <Link href={`/patients/${p.id}`} className="text-sm font-medium text-primary hover:underline">
             View
           </Link>
-          {isAdmin && (
+          {showDelete && (
             <button
               type="button"
-              onClick={() => handleDeletePatient(p.id)}
+              onClick={() => { setDeleteError(null); setPendingDelete({ id: p.id, name: getPatientName(p) }) }}
               disabled={deletingId === p.id}
               className="text-sm text-destructive underline disabled:cursor-not-allowed disabled:text-destructive/50"
             >
@@ -240,21 +249,46 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
           role="alert"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive shadow-sm flex items-center gap-3"
+          className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-text shadow-card flex items-center gap-3"
         >
           <Trash2 className="h-4 w-4 flex-shrink-0" />
           <p>{deleteError}</p>
         </motion.div>
       )}
 
+      {pendingDelete && (
+        <div role="alertdialog" aria-label="Confirm patient deletion" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">
+          <p className="text-destructive">
+            Delete <strong>{pendingDelete.name}</strong>&apos;s record? This also removes their predictions, vitals, lab results, diagnoses, appointments and alerts. This cannot be undone.
+          </p>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              autoFocus
+              onClick={() => handleDeletePatient(pendingDelete.id)}
+              className="rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete record
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingDelete(null)}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Patient Registry</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground/80">
+          <h1 className="text-3xl font-bold tracking-tight">Patient Registry</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             {initialSearch ? (
-              <>Showing <span className="font-semibold text-foreground">{filtered.length}</span> of {normalizedPatients.length} records matching &ldquo;{initialSearch}&rdquo;.</>
+              <>Showing <span className="font-semibold text-foreground">{filtered.length}</span> matching &ldquo;{initialSearch}&rdquo;{normalizedPatients.length >= 200 ? " (first 200 matches)" : ""} — {totalCount ?? normalizedPatients.length} patients in scope in total.</>
             ) : (
-              <>Monitoring <span className="font-semibold text-foreground">{filtered.length}</span> of {normalizedPatients.length} recent patient records.</>
+              <>Showing the <span className="font-semibold text-foreground">{filtered.length}</span> most recent of {totalCount ?? normalizedPatients.length} patients in scope. Search by name or MRN to find older records.</>
             )}
           </p>
         </div>
@@ -269,21 +303,23 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
           >
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <Input
-              placeholder="Search by name or MRN..."
+              placeholder="Search by name or MRN…"
               value={query}
               onChange={e => handleSearchChange(e.target.value)}
               aria-label="Search patients by name or MRN"
-              className="pl-9 h-11 w-full sm:w-64 rounded-xl border-border/50 bg-card shadow-sm transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary"
+              className="pl-9 h-11 w-full sm:w-64 rounded-xl border-border/50 bg-card shadow-card transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary"
             />
           </form>
-          <Link href="/patients/new" prefetch={true} className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
-            <Plus className="mr-2 h-4 w-4" />
-            New Assessment
-          </Link>
+          {canCreate && (
+            <Link href="/patients/new" prefetch={true} className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
+              <Plus className="mr-2 h-4 w-4" />
+              New Assessment
+            </Link>
+          )}
         </div>
       </motion.div>
 
-      <motion.div variants={itemVariants} className="overflow-hidden rounded-2xl border bg-card shadow-sm hover:shadow-md transition-shadow duration-300">
+      <motion.div variants={itemVariants} className="overflow-hidden rounded-xl border bg-card shadow-card">
         <AnimatePresence mode="wait">
           {filtered.length === 0 ? (
             <motion.div
@@ -297,8 +333,8 @@ export function PatientListView({ patients, initialSearch = "", isAdmin = false 
                 icon={UserSearch}
                 title="No patients found"
                 description="No records match the current view. Clear the search, or register a patient and run their first assessment."
-                actionLabel="Add patient"
-                actionHref="/patients/new"
+                actionLabel={canCreate ? "Add patient" : undefined}
+                actionHref={canCreate ? "/patients/new" : undefined}
               />
             </motion.div>
           ) : (

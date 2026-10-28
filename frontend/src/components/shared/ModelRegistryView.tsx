@@ -12,16 +12,20 @@ const METRIC_LABELS: Record<string, string> = {
 }
 
 function MetricBar({ label, value }: { label: string; value: number }) {
+  // Unitless, like every other surface (QA Round 3, ml-honesty M4):
+  // these are 0–1 scores, and printing them as percentages next to the
+  // model card's unitless figures made the same model look better
+  // here. The bar uses the neutral accent — the old green/amber/red
+  // ramp invented a quality judgement no surface had agreed.
   const pct = Math.round(value * 100)
-  const color = pct >= 80 ? "bg-[#1E7A46]" : pct >= 70 ? "bg-[#D97706]" : "bg-[#C0392B]"
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono font-semibold">{pct}%</span>
+        <span className="font-mono font-semibold">{value.toFixed(3)}</span>
       </div>
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-[#2E7FA8] transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
@@ -45,11 +49,38 @@ interface ModelVersionRow {
   created_at: string
 }
 
-export function ModelRegistryView({ models, liveStatus }: { models: ModelVersionRow[]; liveStatus: LiveModelStatus | null }) {
+export function ModelRegistryView({ models, liveStatus, loadError }: {
+  models: ModelVersionRow[]
+  liveStatus: LiveModelStatus | null
+  /** The registry query failed (QA Round 3, states F-04): an empty
+   *  table must not pose as "no models registered". */
+  loadError?: boolean
+}) {
+  // Registry ↔ live reconciliation (QA Round 3, admin A7): when the
+  // serving version has no Production row here, the registry is stale
+  // — say so on the page instead of letting the table look current.
+  const liveVersion = liveStatus?.version
+  const registryHasLive = liveVersion
+    ? models.some((m) => m.stage === 'Production' && m.version === liveVersion)
+    : true
+
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-6 text-center text-sm text-destructive-text">
+        The model registry could not be loaded. Please reload the page to try again.
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {!registryHasLive && (
+        <div role="alert" className="rounded-xl border border-[#D97706]/30 bg-[#FDF0DC] px-4 py-3 text-sm text-[#A85008]">
+          The live service reports model version <strong>{liveVersion}</strong>, but this registry has no Production entry with that version — the registry is behind what is actually serving. Register the current version so this page reflects production.
+        </div>
+      )}
       {/* Live Production Model Card */}
-      <div className="bg-card border rounded-xl p-6 shadow-sm">
+      <div className="bg-card border rounded-xl p-6 shadow-card">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -77,11 +108,11 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Model</p>
-                  <p className="font-semibold">{liveStatus.model_name}</p>
+                  <p className="font-semibold">{liveStatus.model_name || "Not reported"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Version</p>
-                  <p className="font-semibold font-mono">{liveStatus.version}</p>
+                  <p className="font-semibold font-mono">{liveStatus.version || "Not reported"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
@@ -120,7 +151,7 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
       </div>
 
       {/* Model Registry Table from Supabase */}
-      <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border rounded-xl shadow-card overflow-hidden">
         <div className="p-4 border-b flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-semibold">Model Registry</h2>
@@ -158,10 +189,10 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
                     </Badge>
                   </td>
                   <td className="p-4 font-mono">
-                    {m.metrics?.auc_roc != null ? (m.metrics.auc_roc * 100).toFixed(1) + "%" : "—"}
+                    {m.metrics?.auc_roc != null ? m.metrics.auc_roc.toFixed(3) : "—"}
                   </td>
                   <td className="p-4 font-mono">
-                    {m.metrics?.f1_score != null ? (m.metrics.f1_score * 100).toFixed(1) + "%" : "—"}
+                    {m.metrics?.f1_score != null ? m.metrics.f1_score.toFixed(3) : "—"}
                   </td>
                   <td className="p-4 text-muted-foreground text-xs">
                     {fmtDateTime(m.created_at)}
@@ -171,6 +202,11 @@ export function ModelRegistryView({ models, liveStatus }: { models: ModelVersion
             </tbody>
           </table>
         </div>
+        {models.length >= 100 && (
+          <p className="border-t bg-muted/10 p-3 text-xs text-muted-foreground">
+            Showing the 100 most recent model versions.
+          </p>
+        )}
       </div>
     </div>
   )
