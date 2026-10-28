@@ -53,8 +53,8 @@ export function ShapFactorList({ data }: ShapFactorListProps) {
     <div>
       <div className="space-y-2.5">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center gap-3 text-[13px]">
-            <span className="w-52 shrink-0 truncate text-[#33454F]" title={row.label}>
+          <div key={row.label} className="flex flex-col gap-1 text-[13px] print:break-inside-avoid sm:flex-row sm:items-center sm:gap-3">
+            <span className="w-full shrink-0 text-foreground/80 sm:w-44 sm:truncate print:whitespace-normal print:overflow-visible" title={row.label}>
               {row.label}
             </span>
             <span className="relative h-[9px] flex-1 overflow-hidden rounded-full bg-secondary">
@@ -71,7 +71,7 @@ export function ShapFactorList({ data }: ShapFactorListProps) {
                 />
               )}
             </span>
-            <span className="w-14 shrink-0 text-right font-mono text-[11.5px]">
+            <span className="w-14 shrink-0 font-mono text-[11.5px] sm:text-right">
               {row.impact > 0 ? "+" : ""}
               {row.impact.toFixed(2)}
             </span>

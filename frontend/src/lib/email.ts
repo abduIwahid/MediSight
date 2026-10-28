@@ -126,6 +126,25 @@ export async function sendAppointmentReminderEmail(data: AppointmentEmailData): 
   return sendEmail(data.patientEmail, "Reminder: your WhyRisk appointment", lines.join("\n"))
 }
 
+/** Sent to the patient when an appointment is cancelled (QA Round 3). */
+export async function sendAppointmentCancellationEmail(data: AppointmentEmailData): Promise<boolean> {
+  const lines = [
+    `Hello ${data.patientName},`,
+    "",
+    `Your appointment with Dr. ${data.doctorName} has been cancelled.`,
+    "",
+    `When it was booked for: ${formatWhen(data.scheduledAt)}`,
+  ]
+  if (data.reason) lines.push(`Reason for visit: ${data.reason}`)
+  lines.push(
+    "",
+    "If this was a mistake, you can book a new appointment from your WhyRisk appointments page.",
+    "",
+    "— WhyRisk"
+  )
+  return sendEmail(data.patientEmail, "Your WhyRisk appointment was cancelled", lines.join("\n"))
+}
+
 export interface ContactInquiryEmailData {
   name: string
   email: string

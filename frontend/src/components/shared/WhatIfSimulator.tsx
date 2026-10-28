@@ -12,6 +12,11 @@ interface WhatIfSimulatorProps {
   /** The stored prediction's probability (0-1) the simulation compares against. */
   originalProbability: number
   originalSeverity: string
+  /** False when the baseline was re-derived from the patient's
+   *  CURRENT record (legacy prediction without a stored snapshot) —
+   *  the labels then say "current value", never "recorded"
+   *  (QA Round 3, prediction-print M2). */
+  fromSnapshot?: boolean
 }
 
 interface SimResult {
@@ -34,7 +39,8 @@ const GEN_HLTH_LABELS: Record<number, string> = {
  * unavailable the simulator says so, exactly like the prediction flow.
  * Simulations are exploratory and are never saved to the patient record.
  */
-export function WhatIfSimulator({ baseline, originalProbability, originalSeverity }: WhatIfSimulatorProps) {
+export function WhatIfSimulator({ baseline, originalProbability, originalSeverity, fromSnapshot = true }: WhatIfSimulatorProps) {
+  const baselineWord = fromSnapshot ? "recorded" : "current"
   const [bmi, setBmi] = useState(baseline.BMI)
   const [physActivity, setPhysActivity] = useState(baseline.PhysActivity)
   const [highBP, setHighBP] = useState(baseline.HighBP)
@@ -108,7 +114,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
   const delta = result ? result.probability - originalProbability : null
 
   return (
-    <Card>
+    <Card className="print:hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <SlidersHorizontal className="h-5 w-5 text-brand" />
@@ -116,7 +122,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
         </CardTitle>
         <CardDescription>
           Adjust a factor and the model re-runs on the spot — the new score is a real model output, not an
-          estimate. Simulations are exploratory and are not saved to the patient record.
+          estimate. Simulations are exploratory and are not saved to the patient record.{!fromSnapshot && " The starting values below come from the patient's current record — this prediction has no stored input snapshot."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -126,14 +132,14 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
               <div className="mb-1.5 flex items-center justify-between text-sm">
                 <label htmlFor="whatif-bmi" className="font-medium">BMI</label>
                 <span className="font-mono text-xs text-muted-foreground">
-                  {bmi.toFixed(1)} (recorded: {baseline.BMI.toFixed(1)})
+                  {bmi.toFixed(1)} ({baselineWord}: {baseline.BMI.toFixed(1)})
                 </span>
               </div>
               <input
                 id="whatif-bmi"
                 type="range"
-                min={15}
-                max={55}
+                min={Math.min(15, Math.floor(baseline.BMI))}
+                max={Math.max(55, Math.ceil(baseline.BMI))}
                 step={0.1}
                 value={bmi}
                 onChange={(e) => setBmi(parseFloat(e.target.value))}
@@ -147,11 +153,12 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
                 <span className="font-medium">General health</span>
                 <span className="font-mono text-xs text-muted-foreground">{GEN_HLTH_LABELS[genHlth]}</span>
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5" role="group" aria-label="General health">
                 {[1, 2, 3, 4, 5].map((level) => (
                   <button
                     key={level}
                     type="button"
+                    aria-pressed={genHlth === level}
                     onClick={() => setGenHlth(level)}
                     className={`h-9 flex-1 rounded-lg border text-sm font-medium transition-colors ${
                       genHlth === level
@@ -172,6 +179,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
+                aria-pressed={physActivity === 1}
                 onClick={() => setPhysActivity(physActivity === 1 ? 0 : 1)}
                 className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                   physActivity === 1 ? "border-primary bg-secondary" : "border-border bg-background hover:bg-secondary"
@@ -182,6 +190,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
               </button>
               <button
                 type="button"
+                aria-pressed={highBP === 1}
                 onClick={() => setHighBP(highBP === 1 ? 0 : 1)}
                 className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                   highBP === 1 ? "border-primary bg-secondary" : "border-border bg-background hover:bg-secondary"
@@ -198,7 +207,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
                 onClick={reset}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-text hover:underline"
               >
-                <RotateCcw className="h-3.5 w-3.5" /> Reset to recorded values
+                <RotateCcw className="h-3.5 w-3.5" /> Reset to {baselineWord} values
               </button>
             )}
           </div>
@@ -206,9 +215,9 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
           <div className="flex flex-col justify-center rounded-xl border border-border bg-background p-5">
             {!changed && (
               <div>
-                <p className="text-sm text-muted-foreground">Recorded score</p>
+                <p className="text-sm text-muted-foreground">{fromSnapshot ? "Recorded score" : "Stored score"}</p>
                 <p className="font-display text-4xl leading-tight">
-                  {(originalProbability * 100).toFixed(1)}
+                  {(Math.min(1, Math.max(0, originalProbability)) * 100).toFixed(1)}
                   <span className="font-sans text-sm font-semibold text-muted-foreground">%</span>
                 </p>
                 <div className="mt-2">
@@ -227,13 +236,13 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
             )}
 
             {changed && !loading && unavailable && (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
                 Prediction service unavailable. No score was generated.
               </div>
             )}
 
             {changed && !loading && error && (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
                 {error}
               </div>
             )}
@@ -242,7 +251,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
               <div>
                 <p className="text-sm text-muted-foreground">Simulated score</p>
                 <p className="font-display text-4xl leading-tight">
-                  {(result.probability * 100).toFixed(1)}
+                  {(Math.min(1, Math.max(0, result.probability)) * 100).toFixed(1)}
                   <span className="font-sans text-sm font-semibold text-muted-foreground">%</span>
                 </p>
                 <div className="mt-2 flex items-center gap-3">
@@ -252,7 +261,7 @@ export function WhatIfSimulator({ baseline, originalProbability, originalSeverit
                     style={{ color: delta < 0 ? "#1E7A46" : delta > 0 ? "#C0392B" : undefined }}
                   >
                     {delta > 0 ? "+" : ""}
-                    {(delta * 100).toFixed(1)} pts vs recorded
+                    {(delta * 100).toFixed(1)} pts vs stored score
                   </span>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
