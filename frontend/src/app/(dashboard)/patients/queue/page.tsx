@@ -64,6 +64,11 @@ export default async function RiskQueuePage({
             predictions (id, disease, probability, severity, created_at)
           )
         `)
+        // The queue only reads each patient's LATEST prediction —
+        // order + cap the nested embed instead of shipping full
+        // histories per assignment (QA Round 2, cluster 30).
+        .order("created_at", { referencedTable: "patients.predictions", ascending: false })
+        .limit(10, { referencedTable: "patients.predictions" })
         .eq("doctor_id", user.id)
     : { data: null, error: null }
 

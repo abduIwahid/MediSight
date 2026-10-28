@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 import { ALL_SYMPTOMS } from "@/lib/symptoms"
+import { severityPillClass } from "@/lib/status"
 
 /* ------------------------------------------------------------------ */
 /*  Static config                                                      */
@@ -67,13 +68,9 @@ type Doctor = {
   hospitals?: { name: string } | null
 }
 
-// The canonical RiskBadge palette — the same tints as everywhere else.
-const RISK_STYLES: Record<string, string> = {
-  Low: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
-  Moderate: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
-  High: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
-  Critical: "bg-[#C0392B] text-white border-[#C0392B]",
-}
+// The canonical severity pill classes from lib/status.ts — the same
+// tints as everywhere else, defined once.
+const RISK_STYLES = severityPillClass
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                                */
@@ -217,7 +214,12 @@ export default function PredictPage() {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
+      {/* No mode="wait" (QA Round 2, cluster 29): with it, the incoming
+          step only mounted after the outgoing step's exit animation, so
+          the focus effect fired before the new heading existed and
+          focus dropped to <body> at every step change. Without it the
+          new step mounts immediately and the heading receives focus. */}
+      <AnimatePresence>
         {/* ---------------- Step 1: Symptoms ---------------- */}
         {step === 0 && (
           <motion.div key="symptoms" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -289,7 +291,7 @@ export default function PredictPage() {
                   id="wiz-gender"
                   value={patient.gender}
                   onChange={(e) => setPatient({ ...patient, gender: e.target.value })}
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-base sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="">Select</option>
                   <option value="female">Female</option>
@@ -303,7 +305,7 @@ export default function PredictPage() {
                   id="wiz-blood-group"
                   value={patient.bloodGroup}
                   onChange={(e) => setPatient({ ...patient, bloodGroup: e.target.value })}
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-base sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="">Select</option>
                   {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
@@ -348,6 +350,15 @@ export default function PredictPage() {
         {step === 2 && result && (
           <motion.div key="result" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-6">
             <div id="report" className="print-report rounded-2xl border border-border bg-card p-7 shadow-premium">
+              {/* Print-only identity line (QA Round 2, cluster 27): the
+                  printed screening result carries the WhyRisk name —
+                  on screen the page header already provides it. */}
+              <div className="mb-5 hidden border-b border-border pb-4 print:block">
+                <p className="font-display text-[22px] uppercase leading-none tracking-wide">WhyRisk</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Symptom screening result — a rule-based screening, not a diagnosis.
+                </p>
+              </div>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="eyebrow mb-3">Screening Result</p>

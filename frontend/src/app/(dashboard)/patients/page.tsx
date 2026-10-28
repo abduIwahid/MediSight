@@ -35,6 +35,11 @@ export default async function PatientListPage({
       predictions(severity, probability, disease, created_at)
     `)
     .order('created_at', { ascending: false })
+    // The registry only reads each patient's LATEST prediction —
+    // cap the embed instead of shipping full histories per row
+    // (QA Round 2, cluster 30).
+    .order('created_at', { referencedTable: 'predictions', ascending: false })
+    .limit(10, { referencedTable: 'predictions' })
 
   if (search) {
     const term = search.replace(/[%_,()]/g, " ").trim()

@@ -330,7 +330,9 @@ export default function NewPatientPage() {
                 <Stethoscope className="h-5 w-5 text-primary" /> Clinical Profile Registration
               </CardTitle>
               <CardDescription>
-                All fields will be processed by the LightGBM engine in real-time.
+                The details you record here are scored by the LightGBM model. Anything not recorded
+                uses documented population defaults — the score&apos;s detail page lists exactly
+                which inputs were recorded and which were defaults.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8 pt-8">
