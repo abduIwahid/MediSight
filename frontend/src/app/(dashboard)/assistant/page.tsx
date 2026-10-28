@@ -21,6 +21,10 @@ export default function AssistantPage() {
   const [patients, setPatients] = useState<PatientRow[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
   const [patientSearch, setPatientSearch] = useState("")
+  // Picker loading/error states (QA Round 3, states F-11): a failed
+  // load used to present as an empty patient list.
+  const [pickerLoading, setPickerLoading] = useState(true)
+  const [pickerError, setPickerError] = useState(false)
   const supabase = createClient()
 
   // The picker is searchable (QA Round 1, item 61): with a full patient
@@ -31,14 +35,22 @@ export default function AssistantPage() {
 
   useEffect(() => {
     const fetchPatients = async () => {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('id, demographics, mrn')
-        .order('created_at', { ascending: false })
-        .limit(50)
+      setPickerLoading(true)
+      setPickerError(false)
+      try {
+        const { data, error } = await supabase
+          .from('patients')
+          .select('id, demographics, mrn')
+          .order('created_at', { ascending: false })
+          .limit(50)
 
-      if (!error && data) {
-        setPatients(data)
+        if (error) throw error
+        setPatients(data ?? [])
+      } catch (e) {
+        console.error("Assistant patient list failed to load:", e)
+        setPickerError(true)
+      } finally {
+        setPickerLoading(false)
       }
     }
     fetchPatients()
@@ -67,7 +79,7 @@ export default function AssistantPage() {
                     value={patientSearch}
                     onChange={(e) => setPatientSearch(e.target.value)}
                     onKeyDown={(e) => e.stopPropagation()}
-                    placeholder="Search patients..."
+                    placeholder="Search patients…"
                     aria-label="Search patients"
                     className="h-8 pl-8 text-xs"
                   />
@@ -79,8 +91,16 @@ export default function AssistantPage() {
                   {getPatientDisplayName(p)}
                 </SelectItem>
               ))}
-              {visiblePatients.length === 0 && (
-                <p className="px-3 py-2 text-xs text-muted-foreground">No patients match your search.</p>
+              {pickerLoading ? (
+                <p role="status" className="px-3 py-2 text-xs text-muted-foreground">Loading patients…</p>
+              ) : pickerError ? (
+                <p role="alert" className="px-3 py-2 text-xs text-destructive-text">
+                  Patients could not be loaded. Close and reopen to try again.
+                </p>
+              ) : visiblePatients.length === 0 && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">
+                  {patients.length === 0 ? "No patients are registered yet." : "No patients match your search."}
+                </p>
               )}
             </SelectContent>
           </Select>

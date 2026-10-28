@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import nextDynamic from "next/dynamic"
 import { PulseLoader } from "@/components/shared/PulseLoader"
+import { getCurrentProfile } from "@/lib/current-profile"
 
 // The analytics view pulls in recharts — load it lazily so the chart
 // library is not in the first bundle for this route. (The import is
@@ -77,6 +78,7 @@ export default async function AnalyticsPage() {
   if (alertErr) console.error("Analytics alerts error:", alertErr)
 
   const loadError = Boolean(predErr || hospErr || alertErr || recentErr)
+  const viewer = await getCurrentProfile()
 
   return (
     <AnalyticsDashboard
@@ -85,6 +87,13 @@ export default async function AnalyticsPage() {
       alertStats={alertStats || []}
       recentPredictions={recentPredictions || []}
       loadError={loadError}
+      sourceErrors={{
+        predictions: Boolean(predErr),
+        hospitals: Boolean(hospErr),
+        alerts: Boolean(alertErr),
+        recent: Boolean(recentErr),
+      }}
+      viewerRole={viewer?.role ?? null}
     />
   )
 }

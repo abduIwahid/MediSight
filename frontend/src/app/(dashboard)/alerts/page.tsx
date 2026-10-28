@@ -55,34 +55,54 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [ackError, setAckError] = useState<string | null>(null)
+  const [ackLoadError, setAckLoadError] = useState(false)
+  // Exact totals from head-count queries (QA Round 3, dashboard H4):
+  // the list itself is capped at 200, so header counts must not be
+  // derived from the loaded rows.
+  const [totalNew, setTotalNew] = useState(0)
+  const [totalCritical, setTotalCritical] = useState(0)
+  const [totalHigh, setTotalHigh] = useState(0)
   const supabase = createClient()
 
   const fetchAlerts = useCallback(async () => {
     setLoading(true)
     setLoadError(false)
-    // Fetch New alerts with patient join
-    const { data: newAlerts, error } = await supabase
-      .from('alerts')
-      .select('*, patients(mrn, demographics)')
-      .eq('status', 'New')
-      .order('created_at', { ascending: false })
+    setAckLoadError(false)
+    // All four reads in parallel, column-scoped, and the New list
+    // capped (QA Round 3, perf P-2 / dashboard H4): it used to fetch
+    // every New alert with select('*'), sequentially, however many
+    // had accumulated.
+    const [newRes, ackRes, countRes, criticalRes, highRes] = await Promise.all([
+      supabase
+        .from('alerts')
+        .select('id, patient_id, type, severity, status, created_at, updated_at, patients(mrn, demographics)')
+        .eq('status', 'New')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      supabase
+        .from('alerts')
+        .select('id, patient_id, type, severity, status, created_at, updated_at, patients(mrn, demographics)')
+        .eq('status', 'Acknowledged')
+        .order('updated_at', { ascending: false })
+        .limit(5),
+      supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('status', 'New'),
+      supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('status', 'New').eq('severity', 'Critical'),
+      supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('status', 'New').eq('severity', 'High'),
+    ])
 
-    // Fetch recently acknowledged — ordered and stamped by the
-    // acknowledgment time (updated_at moves when the ack write lands),
-    // not by when the alert was created.
-    const { data: ackAlerts } = await supabase
-      .from('alerts')
-      .select('*, patients(mrn, demographics)')
-      .eq('status', 'Acknowledged')
-      .order('updated_at', { ascending: false })
-      .limit(5)
-
-    if (error) {
+    if (newRes.error) {
       setLoadError(true)
-    } else if (newAlerts) {
-      setAlerts(newAlerts)
+    } else if (newRes.data) {
+      setAlerts(newRes.data as unknown as Alert[])
     }
-    if (ackAlerts) setAcknowledged(ackAlerts)
+    if (ackRes.error) {
+      setAckLoadError(true)
+    } else if (ackRes.data) {
+      setAcknowledged(ackRes.data as unknown as Alert[])
+    }
+    if (countRes.count != null) setTotalNew(countRes.count)
+    if (criticalRes.count != null) setTotalCritical(criticalRes.count)
+    if (highRes.count != null) setTotalHigh(highRes.count)
     setLoading(false)
   }, [supabase])
 
@@ -99,7 +119,12 @@ export default function AlertsPage() {
           .select('*, patients(mrn, demographics)')
           .eq('id', payload.new.id)
           .single()
-        if (data) setAlerts((current) => [data, ...current])
+        if (data && data.status === 'New') {
+          // Dedupe by id (QA Round 3, dashboard M5): a reconnect replay
+          // or a race with the initial fetch must not double-list.
+          setAlerts((current) => (current.some((a) => a.id === data.id) ? current : [data as Alert, ...current]))
+          setTotalNew((n) => n + 1)
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'alerts' }, (payload) => {
         if (payload.new.status !== 'New') {
@@ -118,6 +143,9 @@ export default function AlertsPage() {
     // Optimistic move to the acknowledged list…
     setAlerts((current) => current.filter((a) => a.id !== id))
     setAcknowledged((prev) => [{ ...alert, status: 'Acknowledged', updated_at: new Date().toISOString() }, ...prev.slice(0, 4)])
+    setTotalNew((n) => Math.max(0, n - 1))
+    if (alert.severity === 'Critical') setTotalCritical((n) => Math.max(0, n - 1))
+    if (alert.severity === 'High') setTotalHigh((n) => Math.max(0, n - 1))
 
     const { data: { user } } = await supabase.auth.getUser()
     // .select() verification: under RLS a refused update returns NO error
@@ -134,21 +162,24 @@ export default function AlertsPage() {
       // and the failure is said out loud instead of styled as success.
       setAlerts((current) => [alert, ...current])
       setAcknowledged((prev) => prev.filter((a) => a.id !== id))
+      setTotalNew((n) => n + 1)
+      if (alert.severity === 'Critical') setTotalCritical((n) => n + 1)
+      if (alert.severity === 'High') setTotalHigh((n) => n + 1)
       setAckError("That alert could not be acknowledged. It has been put back in the active list — please try again.")
     }
   }
 
-  const criticalCount = alerts.filter(a => a.severity === 'Critical').length
-  const highCount = alerts.filter(a => a.severity === 'High').length
+  const criticalCount = totalCritical
+  const highCount = totalHigh
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Alerts Center</h1>
-          <p className="text-muted-foreground">Real-time notifications for critical patient risk events.</p>
+          <p className="text-muted-foreground">Alerts for patients assessed as High or Critical risk. This list updates live while the page is open.</p>
         </div>
-        {alerts.length > 0 && (
+        {totalNew > 0 && (
           <div className="flex gap-3">
             {criticalCount > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FAE9E7] border border-[#C0392B]/25 text-[#C0392B] text-sm font-medium">
@@ -167,7 +198,7 @@ export default function AlertsPage() {
       </div>
 
       {ackError && (
-        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
           {ackError}
         </div>
       )}
@@ -182,9 +213,9 @@ export default function AlertsPage() {
           <CardDescription>
             {loadError
               ? "Alerts could not be loaded."
-              : alerts.length === 0
+              : totalNew === 0
                 ? "You're all caught up — no unacknowledged alerts."
-                : `${alerts.length} unacknowledged alert${alerts.length !== 1 ? "s" : ""} require attention.`}
+                : `${totalNew} unacknowledged alert${totalNew !== 1 ? "s" : ""} require attention.${alerts.length >= 200 ? " Showing the newest 200." : ""}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -194,7 +225,7 @@ export default function AlertsPage() {
             </div>
           ) : loadError ? (
             <div role="alert" className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-              <p className="text-sm text-destructive">Alerts could not be loaded. Check your connection and try again.</p>
+              <p className="text-sm text-destructive">Alerts could not be loaded. Please try again.</p>
               <Button variant="outline" size="sm" onClick={fetchAlerts}>Try again</Button>
             </div>
           ) : alerts.length === 0 ? (
@@ -248,6 +279,12 @@ export default function AlertsPage() {
           )}
         </CardContent>
       </Card>
+
+      {ackLoadError && (
+        <p role="note" className="text-xs text-muted-foreground">
+          The recently acknowledged list could not be loaded — acknowledged alerts are unaffected.
+        </p>
+      )}
 
       {/* Recently Acknowledged */}
       {acknowledged.length > 0 && (

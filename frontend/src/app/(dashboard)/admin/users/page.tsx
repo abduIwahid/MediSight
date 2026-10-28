@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { UserManagementView } from "@/components/shared/UserManagementView"
 import { getCurrentProfile } from "@/lib/current-profile"
+import type { ProfileRow } from "@/lib/types"
 
 export const dynamic = 'force-dynamic'
 
@@ -33,24 +34,33 @@ export default async function AdminUsersPage() {
     )
   }
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('*, hospitals(name)')
-    .order('created_at', { ascending: false })
-    .limit(1000)
-
-  const { data: hospitals } = await supabase
-    .from('hospitals')
-    .select('id, name')
-    .order('name')
+  // Parallel, column-scoped, and error-aware (QA Round 3, perf P-5 /
+  // states F-03): the two queries used to run in sequence with
+  // select('*'), and a failed profiles fetch rendered as an empty
+  // "No users match" table.
+  const [profilesResult, hospitalsResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, role, hospital_id, created_at, hospitals(name)')
+      .order('created_at', { ascending: false })
+      .limit(1000),
+    supabase
+      .from('hospitals')
+      .select('id, name')
+      .order('name'),
+  ])
+  if (profilesResult.error) {
+    console.error("Admin users list failed to load:", profilesResult.error)
+  }
 
   return (
     <UserManagementView
-      profiles={profiles || []}
-      hospitals={hospitals || []}
+      profiles={(profilesResult.data ?? []) as unknown as ProfileRow[]}
+      hospitals={hospitalsResult.data || []}
       viewerRole={viewer.role}
       viewerId={viewer.id}
       viewerHospitalId={viewer.hospital_id}
+      loadError={Boolean(profilesResult.error)}
     />
   )
 }

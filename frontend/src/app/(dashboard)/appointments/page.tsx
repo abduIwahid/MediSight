@@ -92,7 +92,7 @@ export default function AppointmentsPage() {
       </div>
 
       {actionError && (
-        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
           {actionError}
         </div>
       )}
@@ -117,7 +117,7 @@ export default function AppointmentsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((a) => (
-            <div key={a.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div key={a.id} className="rounded-xl border border-border bg-card p-5 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
