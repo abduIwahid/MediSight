@@ -5,7 +5,7 @@ import type { MetadataRoute } from "next"
 // visitors anyway, so crawling them wastes budget and indexes nothing).
 // The sitemap URL uses the canonical base from NEXT_PUBLIC_SITE_URL,
 // the same variable auth redirects use.
-const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://whyrisk.vercel.app").replace(/\/$/, "")
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -27,6 +27,14 @@ export default function robots(): MetadataRoute.Robots {
           "/forgot-password",
           "/update-password",
           "/auth/",
+          "/about",
+          "/alerts",
+          "/analytics",
+          "/appointments",
+          "/assistant",
+          "/contact",
+          "/doctors",
+          "/predict",
         ],
       },
     ],

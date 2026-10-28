@@ -22,6 +22,7 @@ export default function PatientDashboardPage() {
   const [upcoming, setUpcoming] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [sessionError, setSessionError] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -35,20 +36,29 @@ export default function PatientDashboardPage() {
         return
       }
 
-      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single()
-      if (profile) setFullName(profile.full_name)
-
-      const { data: appts } = await supabase
-        .from("appointments")
-        .select("id, scheduled_at, status, reason, doctor:doctor_id(full_name, specialty)")
-        .eq("patient_id", user.id)
-        // "Upcoming" excludes cancelled bookings (QA Round 1, item 66).
-        .neq("status", "Cancelled")
-        .gte("scheduled_at", new Date().toISOString())
-        .order("scheduled_at", { ascending: true })
-        .limit(3)
-
-      setUpcoming((appts as unknown as Appointment[]) || [])
+      // The profile and appointments reads are independent — run them
+      // together instead of as a serial chain (QA Round 3, perf P-8).
+      // A failed appointments read is NOT "no upcoming appointments"
+      // (QA Round 3, states F-02).
+      const [profileRes, apptsRes] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+        supabase
+          .from("appointments")
+          .select("id, scheduled_at, status, reason, doctor:doctor_id(full_name, specialty)")
+          .eq("patient_id", user.id)
+          // "Upcoming" excludes cancelled bookings (QA Round 1, item 66).
+          .neq("status", "Cancelled")
+          .gte("scheduled_at", new Date().toISOString())
+          .order("scheduled_at", { ascending: true })
+          .limit(3),
+      ])
+      if (profileRes.data) setFullName(profileRes.data.full_name)
+      if (apptsRes.error) {
+        console.error("Upcoming appointments failed to load:", apptsRes.error)
+        setLoadError(true)
+      } else {
+        setUpcoming((apptsRes.data as unknown as Appointment[]) || [])
+      }
       setLoading(false)
     }
     load()
@@ -66,7 +76,7 @@ export default function PatientDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
           href="/patient/appointments/book"
-          className="group flex items-center justify-between rounded-2xl border bg-card p-6 shadow-sm transition hover:shadow-md hover:border-primary/40"
+          className="group flex items-center justify-between rounded-xl border bg-card p-6 shadow-card transition hover:shadow-md hover:border-primary/40"
         >
           <div className="flex items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -82,7 +92,7 @@ export default function PatientDashboardPage() {
 
         <Link
           href="/patient/assistant"
-          className="group flex items-center justify-between rounded-2xl border bg-card p-6 shadow-sm transition hover:shadow-md hover:border-primary/40"
+          className="group flex items-center justify-between rounded-xl border bg-card p-6 shadow-card transition hover:shadow-md hover:border-primary/40"
         >
           <div className="flex items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -97,7 +107,7 @@ export default function PatientDashboardPage() {
         </Link>
       </div>
 
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
+      <div className="rounded-xl border bg-card p-6 shadow-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <CalendarClock className="h-4 w-4 text-primary" />
@@ -111,10 +121,14 @@ export default function PatientDashboardPage() {
         {loading ? (
           <PulseLoader label="Loading your appointments" />
         ) : sessionError ? (
-          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
+          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive-text">
             Your session has ended. Please{" "}
             <Link href="/login" className="font-semibold underline">sign in again</Link>{" "}
             to see your appointments.
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive-text">
+            Your appointments could not be loaded. Please reload the page to try again.
           </div>
         ) : upcoming.length === 0 ? (
           <EmptyState
