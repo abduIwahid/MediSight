@@ -6,15 +6,15 @@
 
 - Predicts diabetes risk with a trained LightGBM model and explains every score with SHAP feature attributions, so the factors behind a score can be inspected instead of trusted blindly.
 - Holds patient and doctor records, appointments, and stored risk assessments, with role-based access (patient / doctor / admin) enforced by middleware and database row-level security.
-- Computes clinical indicators in code alongside the model score: BMI classification, blood-pressure categorisation, eGFR staging, and cholesterol ratios.
+- Presents the recorded clinical indicators behind each assessment (such as BMI and blood pressure) alongside the model score, and lists which model inputs were recorded and which used documented population defaults.
 - Includes a symptom checker that is a rule-based heuristic, labelled as such in the product. It is not a trained model.
 
 ## The model
 
 - Task: diabetes risk (binary classification) — the only trained model in the system today.
 - Dataset: CDC BRFSS 2015 health indicators, balanced 50/50 split file (70,692 records, 21 features, target Diabetes_binary).
-- Selected model: LightGBM, AUC-ROC 0.8307 on a stratified held-out test split (80/20). Logistic Regression, Random Forest, and XGBoost were benchmarked against it, with MLflow experiment tracking.
-- The 0.8307 figure describes the diabetes task only; it does not generalise to other conditions.
+- Selected model: LightGBM, AUC-ROC 0.8222 on a stratified held-out test split (80/20) of the balanced dataset. Because the test split is balanced (50/50), this figure is not directly comparable to performance on a real-world population. Logistic Regression, Random Forest, and XGBoost were benchmarked against it, with MLflow experiment tracking.
+- The 0.8222 figure describes the diabetes task only; it does not generalise to other conditions.
 - Not yet implemented: trained models for heart disease, stroke, chronic kidney disease, hypertension, asthma and COPD. These are roadmap items — no model exists for them today.
 
 ## Pages

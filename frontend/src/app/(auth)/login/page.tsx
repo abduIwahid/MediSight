@@ -189,7 +189,10 @@ function LoginPageInner() {
       options: { redirectTo: `${siteUrl}/auth/callback` },
     })
     if (error) {
-      setError(error.message)
+      // Never render the raw provider message (QA Round 2, security
+      // L1) — the detail goes to the console, the user gets a sentence.
+      console.error("Google sign-in failed:", error.message)
+      setError("Google sign-in could not be started. Please try again, or sign in with your email and password.")
       setOauthLoading(null)
     }
   }
@@ -239,6 +242,7 @@ function LoginPageInner() {
             <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-muted/40 p-1">
               <button
                 type="button"
+                aria-pressed={portal === "patient"}
                 onClick={() => { setPortal("patient"); setError(null) }}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   portal === "patient" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
@@ -248,6 +252,7 @@ function LoginPageInner() {
               </button>
               <button
                 type="button"
+                aria-pressed={portal === "doctor"}
                 onClick={() => { setPortal("doctor"); setError(null) }}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   portal === "doctor" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
@@ -270,7 +275,7 @@ function LoginPageInner() {
                     onChange={e => setIdentifier(e.target.value)}
                     placeholder="Enter your email"
                     required
-                    className="border-0 bg-transparent px-0 text-sm placeholder:text-muted-foreground focus-visible:ring-0 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="border-0 bg-transparent px-0 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:ring-0 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                 </div>
               </div>
@@ -292,7 +297,7 @@ function LoginPageInner() {
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     required
-                    className="border-0 bg-transparent px-0 text-sm placeholder:text-muted-foreground focus-visible:ring-0 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                    className="border-0 bg-transparent px-0 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:ring-0 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
                   />
                   <button
                     type="button"
@@ -305,9 +310,9 @@ function LoginPageInner() {
                 </div>
               </div>
 
-              {callbackError && <div className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">{callbackError}</div>}
+              {callbackError && <div role="alert" className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">{callbackError}</div>}
               {error && (
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   <span>{error}</span>
                   <Link href="/forgot-password" className="shrink-0 font-medium underline underline-offset-2">
                     Forgot password?
@@ -325,7 +330,7 @@ function LoginPageInner() {
                   >
                     {resendBusy ? "Sending..." : "Resend confirmation email"}
                   </button>
-                  {resendMsg && <p className="mt-1 text-muted-foreground">{resendMsg}</p>}
+                  {resendMsg && <p role="status" className="mt-1 text-muted-foreground">{resendMsg}</p>}
                 </div>
               )}
 

@@ -29,7 +29,15 @@ export default function ForgotPasswordPage() {
     })
 
     if (error) {
-      setError(error.message)
+      // Never render the raw provider message (QA Round 2, security
+      // L1). Rate-limit is the one case worth naming; the rest get one
+      // honest sentence and the detail goes to the console.
+      if (/rate|too many/i.test(error.message)) {
+        setError("Too many reset requests for now. Please wait a few minutes and try again.")
+      } else {
+        console.error("Password reset failed:", error.message)
+        setError("The reset email could not be sent. Please check the address and try again.")
+      }
     } else {
       setSent(true)
     }
@@ -44,7 +52,7 @@ export default function ForgotPasswordPage() {
       </div>
       <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-sm">
         {sent ? (
-          <div className="flex flex-col items-center text-center space-y-4 py-4">
+          <div role="status" className="flex flex-col items-center text-center space-y-4 py-4">
             <CheckCircle2 className="h-14 w-14 text-green-500" />
             <div>
               <h1 className="text-2xl font-bold">Check your email</h1>
@@ -82,7 +90,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
 
-              {error && <div className="text-destructive text-sm">{error}</div>}
+              {error && <div role="alert" className="text-destructive text-sm">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Sending..." : "Send Reset Link"}
