@@ -13,10 +13,23 @@ export const metadata: Metadata = {
     "WhyRisk estimates diabetes risk with a trained machine-learning model and shows the reasons behind the score — SHAP explanations, stored per prediction.",
   alternates: { canonical: "/welcome" },
   openGraph: {
+    // Restated in full (QA Round 3, SEO H1): Next REPLACES the
+    // openGraph object per segment instead of merging, so a partial
+    // block silently drops type/siteName/images from the root.
+    type: "website",
+    siteName: "WhyRisk",
     url: "/welcome",
     title: "WhyRisk — Know your risk. See exactly why.",
     description:
       "Diabetes risk prediction with explainable machine learning — every score shows its reasons.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "WhyRisk — Know your risk. See exactly why.",
+      },
+    ],
   },
 }
 
@@ -26,6 +39,9 @@ const jsonLd = {
   name: "WhyRisk",
   applicationCategory: "HealthApplication",
   operatingSystem: "Web",
+  // Free to use — stated plainly so the structured data matches the
+  // product (QA Round 3, SEO L5).
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   url: "https://whyrisk.vercel.app/welcome",
   description:
     "Diabetes risk prediction with explainable machine learning — every score shows its reasons.",
@@ -87,7 +103,13 @@ const DEMO_FACTORS = [
 
 export default function WelcomePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to content
+      </a>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -96,7 +118,7 @@ export default function WelcomePage() {
       <header className="sticky top-0 z-40 border-b border-border bg-background/95">
         <div className="mx-auto flex max-w-6xl items-center gap-3.5 px-4 py-3.5 sm:px-5">
           <Link href="/welcome" className="flex items-center gap-3">
-            <BrandMark className="h-[38px] w-[38px] shrink-0 drop-shadow-sm" />
+            <BrandMark className="h-[38px] w-[38px] shrink-0" />
             <span className="font-display text-[21px] uppercase leading-none tracking-wide">
               WhyRisk
               {/* Tagline hidden below sm: at 360px the header row
@@ -122,7 +144,7 @@ export default function WelcomePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-5">
+      <main id="main-content" className="mx-auto max-w-6xl px-5">
         {/* Hero */}
         <section className="grid items-start gap-10 pb-8 pt-14 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
@@ -138,7 +160,7 @@ export default function WelcomePage() {
               <span className="text-brand">See exactly why.</span>
             </h1>
             <p
-              className="reveal reveal-slow mt-6 max-w-[620px] text-[17.5px] leading-relaxed text-[#33454F]"
+              className="reveal reveal-slow mt-6 max-w-[620px] text-[17.5px] leading-relaxed text-foreground/80"
               style={{ "--d": "200ms" } as CSSProperties}
             >
               WhyRisk helps care teams estimate a patient&apos;s diabetes risk with a trained machine-learning
@@ -161,7 +183,7 @@ export default function WelcomePage() {
               </a>
             </div>
             <div
-              className="reveal reveal-slow mt-7 rounded-[10px] border border-[#D97706] bg-[#FDF0DC] px-4 py-3 text-[13.5px] leading-relaxed text-[#6B4A08]"
+              className="reveal reveal-slow mt-7 rounded-[10px] border border-[#D97706] bg-[#FDF0DC] px-4 py-3 text-[13.5px] leading-relaxed text-[#A85008]"
               style={{ "--d": "430ms" } as CSSProperties}
             >
               <strong>Honest by design:</strong> one trained model today (diabetes). Everything else is clearly marked
@@ -184,9 +206,14 @@ export default function WelcomePage() {
             </div>
             <p className="mt-2 font-sans text-xl font-bold tracking-normal">Ahmed Raza, 47</p>
             <p className="text-[13px] text-muted-foreground">Sample assessment · LightGBM model</p>
-            <div className="mt-2 font-display text-[52px] leading-none">
-              0.31{" "}
-              <small className="font-sans text-sm font-semibold text-muted-foreground">/ 1.00 probability</small>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <span className="font-display text-[52px] leading-none">
+                0.31{" "}
+                <small className="font-sans text-sm font-semibold text-muted-foreground">/ 1.00 probability</small>
+              </span>
+              <span className="rounded-full bg-[#FDF0DC] px-2.5 py-1 text-[11px] font-bold text-[#A85008]">
+                Moderate risk
+              </span>
             </div>
             <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-secondary">
               <div className="h-full w-[31%] rounded-full bg-brand" />
@@ -195,15 +222,16 @@ export default function WelcomePage() {
               <span>LOW</span>
               <span>MODERATE</span>
               <span>HIGH</span>
+              <span>CRITICAL</span>
             </div>
             <div className="mt-[18px] border-t border-secondary pt-3.5">
-              <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[1.6px] text-brand-text">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[1.6px] text-brand-text">
                 Why this score — top factors
-              </h3>
+              </p>
               <div className="mt-1">
                 {DEMO_FACTORS.map((f) => (
                   <div key={f.label} className="mt-2 flex items-center gap-2.5 text-[13px]">
-                    <span className="w-[118px] shrink-0 text-[#33454F]">{f.label}</span>
+                    <span className="w-[118px] shrink-0 text-foreground/80">{f.label}</span>
                     <span className="h-[9px] flex-1 overflow-hidden rounded-full bg-secondary">
                       <span className="block h-full rounded-full" style={{ width: f.width, background: f.color }} />
                     </span>
@@ -241,7 +269,7 @@ export default function WelcomePage() {
                   <c.icon className="h-5 w-5" />
                 </div>
                 <h3 className="font-sans text-[17px] font-bold tracking-normal">{c.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-[#41525B]">{c.text}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/75">{c.text}</p>
               </div>
             ))}
           </div>
@@ -270,7 +298,7 @@ export default function WelcomePage() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl border border-dashed border-[#9FB3B8] bg-secondary p-5">
+            <div className="rounded-xl border border-dashed border-muted-foreground/50 bg-secondary p-5">
               <h3 className="font-mono text-xs font-semibold uppercase tracking-[1.6px] text-muted-foreground">On the roadmap</h3>
               <ul className="mt-2 text-[14.5px]">
                 {[
@@ -282,7 +310,7 @@ export default function WelcomePage() {
                 ].map((label) => (
                   <li key={label} className="flex items-center justify-between gap-2 border-b border-foreground/[0.07] py-[7px] last:border-b-0">
                     <span>{label}</span>
-                    <span className="whitespace-nowrap rounded-full bg-[#DDE5E7] px-2 py-0.5 text-[11px] font-bold text-[#5A6B73]">
+                    <span className="whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
                       In development
                     </span>
                   </li>
@@ -299,7 +327,7 @@ export default function WelcomePage() {
             One admin, one login — a live overview of the whole practice.
           </p>
           <div className="mt-[22px] grid overflow-hidden rounded-[14px] border border-border bg-card md:grid-cols-[200px_1fr]">
-            <div className="hidden bg-foreground p-5 text-[#DCE7EA] md:block">
+            <div className="hidden bg-foreground p-5 text-[#CCD0CF] md:block">
               <div className="font-display text-[17px] uppercase tracking-wide text-white">WhyRisk</div>
               <ul className="mt-[18px] space-y-1 text-[13.5px]">
                 {["Dashboard", "Risk Queue", "Alerts Center", "AI Assistant", "Model Registry", "Audit Logs"].map((item, i) => (
@@ -314,7 +342,7 @@ export default function WelcomePage() {
               <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
                 {["Total patients (live count)", "Total doctors (live count)", "Pending approvals", "Appointments"].map((label) => (
                   <div key={label} className="rounded-[10px] border border-secondary bg-background p-3.5">
-                    <span className="block font-display text-2xl">—</span>
+                    <span className="block font-sans text-2xl font-bold">—</span>
                     <span className="text-xs text-muted-foreground">{label}</span>
                   </div>
                 ))}
@@ -328,7 +356,7 @@ export default function WelcomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-14 bg-foreground py-[30px] text-[#C8D6DA]">
+      <footer className="mt-14 bg-foreground py-[30px] text-[#CCD0CF]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3.5 px-5">
           <span className="font-display text-lg uppercase tracking-wide text-white">WhyRisk</span>
           <span className="flex items-center gap-4">

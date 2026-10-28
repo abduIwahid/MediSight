@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Settings, LogOut, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar, HeartPulse, Wand2 } from "lucide-react"
+import { LayoutDashboard, Users, Settings, LogOut, X, Bell, Bot, ShieldCheck, BarChart3, User, Stethoscope, Mail, Calendar, HeartPulse, Wand2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
@@ -92,9 +92,19 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
     >
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
-          <BrandMark className="h-9 w-9 shrink-0 drop-shadow-md transition-transform group-hover:scale-105" />
+          <BrandMark className="h-9 w-9 shrink-0 transition-transform group-hover:scale-105" />
           <span className="text-xl font-bold tracking-tight text-primary">WhyRisk</span>
         </Link>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
       
       {role && (
@@ -123,9 +133,9 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
                 transition={{ delay: 0.1 + (groupIdx * 0.05) }}
                 className="space-y-1"
               >
-                <h4 className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">
+                <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                   {group.title}
-                </h4>
+                </p>
                 {group.items.map((item) => {
                   const isActive = item.href === activeHref;
                   return (
@@ -137,7 +147,7 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
                       className={cn(
                         "group relative flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
                         isActive
-                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                          ? "bg-primary text-primary-foreground shadow-card" 
                           : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       )}
                     >
@@ -161,10 +171,10 @@ export function DashboardSidebar({ onClose, className }: DashboardSidebarProps) 
         </nav>
       </div>
       
-      <div className="border-t p-4 bg-muted/10">
+      <div className="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-muted/10">
         <button
           onClick={handleLogout}
-          className="group flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive hover:shadow-sm"
+          className="group flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive-text hover:shadow-card"
         >
           <div className="flex items-center gap-3">
             <LogOut className="h-[18px] w-[18px] transition-transform group-hover:-translate-x-1" />

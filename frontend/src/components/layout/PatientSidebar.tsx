@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, CalendarPlus, CalendarClock, Bot, User, LogOut } from "lucide-react"
+import { LayoutDashboard, CalendarPlus, CalendarClock, Bot, User, LogOut, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { motion } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
@@ -48,9 +48,19 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
     >
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/patient/dashboard" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
-          <BrandMark className="h-9 w-9 shrink-0 drop-shadow-md transition-transform group-hover:scale-105" />
+          <BrandMark className="h-9 w-9 shrink-0 transition-transform group-hover:scale-105" />
           <span className="text-xl font-bold tracking-tight text-primary">WhyRisk</span>
         </Link>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <div className="border-b px-6 py-3.5 bg-muted/20">
@@ -75,7 +85,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
                 className={cn(
                   "group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    ? "bg-primary text-primary-foreground shadow-card"
                     : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                 )}
               >
@@ -87,10 +97,10 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
         </nav>
       </div>
 
-      <div className="border-t p-4 bg-muted/10">
+      <div className="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-muted/10">
         <button
           onClick={handleLogout}
-          className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive hover:shadow-sm"
+          className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive-text hover:shadow-card"
         >
           <LogOut className="h-[18px] w-[18px] transition-transform group-hover:-translate-x-1" />
           <span>Sign out</span>

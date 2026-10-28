@@ -39,7 +39,7 @@ export function HeaderSearch() {
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           type="search"
-          placeholder="Search patients, MRN..."
+          placeholder="Search patients, MRN…"
           className="h-10 w-full rounded-full border-border/50 bg-muted/30 pl-10 pr-4 text-sm shadow-inner transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary"
         />
       </div>
