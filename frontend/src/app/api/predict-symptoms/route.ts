@@ -7,17 +7,18 @@ const STAFF_ROLES = ["doctor", "nurse", "hospital_admin", "super_admin", "data_s
 /**
  * Lightweight rule-based symptom screening engine.
  *
- * NOTE: This is a heuristic symptom-checker used for the "Disease Prediction Wizard"
+ * NOTE: This is a heuristic symptom-checker used for the "Symptom Screening Wizard"
  * intake flow. It is intentionally separate from the trained LightGBM diabetes model
  * (see /api/predict) which operates on structured clinical features, not free symptoms.
  * This engine exists to give patients a fast triage signal + doctor recommendation.
  * It must never be presented as a diagnosis.
  */
 
-export async function GET() {
-  return NextResponse.json({ symptoms: ALL_SYMPTOMS })
-}
-
+// No GET handler (QA Round 3, api-security L2): the symptom list is
+// static data that ships in the client bundle via lib/symptoms — the
+// wizard imports it directly. The old unauthenticated GET contradicted
+// the app's "every API route is gated" posture and served nothing the
+// bundle doesn't already contain.
 export async function POST(request: Request) {
   // Staff-only gate, mirroring /api/predict: the symptom wizard's only
   // UI consumer is the staff prediction page. A bare session check let
@@ -56,11 +57,19 @@ export async function POST(request: Request) {
   try {
     const { symptoms } = await request.json()
 
-    if (!Array.isArray(symptoms) || symptoms.length === 0) {
+    // Bounded, validated input (QA Round 3, api-security L2 /
+    // adversarial F9): strings only, known symptom ids only, at most 50
+    // — the array is scored against every disease profile, so an
+    // unbounded caller-supplied array is a CPU/memory nuisance.
+    const KNOWN = new Set(ALL_SYMPTOMS)
+    const cleaned = Array.isArray(symptoms)
+      ? symptoms.filter((s): s is string => typeof s === "string" && KNOWN.has(s)).slice(0, 50)
+      : []
+    if (cleaned.length === 0) {
       return NextResponse.json({ error: "Please select at least one symptom." }, { status: 400 })
     }
 
-    const selected = new Set(symptoms as string[])
+    const selected = new Set(cleaned)
 
     const scored = DISEASE_PROFILES.map((profile) => {
       const maxPossible = Object.values(profile.symptoms).reduce((a, b) => a + b, 0)
@@ -88,7 +97,7 @@ export async function POST(request: Request) {
         // this fallback used to return the fraction 0.35, which the
         // wizard rendered as a "0%" / "1%" match (QA Round 2, cluster 8).
         confidence: 35,
-        risk: "Low",
+        match: "Weak",
         recommendations: [
           "Monitor your symptoms over the next 24-48 hours",
           "Stay hydrated and rest",
@@ -99,14 +108,17 @@ export async function POST(request: Request) {
 
     const top = scored[0]
     const confidencePct = Math.round(top.confidence * 100)
-    const risk =
-      confidencePct >= 80 ? "Critical" : confidencePct >= 60 ? "High" : confidencePct >= 35 ? "Moderate" : "Low"
+    // Match strength, NOT risk severity (QA Round 3, copy C1): this
+    // percentage is how strongly the symptoms match a fixed rule set.
+    // Labelling it with the model's severity names (Low/Moderate/High/
+    // Critical) made a strong flu-rule match read as "Critical Risk".
+    const match = confidencePct >= 80 ? "Strong" : confidencePct >= 60 ? "Moderate" : "Weak"
 
     return NextResponse.json({
       disease: top.profile.disease,
       specialty: top.profile.specialty,
       confidence: confidencePct,
-      risk,
+      match,
       recommendations: top.profile.recommendations,
       alternatives: scored.slice(1, 3).map((s) => ({
         disease: s.profile.disease,

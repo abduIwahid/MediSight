@@ -17,7 +17,12 @@ import { mlServiceFetch } from "@/lib/ml-service"
 export const dynamic = "force-dynamic"
 
 const STATUS_TIMEOUT_MS = 10_000
-const LIVE_HEADERS = { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" }
+// Signed-in staff only (QA Round 3, api-security M1): the response is
+// per-user operational detail, so it is never CDN-shared, and the body
+// is an allowlist — the upstream document used to be relayed verbatim.
+const PRIVATE_HEADERS = { "Cache-Control": "private, no-store" }
+
+const STAFF_ROLES = ["doctor", "nurse", "hospital_admin", "super_admin", "admin", "data_scientist"]
 
 export async function GET() {
   const cookieStore = cookies()
@@ -34,6 +39,25 @@ export async function GET() {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 })
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+  if (!profile || !STAFF_ROLES.includes(profile.role as string)) {
+    return NextResponse.json({ error: "Staff access required." }, { status: 403 })
+  }
+  if (profile.role === "doctor") {
+    const { data: doctor } = await supabase
+      .from("doctors")
+      .select("status")
+      .eq("user_id", user.id)
+      .single()
+    if (doctor?.status !== "approved") {
+      return NextResponse.json({ error: "Doctor account is not approved yet." }, { status: 403 })
+    }
+  }
+
   let response: Response | null
   try {
     response = await mlServiceFetch("/model-status", { requireAuth: false, timeoutMs: STATUS_TIMEOUT_MS })
@@ -44,10 +68,33 @@ export async function GET() {
   if (!response || !response.ok) {
     return NextResponse.json(
       { error: "ML service unavailable." },
-      { status: 503 }
+      { status: 503, headers: PRIVATE_HEADERS }
     )
   }
 
   const data = await response.json()
-  return NextResponse.json(data, { headers: LIVE_HEADERS })
+  // Metrics are all-or-nothing: the chat panel formats all three, so a
+  // partial object would break its rendering.
+  const metrics =
+    data?.metrics &&
+    typeof data.metrics === "object" &&
+    typeof data.metrics.auc_roc === "number" &&
+    typeof data.metrics.f1_score === "number" &&
+    typeof data.metrics.accuracy === "number"
+      ? {
+          auc_roc: data.metrics.auc_roc,
+          f1_score: data.metrics.f1_score,
+          accuracy: data.metrics.accuracy,
+        }
+      : undefined
+  return NextResponse.json(
+    {
+      status: typeof data?.status === "string" ? data.status : undefined,
+      model_loaded: Boolean(data?.model_loaded),
+      model_name: typeof data?.model_name === "string" ? data.model_name : undefined,
+      version: typeof data?.version === "string" ? data.version : undefined,
+      metrics,
+    },
+    { headers: PRIVATE_HEADERS }
+  )
 }

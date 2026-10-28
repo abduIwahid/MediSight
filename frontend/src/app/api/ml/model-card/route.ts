@@ -28,6 +28,15 @@ const LIVE_HEADERS = { "Cache-Control": "public, s-maxage=60, stale-while-revali
 const DOWN_HEADERS = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" }
 const STATUS_TIMEOUT_MS = 10_000
 
+/** The only upstream drift explanations this public route will relay —
+ *  the literal strings the ML service's /drift-status can produce. */
+const KNOWN_DRIFT_REASONS = new Set([
+  "Model not loaded",
+  "Training dataset not found for drift calculation",
+  // "Drift calculation failed. See server logs." is deliberately NOT
+  // relayed — it collapses to the generic unavailable line instead.
+])
+
 export async function GET() {
   try {
     const statusRes = await mlServiceFetch("/model-status", { requireAuth: false, timeoutMs: STATUS_TIMEOUT_MS })
@@ -46,11 +55,17 @@ export async function GET() {
           currentPsi: typeof d.current_psi === "number" ? d.current_psi : null,
           driftDetected: Boolean(d.drift_detected),
           threshold: typeof d.drift_threshold === "number" ? d.drift_threshold : null,
-          // Forward the service's own reason when no baseline could be
-          // computed — the page shows it verbatim instead of guessing a
-          // paraphrase like "No drift baseline yet" (QA Round 2,
-          // R2-DS-10).
-          reason: typeof d.reason === "string" ? d.reason : null,
+          // The upstream reason is mapped through an allowlist, never
+          // forwarded verbatim (QA Round 3, api-security L7): it is
+          // free text from another service and could carry internal
+          // paths or echoed input. Unknown reasons collapse to a
+          // generic line.
+          reason:
+            typeof d.reason === "string" && KNOWN_DRIFT_REASONS.has(d.reason)
+              ? d.reason
+              : d.available === false
+                ? "Drift status is unavailable for this model."
+                : null,
         }
       }
     } catch {
