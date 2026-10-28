@@ -151,7 +151,7 @@ export default function BookAppointmentPage() {
             min={minDateTime}
             onChange={(e) => setDate(e.target.value)}
             required
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm"
           />
         </div>
 
@@ -163,7 +163,7 @@ export default function BookAppointmentPage() {
             onChange={(e) => setReason(e.target.value)}
             placeholder="Briefly describe why you'd like to see the doctor"
             rows={3}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm"
           />
         </div>
 

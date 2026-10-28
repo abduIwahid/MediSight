@@ -63,7 +63,9 @@ export default function DoctorOnboardingPage() {
     })
 
     if (error) {
-      setError(error.message)
+      // Never render the raw provider message (QA Round 2, security L1).
+      console.error("Doctor role request failed:", error.message)
+      setError("Your application could not be submitted. Please try again.")
       setSubmitting(false)
       return
     }
@@ -112,7 +114,7 @@ export default function DoctorOnboardingPage() {
             <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
 
-          {error && <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+          {error && <div role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "Submitting..." : "Submit for Approval"}

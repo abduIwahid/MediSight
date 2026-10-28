@@ -149,7 +149,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {error && <div className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+          {error && <div role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
           <Button type="submit" className="w-full" disabled={saving}>
             {saving ? "Saving..." : "Complete Setup"}

@@ -3,6 +3,7 @@ import type { CSSProperties } from "react"
 import type { Metadata } from "next"
 import { Activity, ArrowRight, CalendarCheck, ListChecks } from "lucide-react"
 import BrandMark from "@/components/shared/BrandMark"
+import { SEVERITY_HEX } from "@/lib/status"
 
 export const metadata: Metadata = {
   // Absolute title: the root template would otherwise append "— WhyRisk"
@@ -40,8 +41,8 @@ const jsonLd = {
 
 const FACTS = [
   {
-    value: "0.8307",
-    text: "AUC-ROC of the diabetes model on a held-out test split — the only accuracy figure we claim",
+    value: "0.8222",
+    text: "AUC-ROC of the diabetes model on a held-out test split of the balanced dataset — the only accuracy figure we claim",
   },
   {
     value: "1",
@@ -49,7 +50,7 @@ const FACTS = [
   },
   {
     value: "21",
-    text: "Health indicators per assessment, from the CDC BRFSS 2015 dataset (253,680 records)",
+    text: "Health indicators per assessment, from the CDC BRFSS 2015 dataset (balanced training file: 70,692 records)",
   },
   {
     value: "SHAP",
@@ -75,11 +76,13 @@ const CAPABILITIES = [
   },
 ]
 
+// Demo SHAP bars: severity fills come from lib/status.ts (Moderate fill
+// #D97706, Low #1E7A46); the brand bar is the accent, not a severity.
 const DEMO_FACTORS = [
-  { label: "BMI 29.4", width: "62%", color: "#D97706", value: "+0.14" },
-  { label: "High blood pressure", width: "48%", color: "#D97706", value: "+0.10" },
+  { label: "BMI 29.4", width: "62%", color: SEVERITY_HEX.Moderate, value: "+0.14" },
+  { label: "High blood pressure", width: "48%", color: SEVERITY_HEX.Moderate, value: "+0.10" },
   { label: "High cholesterol", width: "38%", color: "#2E7FA8", value: "+0.08" },
-  { label: "Physically active", width: "30%", color: "#1E7A46", value: "−0.06" },
+  { label: "Physically active", width: "30%", color: SEVERITY_HEX.Low, value: "−0.06" },
 ]
 
 export default function WelcomePage() {
@@ -91,12 +94,15 @@ export default function WelcomePage() {
       />
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/95">
-        <div className="mx-auto flex max-w-6xl items-center gap-3.5 px-5 py-3.5">
+        <div className="mx-auto flex max-w-6xl items-center gap-3.5 px-4 py-3.5 sm:px-5">
           <Link href="/welcome" className="flex items-center gap-3">
             <BrandMark className="h-[38px] w-[38px] shrink-0 drop-shadow-sm" />
             <span className="font-display text-[21px] uppercase leading-none tracking-wide">
               WhyRisk
-              <span className="mt-1 block font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand-text">
+              {/* Tagline hidden below sm: at 360px the header row
+                  (brand + tagline + CTA) overflowed the screen
+                  (QA Round 2, cluster 28). */}
+              <span className="mt-1 hidden font-mono text-[9.5px] font-medium uppercase tracking-[2px] text-brand-text sm:block">
                 Risk, explained
               </span>
             </span>
@@ -109,7 +115,7 @@ export default function WelcomePage() {
           </nav>
           <Link
             href="/signup"
-            className="ml-4 inline-flex items-center rounded-lg border-[1.5px] border-primary px-5 py-2.5 text-sm font-bold text-primary transition hover:bg-secondary md:ml-6"
+            className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border-[1.5px] border-primary px-3.5 py-2.5 text-sm font-bold text-primary transition hover:bg-secondary sm:ml-4 sm:px-5 md:ml-6"
           >
             Create your account
           </Link>
@@ -135,8 +141,10 @@ export default function WelcomePage() {
               className="reveal reveal-slow mt-6 max-w-[620px] text-[17.5px] leading-relaxed text-[#33454F]"
               style={{ "--d": "200ms" } as CSSProperties}
             >
-              WhyRisk estimates your diabetes risk with a trained machine-learning model — and shows you the reasons
-              behind the score, in plain language. No black box. No invented numbers.
+              WhyRisk helps care teams estimate a patient&apos;s diabetes risk with a trained machine-learning
+              model — and shows the reasons behind every score, in plain language. Assessments are run by your
+              care team; patients use the portal for appointments and their profile. No black box. No invented
+              numbers.
             </p>
             <div className="reveal mt-7 flex flex-wrap gap-3" style={{ "--d": "320ms" } as CSSProperties}>
               <Link
@@ -222,7 +230,7 @@ export default function WelcomePage() {
 
         {/* What it does */}
         <section id="how" className="scroll-mt-24 pb-2 pt-12">
-          <h2 className="font-display text-[30px] uppercase tracking-wide">What it does</h2>
+          <h2 className="font-heading text-[30px] font-bold uppercase tracking-wide">What it does</h2>
           <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
             Three things, done properly — instead of ten things done with smoke and mirrors.
           </p>
@@ -241,7 +249,7 @@ export default function WelcomePage() {
 
         {/* Honest scope */}
         <section id="scope" className="scroll-mt-24 pb-2 pt-12">
-          <h2 className="font-display text-[30px] uppercase tracking-wide">What is real, what is next</h2>
+          <h2 className="font-heading text-[30px] font-bold uppercase tracking-wide">What is real, what is next</h2>
           <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
             Most health apps hide this page. We put it on the homepage.
           </p>
@@ -286,7 +294,7 @@ export default function WelcomePage() {
 
         {/* Inside the app */}
         <section className="pb-4 pt-12">
-          <h2 className="font-display text-[30px] uppercase tracking-wide">Inside the app</h2>
+          <h2 className="font-heading text-[30px] font-bold uppercase tracking-wide">Inside the app</h2>
           <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
             One admin, one login — a live overview of the whole practice.
           </p>
