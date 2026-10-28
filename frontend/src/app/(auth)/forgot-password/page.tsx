@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,18 +14,23 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
+    // Route the recovery link through the server callback (QA Round 3,
+    // auth H1): pointing it straight at /update-password made the flow
+    // depend on the requesting browser's PKCE verifier cookie, so a
+    // fresh link opened on another device/browser failed and was
+    // falsely reported as "expired". The callback exchanges the code /
+    // verifies the token server-side (its type=recovery branch routes
+    // to /update-password and marks the recovery session).
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      redirectTo: `${siteUrl}/auth/callback`,
     })
 
     if (error) {
@@ -50,10 +55,10 @@ export default function ForgotPasswordPage() {
         <BrandMark className="h-10 w-10 shrink-0" />
         <span className="text-xl font-bold tracking-tight">WhyRisk</span>
       </div>
-      <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-sm">
+      <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-xl border shadow-card">
         {sent ? (
           <div role="status" className="flex flex-col items-center text-center space-y-4 py-4">
-            <CheckCircle2 className="h-14 w-14 text-green-500" />
+            <CheckCircle2 className="h-14 w-14 text-[#1E7A46]" />
             <div>
               <h1 className="text-2xl font-bold">Check your email</h1>
               <p className="text-sm text-muted-foreground mt-2">
@@ -93,7 +98,7 @@ export default function ForgotPasswordPage() {
               {error && <div role="alert" className="text-destructive text-sm">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Sending..." : "Send Reset Link"}
+                {loading ? "Sending…" : "Send Reset Link"}
               </Button>
             </form>
 

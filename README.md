@@ -17,14 +17,16 @@ web application, a FastAPI machine-learning service, and a Supabase
 What is actually implemented and served today:
 
 - **One trained model.** The ML service trains and serves a single model:
-  **diabetes risk** (LightGBM, **AUC-ROC 0.8307** on a held-out test
-  split) on the CDC BRFSS 2015 health-indicators dataset. Logistic
+  **diabetes risk** (LightGBM, **AUC-ROC 0.8222** on a stratified
+  held-out test split of the balanced 70,692-record dataset; because the
+  split is 50/50 this is not comparable to performance on a real-world
+  population) on the CDC BRFSS 2015 health-indicators dataset. Logistic
   Regression, Random Forest, and XGBoost were benchmarked against it,
   with MLflow experiment tracking.
 - **SHAP explanations** for that model's predictions, served by the ML
-  service (`/explain`), plus clinical feature indicators computed in
-  code: BMI classification, blood-pressure categorisation, eGFR staging,
-  and cholesterol ratios.
+  service (`/explain`), and a disclosure on each prediction of which of
+  the 21 model inputs were recorded and which used documented population
+  defaults.
 - **A symptom checker** in the frontend that is a **rule-based
   heuristic**, and is labelled as such in the UI. It is not a trained
   model.
@@ -80,12 +82,12 @@ Case Study #U2013 ML-003.pdf   the internship case study for this project
 | Task | Diabetes risk (binary classification) |
 | Dataset | CDC BRFSS 2015 - `diabetes_binary_5050split_health_indicators_BRFSS2015.csv` (50/50 split, 70,692 rows, 21 features, target `Diabetes_binary`) |
 | Candidates | Logistic Regression, Random Forest, XGBoost, LightGBM |
-| Selected | LightGBM - AUC-ROC 0.8307 (stratified 80/20 split, AUC on the test set) |
+| Selected | LightGBM - AUC-ROC 0.8222 (stratified 80/20 split, AUC on the test set) |
 | Tracking | MLflow (experiment `MediSight_Diabetes_Prediction`) |
 | Artifact | `ml-service/models/production/model.joblib` + `model_metadata.json` (gitignored, produced by training) |
 | Explanations | SHAP values per prediction, served by `/explain` |
 
-The 0.8307 AUC-ROC figure is for the diabetes task only. It does not
+The 0.8222 AUC-ROC figure is for the diabetes task only. It does not
 generalise to other conditions.
 
 ## Setup

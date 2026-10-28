@@ -6,10 +6,22 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
+        // Pinned to THIS project's storage host (QA Round 3,
+        // api-security L8): the wildcard let next/image proxy
+        // optimized images from any Supabase tenant's public buckets.
         protocol: "https",
-        hostname: "*.supabase.co",
+        hostname: "qvlufntpplwofzedrbrj.supabase.co",
       },
     ],
+  },
+  // The root is a real redirect, not a 200 meta-refresh stub
+  // (QA Round 3, SEO H2): signed-in users land on their dashboard,
+  // everyone else on the public welcome page. Middleware still runs
+  // for the destination and applies its own role routing.
+  async redirects() {
+    return [
+      { source: "/", destination: "/welcome", permanent: true },
+    ];
   },
   // Baseline security headers on every response (QA Round 2, security
   // M2). The app previously sent none of these, so the signed-in
