@@ -23,23 +23,37 @@ export default function DoctorOnboardingPage() {
 
   useEffect(() => {
     const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push("/login")
-        return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push("/login")
+          return
+        }
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+        if (!profile) {
+          // No profile row yet (QA Round 3, onboarding O-6): the
+          // request_doctor_role RPC requires an existing patient
+          // profile, so submitting from here could only fail. Finish
+          // the basic profile first.
+          router.push("/onboarding")
+          return
+        }
+        if (profile.role === "doctor") {
+          // Already applied — send them to the appropriate status page.
+          router.push("/pending-approval")
+          return
+        }
+        if (profile.role !== "patient") {
+          // An existing clinical-staff account has no business here.
+          router.push("/dashboard")
+          return
+        }
+        setChecking(false)
+      } catch (err) {
+        console.error("Doctor onboarding check failed:", err)
+        setError("Your account could not be checked. Please reload the page to try again.")
+        setChecking(false)
       }
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-      if (profile?.role === "doctor") {
-        // Already applied — send them to the appropriate status page.
-        router.push("/pending-approval")
-        return
-      }
-      if (profile?.role && profile.role !== "patient") {
-        // An existing clinical-staff account has no business here.
-        router.push("/dashboard")
-        return
-      }
-      setChecking(false)
     }
     check()
   }, [])
@@ -77,12 +91,12 @@ export default function DoctorOnboardingPage() {
   if (checking) return <div className="flex h-dvh items-center justify-center"><PulseLoader label="Checking your application" /></div>
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
+    <div className="flex min-h-dvh w-full flex-col items-center justify-center gap-6 bg-muted/30 px-4 py-10">
       <div className="flex items-center gap-2.5">
         <BrandMark className="h-10 w-10 shrink-0" />
         <span className="text-xl font-bold tracking-tight">WhyRisk</span>
       </div>
-      <div className="w-full max-w-lg space-y-6 rounded-2xl border bg-card p-8 shadow-sm">
+      <div className="w-full max-w-lg space-y-6 rounded-xl border bg-card p-5 sm:p-8 shadow-card">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Complete Doctor Registration</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -114,10 +128,10 @@ export default function DoctorOnboardingPage() {
             <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
 
-          {error && <div role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+          {error && <div role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive-text">{error}</div>}
 
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit for Approval"}
+            {submitting ? "Submitting…" : "Submit for Approval"}
           </Button>
         </form>
       </div>
