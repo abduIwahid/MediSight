@@ -1,10 +1,96 @@
 /**
- * The ONE status palette for the product (QA Round 1, item 8):
- * appointment statuses and doctor availability read their colours from
- * here, built on the canonical RiskBadge tints — low #E2F0E6/#1E7A46,
- * moderate #FDF0DC/#A85008, high #FAE9E7/#C0392B, plus the brand tint
- * for informational states. No local colour maps in views.
+ * The ONE status + severity palette for the product (QA Round 1, item 8;
+ * QA Round 2, cluster 26): appointment statuses, doctor availability AND
+ * risk-severity colours all read from here. No local colour maps in
+ * views — if a surface needs a severity colour, it imports it below.
+ *
+ * THE MODERATE RULE (the one place this is written down): Moderate TEXT
+ * is #A85008 (deepened from #D97706 for the 4.5:1 small-text floor),
+ * while Moderate FILLS — chart bars, gauge arcs, dots, borders — use
+ * #D97706. Every other severity uses one hex for both text and fill:
+ * Low #1E7A46, High #C0392B, Critical #C0392B, on the canonical tints
+ * (#E2F0E6 / #FDF0DC / #FAE9E7).
  */
+
+/** Canonical severity hexes for SVG/chart/inline-style contexts. */
+export const SEVERITY_HEX = {
+  Low: "#1E7A46",
+  Moderate: "#D97706", // fill value — see the Moderate rule above
+  High: "#C0392B",
+  Critical: "#C0392B",
+  Unknown: "#5A6B73",
+} as const
+
+/** Severity hexes for TEXT contexts — identical to SEVERITY_HEX except
+ *  Moderate, whose text value is #A85008 (the Moderate rule above). */
+export const SEVERITY_TEXT_HEX = {
+  Low: "#1E7A46",
+  Moderate: "#A85008",
+  High: "#C0392B",
+  Critical: "#C0392B",
+  Unknown: "#5A6B73",
+} as const
+
+export type SeverityName = keyof typeof SEVERITY_HEX
+
+/** Chart/SVG severity map (pie cells, gauge arcs, trend dots). */
+export const severityChartColor: Record<string, string> = { ...SEVERITY_HEX }
+
+/** Alert-status chart colours (Analytics alert breakdown). */
+export const ALERT_STATUS_CHART_COLORS: Record<string, string> = {
+  New: "#C0392B",
+  Acknowledged: "#D97706",
+  Resolved: "#1E7A46",
+}
+
+/**
+ * Severity pill classes (bordered chip, no hover/dark variants) — the
+ * wizard result chip and the model card's band pills render these.
+ */
+export const severityPillClass: Record<string, string> = {
+  Low: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
+  Moderate: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
+  High: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
+  Critical: "bg-[#C0392B] text-white border-[#C0392B]",
+}
+
+/** Alert-row tint per severity (Alerts Center list rows). */
+export function severityRowClass(severity: string): string {
+  switch (severity) {
+    case "Critical":
+    case "High":
+      return "border-[#C0392B]/25 bg-[#FAE9E7]/50 hover:bg-[#FAE9E7]"
+    case "Moderate":
+      return "border-[#D97706]/25 bg-[#FDF0DC]/50 hover:bg-[#FDF0DC]"
+    case "Low":
+      return "border-[#1E7A46]/25 bg-[#E2F0E6]/50 hover:bg-[#E2F0E6]"
+    default:
+      return "border-border bg-card hover:bg-muted/40"
+  }
+}
+
+/** Audit-log action chips (INSERT/UPDATE/DELETE). */
+export const auditActionClass: Record<string, string> = {
+  INSERT: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
+  UPDATE: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
+  DELETE: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
+}
+
+/** Doctor verification status chips (pending/approved/rejected). */
+export const doctorStatusClass: Record<string, string> = {
+  pending: "bg-[#FDF0DC] text-[#A85008] border-[#D97706]/30",
+  approved: "bg-[#E2F0E6] text-[#1E7A46] border-[#1E7A46]/30",
+  rejected: "bg-[#FAE9E7] text-[#C0392B] border-[#C0392B]/30",
+}
+
+/** RiskBadge's class map (hover + dark variants included). */
+export const severityBadgeClass: Record<string, string> = {
+  Low: "bg-[#E2F0E6] text-[#1E7A46] hover:bg-[#E2F0E6]/80 dark:bg-[#1E7A46]/20 dark:text-[#7BC79B]",
+  Moderate: "bg-[#FDF0DC] text-[#A85008] hover:bg-[#FDF0DC]/80 dark:bg-[#D97706]/20 dark:text-[#E8A94E]",
+  High: "bg-[#FAE9E7] text-[#C0392B] hover:bg-[#FAE9E7]/80 dark:bg-[#C0392B]/20 dark:text-[#E88A7E]",
+  Critical: "bg-[#C0392B] text-white hover:bg-[#C0392B]/90 font-bold",
+  Unknown: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+}
 
 export function appointmentStatusClass(status?: string | null): string {
   switch (status) {
