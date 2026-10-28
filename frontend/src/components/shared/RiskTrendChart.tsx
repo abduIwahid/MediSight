@@ -1,11 +1,8 @@
 import type { PredictionRow } from "@/lib/types"
+import { severityChartColor } from "@/lib/status"
 
-const SEVERITY_DOT: Record<string, string> = {
-  Low: "#1E7A46",
-  Moderate: "#D97706",
-  High: "#C0392B",
-  Critical: "#C0392B",
-}
+// Trend dots use the canonical severity fills from lib/status.ts.
+const SEVERITY_DOT = severityChartColor
 
 function fmtShortDate(iso?: string | null): string {
   if (!iso) return "—"

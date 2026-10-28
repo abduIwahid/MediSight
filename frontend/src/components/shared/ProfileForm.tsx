@@ -259,7 +259,7 @@ export function ProfileForm({ user, profile, hospitalName }: {
                 id="bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="min-h-[120px] w-full rounded-md border border-input bg-input px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="min-h-[120px] w-full rounded-md border border-input bg-input px-3 py-2 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 placeholder="Describe your specialties, clinical philosophy, and experience."
               />
             </div>

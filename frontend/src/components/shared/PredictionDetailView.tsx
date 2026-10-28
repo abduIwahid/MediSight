@@ -9,6 +9,7 @@ import { RiskBadge } from "@/components/shared/RiskBadge"
 import { WhatIfSimulator } from "@/components/shared/WhatIfSimulator"
 import { InputsUsedDisclosure } from "@/components/shared/InputsUsedDisclosure"
 import { buildMLPayload, FEATURE_NAMES, type MLFeaturePayload } from "@/lib/prediction-features"
+import { severityChartColor } from "@/lib/status"
 import type { PatientRow, PredictionRow } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -20,12 +21,8 @@ interface PredictionDetailViewProps {
   patientId: string
 }
 
-const SEVERITY_GAUGE_COLOR: Record<string, string> = {
-  Low: "#1E7A46",
-  Moderate: "#D97706",
-  High: "#C0392B",
-  Critical: "#C0392B",
-}
+// Gauge colours are the canonical severity fills from lib/status.ts.
+const SEVERITY_GAUGE_COLOR = severityChartColor
 
 export function PredictionDetailView({
   prediction,
