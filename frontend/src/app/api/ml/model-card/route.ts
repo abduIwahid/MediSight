@@ -36,7 +36,7 @@ export async function GET() {
     }
     const status = await statusRes.json()
 
-    let drift: { available: boolean; currentPsi: number | null; driftDetected: boolean; threshold: number | null } | null = null
+    let drift: { available: boolean; currentPsi: number | null; driftDetected: boolean; threshold: number | null; reason: string | null } | null = null
     try {
       const driftRes = await mlServiceFetch("/drift-status", { timeoutMs: STATUS_TIMEOUT_MS })
       if (driftRes && driftRes.ok) {
@@ -46,6 +46,11 @@ export async function GET() {
           currentPsi: typeof d.current_psi === "number" ? d.current_psi : null,
           driftDetected: Boolean(d.drift_detected),
           threshold: typeof d.drift_threshold === "number" ? d.drift_threshold : null,
+          // Forward the service's own reason when no baseline could be
+          // computed — the page shows it verbatim instead of guessing a
+          // paraphrase like "No drift baseline yet" (QA Round 2,
+          // R2-DS-10).
+          reason: typeof d.reason === "string" ? d.reason : null,
         }
       }
     } catch {

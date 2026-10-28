@@ -14,7 +14,10 @@
        cool paper background. Flat surfaces, 1px borders, layered soft shadows. */
     --background: #F4F6F6;
     --foreground: #06141B;
-    --card: #FFFFFF;
+    /* Locked Midnight Clinical card surface (QA Round 2, cluster 26):
+       the palette's Card is #E7EDEC, not white — this token was the one
+       surface that had drifted from the approved palette. */
+    --card: #E7EDEC;
     --card-foreground: #06141B;
     --popover: #FFFFFF;
     --popover-foreground: #06141B;
@@ -231,15 +234,44 @@
   }
 }
 
-/* Print: the patient risk report prints alone, on one page, with its
-   colours intact. Everything outside .print-report is hidden; elements
-   marked .print-hidden are removed entirely. */
+/* Print: when a .print-report is on the page, it prints alone with its
+   colours intact — everything outside it is hidden and elements marked
+   .print-hidden are removed entirely. When NO report is on the page,
+   the screen prints as-is (app chrome carries print:hidden classes):
+   the visibility trick is scoped with :has() so printing a chart, the
+   queue or the appointments list no longer yields a blank page
+   (QA Round 2, cluster 27). */
+.print-repeat-header {
+  display: none;
+}
 @media print {
-  body * {
+  body:has(.print-report) * {
     visibility: hidden;
   }
   .print-report,
   .print-report * {
+    visibility: visible;
+  }
+  /* Repeating patient-identifier header: position:fixed elements are
+     re-rendered on every printed page by the browser, so page 2+ of a
+     report still carries whose report it is. It lives inside
+     .print-report, so the visibility rules above keep it printable. */
+  .print-repeat-header {
+    display: flex;
+    visibility: visible;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2mm;
+    font-size: 10px;
+    color: var(--muted-foreground);
+  }
+  .print-repeat-header * {
     visibility: visible;
   }
   .print-report {
@@ -257,6 +289,7 @@
     display: none !important;
   }
   @page {
-    margin: 14mm;
+    /* Extra top room for the repeating print header. */
+    margin: 20mm 14mm 14mm;
   }
 }

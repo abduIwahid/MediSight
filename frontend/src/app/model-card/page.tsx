@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import BrandMark from "@/components/shared/BrandMark"
+import { severityPillClass, SEVERITY_HEX } from "@/lib/status"
 
 interface LiveStatus {
   live: boolean
@@ -16,6 +17,9 @@ interface LiveStatus {
     currentPsi: number | null
     driftDetected: boolean
     threshold: number | null
+    /** The ML service's own reason when no baseline could be computed —
+     *  shown verbatim, never paraphrased (QA Round 2, R2-DS-10). */
+    reason: string | null
   } | null
 }
 
@@ -23,7 +27,7 @@ const FACTS: { label: string; value: string; note: string }[] = [
   {
     label: "Dataset",
     value: "CDC BRFSS 2015",
-    note: "Behavioural Risk Factor Surveillance System survey data — 253,680 records, 21 input features per record.",
+    note: "Behavioural Risk Factor Surveillance System survey data — the balanced 50/50 training file of 70,692 records, 21 input features per record.",
   },
   {
     label: "Selected model",
@@ -32,8 +36,8 @@ const FACTS: { label: string; value: string; note: string }[] = [
   },
   {
     label: "Measured performance",
-    value: "AUC-ROC 0.8307",
-    note: "Measured on a stratified held-out test split (80/20) that the model never trained on. Diabetes prediction only — this figure does not describe any other condition.",
+    value: "AUC-ROC 0.8222",
+    note: "Measured on a stratified held-out test split (80/20) of the balanced dataset that the model never trained on. Because the test split is balanced (50/50), this figure is not directly comparable to performance on a real-world population. Diabetes prediction only — this figure does not describe any other condition.",
   },
   {
     label: "Explanations",
@@ -125,7 +129,7 @@ export default function ModelCardPage() {
             <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
               <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5">
                 <dt className="text-muted-foreground">Service</dt>
-                <dd className="font-mono font-semibold" style={{ color: live.modelLoaded ? "#1E7A46" : "#C0392B" }}>
+                <dd className="font-mono font-semibold" style={{ color: live.modelLoaded ? SEVERITY_HEX.Low : SEVERITY_HEX.High }}>
                   {live.modelLoaded ? "Model loaded" : "Model not loaded"}
                 </dd>
               </div>
@@ -145,17 +149,22 @@ export default function ModelCardPage() {
                 <dd className="font-mono font-semibold">{(live.diseases || []).join(", ") || "—"}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-4 rounded-lg bg-background px-4 py-2.5 sm:col-span-2">
-                <dt className="text-muted-foreground">Data drift (PSI)</dt>
+                <dt className="text-muted-foreground">Drift baseline (training data, PSI)</dt>
                 <dd className="font-mono font-semibold">
                   {!live.drift
                     ? "Status unavailable"
                     : !live.drift.available
-                      ? "No drift baseline yet"
+                      ? (live.drift.reason ?? "Baseline unavailable")
                       : live.drift.currentPsi == null
                         ? "—"
                         : `${live.drift.currentPsi.toFixed(3)}${live.drift.threshold != null ? ` (threshold ${live.drift.threshold.toFixed(2)})` : ""} — ${live.drift.driftDetected ? "drift detected" : "no drift detected"}`}
                 </dd>
               </div>
+              <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
+                The drift baseline is a self-check the ML service computes between two slices of the
+                training dataset. It is not live monitoring: drift on production traffic is not yet
+                measured.
+              </p>
             </dl>
           )}
         </section>
@@ -184,10 +193,10 @@ export default function ModelCardPage() {
             Every score is placed in one of four severity bands — the same bands used everywhere in the app:
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full border border-[#1E7A46]/30 bg-[#E2F0E6] px-3 py-1 text-xs font-semibold text-[#1E7A46]">Low — under 0.20</span>
-            <span className="rounded-full border border-[#D97706]/30 bg-[#FDF0DC] px-3 py-1 text-xs font-semibold text-[#A85008]">Moderate — 0.20 to 0.49</span>
-            <span className="rounded-full border border-[#C0392B]/30 bg-[#FAE9E7] px-3 py-1 text-xs font-semibold text-[#C0392B]">High — 0.50 to 0.79</span>
-            <span className="rounded-full border border-[#C0392B] bg-[#C0392B] px-3 py-1 text-xs font-semibold text-white">Critical — 0.80 and above</span>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${severityPillClass.Low}`}>Low — under 0.20</span>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${severityPillClass.Moderate}`}>Moderate — 0.20 to 0.49</span>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${severityPillClass.High}`}>High — 0.50 to 0.79</span>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${severityPillClass.Critical}`}>Critical — 0.80 and above</span>
           </div>
         </section>
 
