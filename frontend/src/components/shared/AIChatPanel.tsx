@@ -82,30 +82,41 @@ function buildPatientSummary(patient: PatientRow | null): string {
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const latest = preds[0]
-  const vitals = byRecordedAtDesc(patient.vitals)
-    .slice(0, 6)
-    .map((v) => `${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}`)
-    .join(", ")
-  const labs = byRecordedAtDesc(patient.lab_results)
+  // Most recent first, capped (QA Round 3, ai-chat M3): the embedded
+  // diagnoses arrive in arbitrary order in arbitrary number, and the
+  // previous flat join let a years-old condition read as current.
+  const diagnoses = [...(patient.diagnoses || [])]
+    .sort((a, b) => new Date(b.diagnosed_at || 0).getTime() - new Date(a.diagnosed_at || 0).getTime())
     .slice(0, 5)
-    .map((l) => `${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}`)
-    .join(", ")
-  const diagnoses = (patient.diagnoses || [])
     .map((dx) => dx.condition)
+    .join(", ")
+
+  // Every figure carries its date (QA Round 3, ai-chat #9): without
+  // them the model narrated the newest rows as the patient's current
+  // state, however old they were.
+  const asOf = (iso?: string | null) =>
+    iso ? ` (${new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})` : ""
+  const vitalsDated = byRecordedAtDesc(patient.vitals)
+    .slice(0, 6)
+    .map((v) => `${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}${asOf(v.recorded_at)}`)
+    .join(", ")
+  const labsDated = byRecordedAtDesc(patient.lab_results)
+    .slice(0, 5)
+    .map((l) => `${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}${asOf(l.recorded_at)}`)
     .join(", ")
 
   let ctx = `Patient: ${name}${age ? `, ${age}` : ""}${gender ? `, ${gender}` : ""}. MRN: ${patient.mrn}.`
   if (latest) {
-    ctx += ` Latest risk assessment: **${latest.severity}** severity — ${((latest.probability ?? 0) * 100).toFixed(1)}% diabetes probability`
+    ctx += ` Latest risk assessment${asOf(latest.created_at)}: **${latest.severity}** severity — ${((latest.probability ?? 0) * 100).toFixed(1)}% diabetes probability`
     if (latest.confidence) ctx += ` (confidence: ${(latest.confidence * 100).toFixed(0)}%)`
     ctx += `. Disease: ${latest.disease || "Diabetes"}.`
   } else {
     ctx += " No risk prediction has been run yet."
   }
   if (preds.length > 1) ctx += ` ${preds.length} historical predictions on record.`
-  if (diagnoses) ctx += ` Known conditions: ${diagnoses}.`
-  if (vitals) ctx += ` Recent vitals — ${vitals}.`
-  if (labs) ctx += ` Recent labs — ${labs}.`
+  if (diagnoses) ctx += ` Recorded conditions (most recent first, up to 5): ${diagnoses}.`
+  if (vitalsDated) ctx += ` Recent vitals — ${vitalsDated}.`
+  if (labsDated) ctx += ` Recent labs — ${labsDated}.`
   return ctx
 }
 
@@ -165,13 +176,19 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
       return `**Clinical Risk Summary**\n\n${patientContext}\n\n---\nBased on the patient's structured clinical data, the risk assessment reflects the 21 features evaluated by the WhyRisk LightGBM model. Please verify these findings against the full clinical chart before making decisions.`
     }
     if (q.includes("lab") || q.includes("driving") || q.includes("factor") || q.includes("which")) {
-      return `**Key Risk Drivers**\n\nThe WhyRisk model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor a detailed SHAP waterfall chart, navigate to the patient's prediction detail page.`
+      // Honest framing (QA Round 3, ml-honesty): this template cannot
+      // know THIS patient's drivers — it has no SHAP access — so it
+      // must not present the model's general feature list under a
+      // "Key Risk Drivers" heading.
+      return `**What the model weighs**\n\nThis built-in answer can't see this patient's per-feature contributions (SHAP values) — for those, open the patient's prediction detail page. In general, the WhyRisk model evaluates 21 clinical features:\n• **Biometric:** BMI, systolic BP, cholesterol status\n• **Lifestyle:** Physical activity, smoking history, diet, alcohol\n• **Medical history:** Stroke, heart disease, mobility difficulty\n• **Socioeconomic:** Income, education, healthcare access\n\n${patientContext}\n\n---\nFor the per-patient SHAP breakdown, navigate to the patient's prediction detail page.`
     }
     if (q.includes("discharge") || q.includes("draft")) {
       return `**Discharge Risk Summary (AI Draft)**\n\n${patientContext}\n\n**Next steps to confirm with the treating team:**\n• Review the discharge plan with the treating physician before it is finalised\n• Arrange follow-up and any further tests according to your facility's protocol for this risk band\n• Make sure the patient understands their follow-up plan before they leave\n\n---\nNote: This is an AI-generated draft — review and edit before official use.`
     }
     if (q.includes("change") || q.includes("last visit") || q.includes("since") || q.includes("trend")) {
-      return `**Trend Analysis**\n\n${patientContext}\n\nComparing historical predictions shows the trajectory of risk over time. If risk has increased since the last visit, consider re-evaluating:\n• Medication adherence\n• Weight and BMI changes\n• Blood pressure management\n• Physical activity levels\n\n---\nFull trend data is visible in the Prediction History on the patient detail page.`
+      // No trend is computed here (QA Round 3, ml-honesty): the old
+      // answer asserted a "trajectory" this template never calculated.
+      return `**About trend questions**\n\nThis built-in answer doesn't calculate a trend. The patient's dated predictions are listed in the Prediction History on the patient detail page — comparing those directly shows how the score has moved.\n\n${patientContext}`
     }
     return `**Patient Insights**\n\n${patientContext}\n\nI can help with:\n• Risk summaries and severity explanations\n• Key clinical drivers (ask "which factors are driving the prediction?")\n• Discharge planning (ask "draft a discharge summary")\n• Trend analysis (ask "what changed since their last visit?")`
   }
@@ -180,12 +197,16 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
   if (q.includes("model") || q.includes("accuracy") || q.includes("performance")) {
     const metrics = modelStatus?.metrics
     if (metrics) {
-      return `**Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (balanced file of 70,692 survey responses; metrics measured on its balanced held-out test split).`
+      // Unitless, the way every other surface states them (QA Round 3,
+      // ml-honesty H3/H4): AUC and F1 are not percentages, the bare
+      // Accuracy figure is not published anywhere else in the product,
+      // and an unknown version is stated as unknown — never invented.
+      return `**Model Performance**\n\n• **AUC-ROC:** ${metrics.auc_roc.toFixed(3)}\n• **F1 Score:** ${metrics.f1_score.toFixed(3)}\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "not reported by the service"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (balanced file of 70,692 survey responses; metrics measured on its balanced held-out test split).`
     }
     return `**Model Performance**\n\nThe WhyRisk ML engine (LightGBM) reports AUC-ROC 0.8222 on the held-out test split of its balanced training dataset (70,692 records).\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
   }
   if (q.includes("diabetes") || q.includes("disease") || q.includes("predict")) {
-    return `**About WhyRisk Prediction**\n\nWhyRisk detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\nLow risk: (< 20%) · Moderate risk: (20–50%) · High risk: (50–80%) · Critical risk: (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
+    return `**About WhyRisk Prediction**\n\nWhyRisk estimates Diabetes risk from 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\nLow risk: (< 20%) · Moderate risk: (20–50%) · High risk: (50–80%) · Critical risk: (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
   }
   if (q.includes("help") || q.includes("what can") || q.includes("feature")) {
     return `**How I Can Help**\n\n1. **Patient risk summaries** — Select a patient and ask me to summarize their risk\n2. **Risk driver analysis** — Find out which clinical factors are influencing the prediction\n3. **Discharge drafts** — Generate a draft risk summary for discharge planning\n4. **Trend analysis** — Understand how a patient's risk has changed over time\n5. **Model performance** — Ask about the model's accuracy and metrics\n\nSelect a patient from the dropdown above to get started!`
@@ -224,6 +245,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
   // patient (QA Round 2, cluster 10).
   const contextGeneration = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   const scrollToBottom = () => {
@@ -309,21 +331,49 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
       // model status fetched at mount — no per-message refetching.
       const patientContext = patientId ? buildPatientSummary(patientData) : ""
 
-      // Try the real AI (Gemini) first. Send recent chat history for conversational context.
+      // Try the real AI (Gemini) first. History excludes the welcome /
+      // context messages and any template-fallback replies (QA Round 3,
+      // ai-chat #7): canned text must not re-enter the model's prompt
+      // as if it were a real earlier answer.
       let reply: string | null = null
+      let gateMessage: string | null = null
       try {
-        const recentHistory = messages.slice(-8).map(m => ({ role: m.role, content: m.content }))
+        const recentHistory = messages
+          .filter((m) => !m.fallback && m.id !== "welcome")
+          .slice(-8)
+          .map(m => ({ role: m.role, content: m.content }))
         const aiRes = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(35_000),
           body: JSON.stringify({ message: text, patientContext, history: recentHistory, mode: "doctor" }),
         })
-        if (aiRes.ok) {
-          const data = await aiRes.json()
+        const data = await aiRes.json().catch(() => null)
+        if (aiRes.ok && data?.reply) {
           reply = data.reply
+        } else if (aiRes.status === 401 || aiRes.status === 403) {
+          // Authorization answers are NOT service failures (QA Round 3,
+          // ai-chat High): falling back here handed an unapproved
+          // doctor (or a signed-out session) patient-specific canned
+          // output built from a context the route had just refused.
+          gateMessage =
+            aiRes.status === 401
+              ? "Your session has expired. Please sign in again to keep using the assistant."
+              : "The clinical assistant is available once your doctor account is approved. If you believe this is a mistake, contact an administrator."
+        } else if (data?.fallback === true) {
+          reply = null // service unavailable → template fallback below
         }
       } catch {
         // Network/AI failure — fall through to local response below
+      }
+
+      if (gateMessage) {
+        setMessages((prev) => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: gateMessage as string,
+        }])
+        return
       }
 
       // Fallback: rule-based response if Gemini isn't configured or the
@@ -347,10 +397,13 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
       setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         role: "assistant",
-        content: "Something went wrong while generating a response. Please check your connection and try again."
+        content: "Something went wrong while generating a response. Please try again."
       }])
     } finally {
       setIsLoading(false)
+      // Return focus to the composer (QA Round 3, accessibility L6):
+      // without this, keyboard focus falls to <body> after every send.
+      requestAnimationFrame(() => inputRef.current?.focus())
     }
   }
 
@@ -371,7 +424,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
   }
 
   return (
-    <Card className="flex flex-col h-[calc(100dvh-12rem)] border shadow-sm">
+    <Card className="flex flex-col h-[calc(100dvh-12rem)] min-h-[420px] border shadow-card">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
@@ -379,7 +432,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
           {isLoadingContext && (
             <div className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Loading patient data...
+              Loading patient data…
             </div>
           )}
         </div>
@@ -390,11 +443,11 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
               ? "Patient context loaded. Ask about risk, clinical drivers, or request a discharge summary."
               : contextStatus === "error"
                 ? "Patient context could not be loaded — answers will be general, with no patient data."
-                : "Loading patient context..."}
+                : "Loading patient context…"}
         </CardDescription>
         {patientId && contextStatus === "error" && (
           <p role="alert" className="mt-2 rounded-lg border border-[#D97706]/30 bg-[#FDF0DC] px-3 py-2 text-xs text-[#A85008]">
-            Could not load this patient&apos;s data. Please check your connection and re-select the patient to try again.
+            Could not load this patient&apos;s data. Re-select the patient to try again.
           </p>
         )}
       </CardHeader>
@@ -435,7 +488,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
             </div>
             <div className="px-4 py-3 rounded-xl bg-muted flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Analyzing clinical data...</span>
+              <span className="text-sm text-muted-foreground">Analyzing clinical data…</span>
             </div>
           </div>
         )}
@@ -450,7 +503,7 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
                 key={i}
                 variant="outline"
                 size="sm"
-                className="text-xs rounded-full h-7"
+                className="text-xs rounded-full min-h-10 h-auto py-1.5"
                 onClick={() => handleSend(prompt)}
                 disabled={isLoading || isLoadingContext}
               >
@@ -470,9 +523,10 @@ export function AIChatPanel({ patientId }: AIChatPanelProps) {
           }}
         >
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={patientId ? "Ask about this patient's risk, labs, or request a discharge summary..." : "Ask a general clinical question..."}
+            placeholder={patientId ? "Ask about this patient's risk, labs, or request a discharge summary…" : "Ask a general clinical question…"}
             disabled={isLoading || isLoadingContext}
             className="flex-1"
             aria-label="Message"

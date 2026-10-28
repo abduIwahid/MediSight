@@ -53,7 +53,7 @@ export function AuditLogView({ logs, loadError = false }: { logs: AuditLogRow[];
   return (
     <div className="space-y-4">
       {loadError && (
-        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive-text">
           The audit trail could not be loaded, so entries below may be missing. Refresh the page to try again — an empty list here does not mean nothing happened.
         </div>
       )}
@@ -61,7 +61,7 @@ export function AuditLogView({ logs, loadError = false }: { logs: AuditLogRow[];
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by actor, table, or row ID..."
+            placeholder="Search by actor, table, or row ID…"
             value={query}
             onChange={e => { setQuery(e.target.value); resetPage() }}
             className="pl-9"
@@ -92,13 +92,14 @@ export function AuditLogView({ logs, loadError = false }: { logs: AuditLogRow[];
         </Select>
       </div>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-card border rounded-xl overflow-hidden shadow-card">
         <div className="p-4 border-b flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           <span className="font-semibold">PHI Audit Trail</span>
           <span className="text-xs text-muted-foreground ml-auto">
             {filtered.length} of {logs.length} entries
             {logs.length >= 200 ? " · most recent 200 shown" : ""}
+            {" · search and filters apply to the loaded entries only"}
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -139,14 +140,24 @@ export function AuditLogView({ logs, loadError = false }: { logs: AuditLogRow[];
                         <Badge className={`border ${ACTION_COLORS[log.action] || "bg-muted text-muted-foreground border-border"}`}>{log.action}</Badge>
                       </td>
                       <td className="p-3 font-mono text-xs">{log.table_name}</td>
-                      <td className="p-3 font-mono text-xs text-muted-foreground">{log.row_id?.slice(0, 8)}…</td>
+                      <td className="p-3 font-mono text-xs text-muted-foreground">
+                        <button
+                          type="button"
+                          title={log.row_id || undefined}
+                          aria-label={`Copy full row ID ${log.row_id || ""}`}
+                          onClick={() => { try { void navigator.clipboard?.writeText(log.row_id || "") } catch { /* clipboard unavailable */ } }}
+                          className="break-all text-left hover:text-foreground"
+                        >
+                          {log.row_id}
+                        </button>
+                      </td>
                       <td className="p-3">
                         {hasValues ? (
                           <button
                             type="button"
                             onClick={() => setExpandedId(expanded ? null : log.id)}
                             aria-expanded={expanded}
-                            className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                            className="inline-flex min-h-10 items-center text-xs font-medium text-primary underline-offset-2 hover:underline"
                           >
                             {expanded ? "Hide" : "Show"}
                           </button>
@@ -158,7 +169,8 @@ export function AuditLogView({ logs, loadError = false }: { logs: AuditLogRow[];
                     {expanded && hasValues && (
                       <tr className="border-b bg-muted/10">
                         <td colSpan={6} className="p-3 text-xs leading-relaxed text-muted-foreground">
-                          <p><span className="font-semibold text-foreground">Before:</span> {formatValues(log.old_values)}</p>
+                          <p><span className="font-semibold text-foreground">Row ID:</span> <span className="font-mono break-all">{log.row_id}</span></p>
+                          <p className="mt-1"><span className="font-semibold text-foreground">Before:</span> {formatValues(log.old_values)}</p>
                           <p className="mt-1"><span className="font-semibold text-foreground">After:</span> {formatValues(log.new_values)}</p>
                         </td>
                       </tr>
