@@ -32,10 +32,19 @@ export default async function AdminDoctorsPage() {
     )
   }
 
-  const { data: doctors } = await supabase
-    .from('doctors')
-    .select('user_id, license_number, hospital, specialization, experience, phone, status, created_at, profile:user_id(full_name, email)')
-    .order('created_at', { ascending: false })
+  // Capped and error-aware (QA Round 3, admin A4 / states F-01): the
+  // queue used to select('*')-equivalent with no limit and render a
+  // failed fetch as "No applications waiting". The cap is disclosed
+  // in the view's footer.
+  const [{ data: doctors, error: doctorsError }, { data: hospitals }] = await Promise.all([
+    supabase
+      .from('doctors')
+      .select('user_id, license_number, hospital, specialization, experience, phone, status, created_at, profile:user_id(full_name, email, hospital_id)')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    supabase.from('hospitals').select('id, name').order('name'),
+  ])
+  if (doctorsError) console.error("Doctor verification queue failed to load:", doctorsError)
 
   const rows = (doctors as unknown as DoctorRow[]) || []
 
@@ -62,5 +71,12 @@ export default async function AdminDoctorsPage() {
     }
   }
 
-  return <DoctorVerificationView doctors={rows} viewerName={viewer.full_name} />
+  return (
+    <DoctorVerificationView
+      doctors={rows}
+      viewerName={viewer.full_name}
+      hospitals={hospitals || []}
+      loadError={Boolean(doctorsError)}
+    />
+  )
 }

@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage users, review model performance, monitor drift, and audit system activity.
+          Manage users, review model performance, check the training-data drift baseline, and audit system activity.
         </p>
       </div>
       <AdminTabs />
