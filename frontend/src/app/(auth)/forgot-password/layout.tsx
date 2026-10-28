@@ -8,8 +8,6 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "Forgot password",
   description: "Reset your WhyRisk account password by email.",
-  alternates: { canonical: "/forgot-password" },
-  openGraph: { url: "/forgot-password", title: "Forgot password — WhyRisk" },
 }
 
 export default function ForgotPasswordLayout({ children }: { children: React.ReactNode }) {

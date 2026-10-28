@@ -115,7 +115,12 @@ begin
       new.raw_user_meta_data->>'license_number',
       new.raw_user_meta_data->>'hospital',
       new.raw_user_meta_data->>'specialization',
-      nullif(new.raw_user_meta_data->>'experience', '')::integer,
+      -- Hardened cast (QA Round 3, onboarding O-8): a fractional or
+      -- non-numeric metadata value ('5.5') used to crash the whole
+      -- signup inside this trigger. Non whole-number input now stores
+      -- NULL instead of failing the account creation.
+      case when (new.raw_user_meta_data->>'experience') ~ '^\d+$'
+        then (new.raw_user_meta_data->>'experience')::integer else null end,
       new.raw_user_meta_data->>'phone',
       'pending'
     );
@@ -174,6 +179,15 @@ begin
   if new.hospital_id is distinct from old.hospital_id then
     if not (
       auth.role() = 'service_role'
+      -- First assignment by the account owner (QA Round 3, onboarding
+      -- O-4): onboarding legitimately writes NULL -> hospital when a
+      -- patient picks their care hospital. Without this exemption this
+      -- trigger rejects onboarding's own first write and breaks the
+      -- flow the day this migration is applied. It is safe alongside
+      -- section 4 below: the amended clinical policies key on role +
+      -- approval, not on a patient's hospital_id alone. Re-assignment
+      -- (hospital -> a different hospital) stays admin-only.
+      or (old.hospital_id is null and auth.uid() = old.id and public.get_my_role() = 'patient')
       or public.get_my_role() in ('super_admin', 'hospital_admin')
       -- Same vetted-RPC escape hatch the role guard honours
       -- (request_doctor_role sets this GUC inside its transaction).

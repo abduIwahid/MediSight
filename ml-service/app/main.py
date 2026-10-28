@@ -229,16 +229,19 @@ def generate_text_explanation(shap_dict, inputs: PatientFeatures) -> str:
         elif val < -0.01:
             negative_drivers.append(label)
 
+    # SHAP values are associations the model used, not causes
+    # (QA Round 3, ml-honesty M2): the wording says what weighed on
+    # the score, never that a factor caused the risk.
     explanation_parts = []
     if positive_drivers:
-        explanation_parts.append(f"risk is elevated primarily due to {', '.join(positive_drivers)}")
+        explanation_parts.append(f"the factors weighing most toward a higher score were {', '.join(positive_drivers)}")
     if negative_drivers:
-        explanation_parts.append(f"risk is mitigated by {', '.join(negative_drivers)}")
+        explanation_parts.append(f"the factors weighing toward a lower score were {', '.join(negative_drivers)}")
 
     if explanation_parts:
-        text = "Patient's Diabetes " + " and ".join(explanation_parts) + "."
+        text = "For this assessment, " + " and ".join(explanation_parts) + ". These are the inputs the model weighted most heavily; they are associations in the training data, not proven causes."
     else:
-        text = "Diabetes risk is within standard range with no abnormal indicators."
+        text = "No single factor weighed heavily on this score; the estimate rests on the overall pattern of inputs."
 
     return text
 
@@ -380,13 +383,12 @@ def compute_psi(expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> 
 @app.get("/drift-status", dependencies=[Depends(require_api_key)])
 def drift_status():
     """
-    Compute feature drift (PSI) of prediction probability distribution.
-    Compares the historical baseline (from training metrics) to a simulated
-    recent production window using the loaded model's output probabilities.
-
-    In production, 'actual' probabilities would come from a live predictions log.
-    Here we simulate a production sample using the model on a held-out subset
-    of the training data to compute a real (not mocked) PSI value.
+    Training-data baseline PSI — NOT production drift (QA Round 3,
+    ml-honesty H1). There is no live prediction log wired in, so every
+    window below is a slice of the TRAINING dataset compared against
+    the training reference: the PSI values are real computations, but
+    they describe the training data, never live traffic. Windows are
+    labelled by index, never by fabricated calendar dates.
     """
     if model is None or metadata is None:
         return {
@@ -437,9 +439,9 @@ def drift_status():
             X_win = X.iloc[start:end]
             win_probs = model.predict_proba(X_win)[:, 1]
             win_psi = compute_psi(ref_probs[:len(win_probs)], win_probs)
-            from datetime import timedelta
-            window_date = (datetime.now() - timedelta(days=(n_windows - i))).strftime("%b %d")
-            psi_history.append({"date": window_date, "psi": win_psi})
+            # Windows are training-data slices — identified by index,
+            # never by a fabricated date (QA Round 3, ml-honesty H1).
+            psi_history.append({"window": i + 1, "date": f"Window {i + 1}", "psi": win_psi})
 
         return {
             "available": True,
