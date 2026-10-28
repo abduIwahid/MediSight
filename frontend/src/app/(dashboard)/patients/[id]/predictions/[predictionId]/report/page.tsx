@@ -43,7 +43,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
-  const { data: prediction } = await supabase
+  const { data: prediction, error: predictionError } = await supabase
     .from("predictions")
     .select(`
       *,
@@ -61,6 +61,17 @@ export default async function PredictionReportPage({ params }: { params: { id: s
     .limit(200, { referencedTable: "patients.vitals" })
     .eq("id", params.predictionId)
     .single()
+
+  // A load failure is not a 404 (QA Round 3, states F-07).
+  if (predictionError && predictionError.code !== 'PGRST116') {
+    console.error("Report failed to load:", predictionError)
+    return (
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive-text">
+        <h2 className="font-bold">This report could not be loaded</h2>
+        <p className="text-sm">Please reload the page to try again.</p>
+      </div>
+    )
+  }
 
   // The prediction must belong to the patient in the URL.
   if (!prediction || prediction.patient_id !== params.id) return notFound()
@@ -124,7 +135,10 @@ export default async function PredictionReportPage({ params }: { params: { id: s
   })()
   const derived = patient ? buildMLPayload(patient) : null
   const scoredPayload: Record<string, number> | null = snapshotFeatures ?? derived?.payload ?? null
-  const recordedFeatures = derived?.recordedFeatures ?? []
+  // With a snapshot, classification compares against the defaults —
+  // today's recorded set must not be projected back onto the scored
+  // inputs (QA Round 3, prediction-print H1).
+  const recordedFeatures = snapshotFeatures ? undefined : (derived?.recordedFeatures ?? [])
 
   const indicators: { label: string; value: string }[] = scoredPayload
     ? (["BMI", "HighBP", "Age", "Sex"] as const).map((name) => ({
@@ -150,7 +164,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
         <PrintButton />
       </div>
 
-      <article className="print-report rounded-2xl border bg-card p-8 shadow-sm">
+      <article className="print-report rounded-xl border bg-card p-5 shadow-card sm:p-8">
         {/* Print-only repeating header (globals.css .print-repeat-header):
             the browser re-renders it on every printed page, so page 2+
             still identifies the patient this report belongs to. */}
@@ -168,6 +182,7 @@ export default async function PredictionReportPage({ params }: { params: { id: s
           </div>
           <div className="text-right text-xs leading-relaxed text-muted-foreground">
             <p>Assessment date: {fmtDate(prediction.created_at)}</p>
+            <p>Prediction ID: <span className="font-mono">{prediction.id}</span></p>
             <p>Report generated: {fmtDate(new Date().toISOString())}</p>
             <p>Model version: {prediction.model_version || "—"}</p>
           </div>
@@ -237,14 +252,14 @@ export default async function PredictionReportPage({ params }: { params: { id: s
           </section>
         )}
 
-        <section className="border-b border-border py-5">
+        <section className="border-b border-border py-5 print:break-inside-avoid">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Why this score — top factors</h2>
           <div className="mt-3">
             <ShapFactorList data={shapPayload} />
           </div>
         </section>
 
-        <section className="border-b border-border py-5">
+        <section className="border-b border-border py-5 print:break-inside-avoid">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical explanation</h2>
           <p className="mt-2 max-w-[70ch] text-sm leading-relaxed text-muted-foreground">
             {explanation?.clinical_explanation ||

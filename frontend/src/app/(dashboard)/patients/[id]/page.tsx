@@ -22,7 +22,7 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
   // prediction the patient ever had shipped with the page. The view
   // displays the latest 8 vitals/labs and the recent prediction
   // history; the caps sit far above those display windows.
-  const { data: patient } = await supabase
+  const { data: patient, error: patientError } = await supabase
     .from('patients')
     .select(`
       *,
@@ -40,20 +40,38 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
     .limit(100, { referencedTable: 'predictions' })
     .single()
 
+  // Only a genuine no-row result is a 404 (QA Round 3, states F-07):
+  // any other failure (network, RLS, embed error) renders an error
+  // panel — telling a clinician a real patient "doesn't exist" is the
+  // worst available lie.
+  if (patientError && patientError.code !== 'PGRST116') {
+    console.error("Patient detail failed to load:", patientError)
+    return (
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive-text">
+        <h2 className="font-bold">This patient record could not be loaded</h2>
+        <p className="text-sm">Please reload the page to try again.</p>
+      </div>
+    )
+  }
   if (!patient) return notFound()
 
   const profile = await getCurrentProfile()
 
   const isAdmin = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.role))
+  // Doctors can edit demographics (their update policy allows it) —
+  // they were the one role doing daily corrections with no UI at all
+  // (QA Round 3, patients-crud M7). Deleting stays admin-only.
+  const canEdit = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'data_scientist', 'doctor'].includes(profile.role))
 
   // Get the latest prediction
   const latestPrediction = (patient.predictions?.sort((a: PredictionRow, b: PredictionRow) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]) ?? null
 
   return (
-    <PatientDetailView 
-      patient={patient} 
-      latestPrediction={latestPrediction} 
+    <PatientDetailView
+      patient={patient}
+      latestPrediction={latestPrediction}
       isAdmin={isAdmin}
+      canEdit={canEdit}
     />
   )
 }

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ArrowLeft, HeartPulse, Stethoscope, TestTube2, CheckCircle2 } from "lucide-react"
+import { Loader2, ArrowLeft, HeartPulse, Stethoscope, TestTube2, CheckCircle2, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { motion, type Variants } from "framer-motion"
 
@@ -20,7 +20,12 @@ export default function NewPatientPage() {
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [createdPatientId, setCreatedPatientId] = useState<string | null>(null)
-  const submitLabel = useStagedLoadingLabel(loading, "Generating AI Prediction...")
+  // Possible-duplicate pause (QA Round 3, patients-crud H2): when the
+  // name matches an existing record at the same hospital, the submit
+  // stops here and the clinician decides — duplicates used to be
+  // created silently and surfaced only as twins in the registry.
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null)
+  const submitLabel = useStagedLoadingLabel(loading, "Generating AI Prediction…")
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -35,23 +40,33 @@ export default function NewPatientPage() {
     smoker: false,
     historyHeartDisease: false,
     historyStroke: false,
-    physActivity: true,
-    genHlth: "3",
+    // physActivity is an explicit checkbox the clinician attests —
+    // unchecked means "not active", an answer, not a default.
+    physActivity: false,
+    // General health starts UNSELECTED (Round-2 carryover): "3 — Good"
+    // used to be pre-chosen, so a rushed submit persisted a rating
+    // nobody gave. The select is required below.
+    genHlth: "",
+    dob: "",
     labs: [
       { testName: "", value: "", unit: "", recordedAt: new Date().toISOString().slice(0, 10) }
     ]
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, force = false) => {
     e.preventDefault()
     if (loading) return
     setLoading(true)
     setError(null)
     setWarning(null)
+    // Tracks the created row so a late failure can point AT the record
+    // instead of leaving the clinician unsure whether anything saved
+    // (QA Round 3, data-integrity DI3-04).
+    let createdId: string | null = null
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("Authentication required")
+      if (!user) throw new Error("Your session has expired. Please sign in again.")
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -59,28 +74,62 @@ export default function NewPatientPage() {
         .eq("id", user.id)
         .single()
 
-      // Resolve hospital_id — fallback to first available hospital if doctor has none set
-      let resolvedHospitalId = profile?.hospital_id || null
-      if (!resolvedHospitalId) {
-        const { data: firstHospital } = await supabase
-          .from("hospitals")
-          .select("id")
-          .limit(1)
-          .single()
-        resolvedHospitalId = firstHospital?.id || null
-      }
-      if (!resolvedHospitalId) throw new Error("No hospital is configured for your account yet. Please ask an admin to set up a hospital before adding patients.")
+      // The patient is filed under the CLINICIAN'S hospital — never an
+      // arbitrary "first" one (QA Round 3, adversarial F12): the old
+      // fallback silently recorded the patient at a hospital the
+      // clinician may have no relationship with, where their own RLS
+      // scope then hid the record from them.
+      const resolvedHospitalId = profile?.hospital_id || null
+      if (!resolvedHospitalId) throw new Error("No hospital is assigned to your account yet. Ask an administrator to assign your hospital in User Management before adding patients.")
 
       // 1. Run the model FIRST. Until the score exists, nothing is
       // written: if the ML service is down (503), the submit aborts here
       // and no half-created patient record is left behind.
-      const ageNum = parseInt(formData.age)
+      // A real date of birth, when given, wins over the typed age —
+      // the two used to be stored side by side and drift apart
+      // (QA Round 3, patients-crud M2). Without a DOB, NO birth_date
+      // is stored: the old code fabricated one from the age, and a
+      // made-up exact birthday is worse than an honest age.
+      let ageNum = parseInt(formData.age)
+      if (formData.dob) {
+        const dobDate = new Date(`${formData.dob}T12:00:00`)
+        if (Number.isNaN(dobDate.getTime()) || dobDate.getTime() > Date.now()) {
+          throw new Error("That date of birth is not valid.")
+        }
+        ageNum = Math.floor((Date.now() - dobDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      }
+      if (!Number.isFinite(ageNum) || ageNum < 1 || ageNum > 120) throw new Error("Please enter the patient's age (1–120), or a valid date of birth.")
       const ageGroup = brfssAgeBand(ageNum)
       const bmiNum = parseFloat(formData.bmi)
       if (!Number.isFinite(bmiNum)) throw new Error("Please enter the patient's measured BMI.")
+      if (bmiNum < 10 || bmiNum > 80) throw new Error(`That BMI (${bmiNum}) is outside the plausible range of 10–80. Please check the measurement.`)
       const bpNum = parseInt(formData.bpSystolic)
       if (!Number.isFinite(bpNum)) throw new Error("Please enter the patient's measured systolic blood pressure.")
+      if (bpNum < 40 || bpNum > 300) throw new Error(`That systolic reading (${bpNum}) is outside the plausible range of 40–300 mmHg. Please check the measurement.`)
+      if (!formData.genHlth) throw new Error("Please select the patient's general health rating.")
       const bpHigh = bpNum >= 130 ? 1.0 : 0.0
+
+      // Possible-duplicate check (QA Round 3, patients-crud H2): same
+      // name at the same hospital pauses the submit for a decision.
+      if (!force) {
+        const { data: possibleDuplicates } = await supabase
+          .from("patients")
+          .select("id, mrn, demographics")
+          .eq("hospital_id", resolvedHospitalId)
+          .filter("demographics->>first_name", "ilike", formData.firstName.trim())
+          .filter("demographics->>last_name", "ilike", formData.lastName.trim())
+          .limit(3)
+        if (possibleDuplicates && possibleDuplicates.length > 0) {
+          const first = possibleDuplicates[0]
+          const d = (first.demographics || {}) as { age?: number }
+          setDuplicateNotice(
+            `A patient named ${formData.firstName} ${formData.lastName} already exists at your hospital${d.age ? `, age ${d.age}` : ""} (${first.mrn}). If this is the same person, open their record instead of creating a duplicate.`
+          )
+          setLoading(false)
+          return
+        }
+      }
+      setDuplicateNotice(null)
 
       const mlPayload = {
         HighBP: bpHigh,
@@ -96,7 +145,7 @@ export default function NewPatientPage() {
         HvyAlcoholConsump: 0.0,
         AnyHealthcare: 1.0,
         NoDocbcCost: 0.0,
-        GenHlth: parseFloat(formData.genHlth) || 3.0,
+        GenHlth: parseFloat(formData.genHlth),
         MentHlth: 0.0,
         PhysHlth: 0.0,
         DiffWalk: 0.0,
@@ -119,49 +168,72 @@ export default function NewPatientPage() {
 
       const prediction = await mlRes.json()
 
-      // 2. Insert Patient
-      const mrn = `MRN-${Math.floor(Math.random() * 900000) + 100000}`
-      const { data: patient, error: patientError } = await supabase
-        .from("patients")
-        .insert({
-          mrn,
-          demographics: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            age: parseInt(formData.age),
-            gender: formData.gender,
-            birth_date: new Date(
-              new Date().setFullYear(new Date().getFullYear() - parseInt(formData.age))
-            ).toISOString(),
-            // The four risk factors collected on this form are persisted
-            // with the record, so every later re-run scores the values
-            // entered here instead of silently falling back to the
-            // population defaults in buildMLPayload (QA Round 2, cluster 2).
-            [INTAKE_RISK_FACTOR_KEYS.HighChol]: formData.highChol ? 1 : 0,
-            [INTAKE_RISK_FACTOR_KEYS.Smoker]: formData.smoker ? 1 : 0,
-            [INTAKE_RISK_FACTOR_KEYS.PhysActivity]: formData.physActivity ? 1 : 0,
-            [INTAKE_RISK_FACTOR_KEYS.GenHlth]: parseFloat(formData.genHlth) || 3,
-          },
-          hospital_id: resolvedHospitalId,
-        })
-        .select()
-        .single()
-
-      if (patientError || !patient) throw new Error(`Patient Error: ${patientError?.message}`)
+      // 2. Insert Patient. The MRN suffix comes from a CSPRNG and a
+      // uniqueness collision retries with a fresh one (QA Round 3,
+      // data-integrity carryover): Math.random() in a 900k space
+      // collides within a few hundred registrations, and the raw
+      // database error used to be shown to the clinician.
+      const newMrn = () =>
+        `MRN-${100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)}`
+      const demographics = {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        age: ageNum,
+        gender: formData.gender,
+        ...(formData.dob ? { birth_date: formData.dob } : {}),
+        // The four risk factors collected on this form are persisted
+        // with the record, so every later re-run scores the values
+        // entered here instead of silently falling back to the
+        // population defaults in buildMLPayload (QA Round 2, cluster 2).
+        [INTAKE_RISK_FACTOR_KEYS.HighChol]: formData.highChol ? 1 : 0,
+        [INTAKE_RISK_FACTOR_KEYS.Smoker]: formData.smoker ? 1 : 0,
+        [INTAKE_RISK_FACTOR_KEYS.PhysActivity]: formData.physActivity ? 1 : 0,
+        [INTAKE_RISK_FACTOR_KEYS.GenHlth]: parseFloat(formData.genHlth),
+      }
+      let patient: { id: string } | null = null
+      let patientError: { code?: string; message: string } | null = null
+      for (let attempt = 0; attempt < 3 && !patient; attempt++) {
+        const res = await supabase
+          .from("patients")
+          .insert({ mrn: newMrn(), demographics, hospital_id: resolvedHospitalId })
+          .select()
+          .single()
+        if (res.data) {
+          patient = res.data
+          patientError = null
+        } else {
+          patientError = res.error
+          if (res.error?.code !== "23505") break
+        }
+      }
+      if (patientError || !patient) {
+        console.error("Patient insert failed:", patientError)
+        throw new Error("The patient record could not be created. Please try again.")
+      }
+      createdId = patient.id
 
       // From here on the patient row exists — every failure must say so
       // honestly instead of implying nothing was saved.
-      const partial = (what: string, detail?: string) =>
-        new Error(`The patient was created, but ${what} could not be saved${detail ? `: ${detail}` : ""}. Open the patient record to review what is missing.`)
+      // Failure text never carries raw database detail (QA Round 3,
+      // copy H3) — the specifics are logged, the clinician gets a
+      // plain sentence and (via the catch block) a link to the record.
+      const partial = (what: string) =>
+        new Error(`The patient was created, but ${what} could not be saved. Open the patient record to review what is missing.`)
 
       // 3. Assign the creating clinician — the Risk Queue reads
-      // doctor_patient_assignments; best-effort (duplicate/RLS refusal
-      // must not block registration).
-      await supabase.from("doctor_patient_assignments").insert({
+      // doctor_patient_assignments. Only a genuine duplicate (23505)
+      // is ignorable (QA Round 3, data-integrity DI3-11): any other
+      // failure is collected as a warning below rather than discarded.
+      const { error: assignmentError } = await supabase.from("doctor_patient_assignments").insert({
         doctor_id: user.id,
         patient_id: patient.id,
         hospital_id: resolvedHospitalId,
       })
+      const earlyWarnings: string[] = []
+      if (assignmentError && assignmentError.code !== "23505") {
+        console.error("Assignment insert failed:", assignmentError)
+        earlyWarnings.push("the assignment to your patient list could not be saved — the record exists, but it may not appear in your Risk Queue")
+      }
 
       // 4. Insert Vitals
       const now = new Date().toISOString()
@@ -169,7 +241,7 @@ export default function NewPatientPage() {
         { patient_id: patient.id, type: "BMI", value: formData.bmi, unit: "kg/m²", recorded_at: now },
         { patient_id: patient.id, type: "Blood Pressure Systolic", value: formData.bpSystolic, unit: "mmHg", recorded_at: now },
       ])
-      if (vitalsError) throw partial("the vitals", vitalsError.message)
+      if (vitalsError) { console.error("Vitals insert failed:", vitalsError); throw partial("the vitals") }
 
       // 5. Insert Lab Results
       const labRows = formData.labs
@@ -184,7 +256,7 @@ export default function NewPatientPage() {
 
       if (labRows.length > 0) {
         const { error: labsError } = await supabase.from("lab_results").insert(labRows)
-        if (labsError) throw partial("the lab results", labsError.message)
+        if (labsError) { console.error("Lab insert failed:", labsError); throw partial("the lab results") }
       }
 
       // 6. Insert Diagnoses History
@@ -196,7 +268,7 @@ export default function NewPatientPage() {
         diagnosesToInsert.push({ patient_id: patient.id, condition: "Stroke", diagnosed_at: today })
       if (diagnosesToInsert.length > 0) {
         const { error: diagnosesError } = await supabase.from("diagnoses").insert(diagnosesToInsert)
-        if (diagnosesError) throw partial("the medical history", diagnosesError.message)
+        if (diagnosesError) { console.error("Diagnoses insert failed:", diagnosesError); throw partial("the medical history") }
       }
 
       // 7. Save the prediction (only confirmed schema columns)
@@ -214,13 +286,14 @@ export default function NewPatientPage() {
         .single()
 
       if (predSaveErr || !savedPrediction) {
-        throw partial("the prediction", predSaveErr?.message)
+        console.error("Prediction insert failed:", predSaveErr)
+        throw partial("the prediction")
       }
 
       // Non-blocking follow-ups: if any of these fail, the page shows a
       // warning with a link to the record instead of navigating away and
       // hiding it.
-      const warnings: string[] = []
+      const warnings: string[] = [...earlyWarnings]
 
       // 8 + 9 run in PARALLEL: snapshot the exact inputs this score was
       // computed from (predictions.features, migration 20261025200000 —
@@ -257,12 +330,16 @@ export default function NewPatientPage() {
         }
       })()
 
-      const [{ error: featuresErr }, explainWarning] = await Promise.all([
-        supabase.from("predictions").update({ features: mlPayload }).eq("id", savedPrediction.id),
+      const [featuresRes, explainWarning] = await Promise.all([
+        supabase.from("predictions").update({ features: mlPayload }).eq("id", savedPrediction.id).select("id"),
         explainPromise,
       ])
-      if (featuresErr) {
-        console.warn("Prediction feature snapshot was not stored:", featuresErr.message)
+      // Verified like every other write (QA Round 3, data-integrity
+      // DI3-01): a zero-row update is a failure too, and it downgrades
+      // the detail page's "Inputs used" disclosure — worth a warning.
+      if (featuresRes.error || !featuresRes.data || featuresRes.data.length === 0) {
+        if (featuresRes.error) console.warn("Prediction feature snapshot was not stored:", featuresRes.error.message)
+        warnings.push("its input snapshot could not be stored — the detail page will classify its inputs conservatively")
       }
       if (explainWarning) warnings.push(explainWarning)
 
@@ -288,7 +365,16 @@ export default function NewPatientPage() {
       router.push(`/patients/${patient.id}`)
     } catch (err: unknown) {
       console.error(err)
-      setError(err instanceof Error && err.message ? err.message : "An unexpected error occurred while creating the patient and prediction.")
+      const message = err instanceof Error && err.message ? err.message : "An unexpected error occurred while creating the patient and prediction."
+      if (createdId) {
+        // The record exists — say so in the warning banner, which
+        // carries the "Open patient record" link, instead of the
+        // plain error banner that implies nothing was saved.
+        setCreatedPatientId(createdId)
+        setWarning(message)
+      } else {
+        setError(message)
+      }
       setLoading(false)
     }
   }
@@ -312,18 +398,18 @@ export default function NewPatientPage() {
     >
       <motion.div variants={itemVariants} className="flex items-center gap-5">
         <Link href="/patients">
-          <button type="button" className="h-10 w-10 rounded-full border border-border/50 bg-muted/30 flex items-center justify-center hover:bg-muted hover:scale-105 transition-all shadow-sm">
+          <button type="button" className="h-10 w-10 rounded-full border border-border/50 bg-muted/30 flex items-center justify-center hover:bg-muted hover:scale-105 transition-all shadow-card">
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </button>
         </Link>
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">New Patient Assessment</h1>
-          <p className="text-muted-foreground mt-1">Input clinical data to immediately trigger the predictive AI model.</p>
+          <h1 className="text-3xl font-bold tracking-tight">New Patient Assessment</h1>
+          <p className="text-muted-foreground mt-1">Register a patient and run their first risk assessment.</p>
         </div>
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <Card className="rounded-2xl shadow-sm border overflow-hidden">
+        <Card className="rounded-2xl shadow-card border overflow-hidden">
           <form onSubmit={handleSubmit}>
             <CardHeader className="bg-muted/10 border-b pb-6">
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -338,22 +424,45 @@ export default function NewPatientPage() {
             <CardContent className="space-y-8 pt-8">
               {error && (
                 <motion.div
+                  role="alert"
                   initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                  className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 text-sm font-medium flex items-start gap-3"
+                  className="p-4 bg-destructive/10 text-destructive-text rounded-xl border border-destructive/20 text-sm font-medium flex items-start gap-3"
                 >
-                  <Loader2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                   <p>{error}</p>
                 </motion.div>
               )}
 
               {warning && (
-                <div className="p-4 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-500/20 text-sm font-medium flex items-start justify-between gap-3">
+                <div role="status" className="p-4 bg-[#FDF0DC] text-[#A85008] rounded-xl border border-[#D97706]/30 text-sm font-medium flex items-start justify-between gap-3">
                   <p>{warning}</p>
                   {createdPatientId && (
                     <Link href={`/patients/${createdPatientId}`} className="shrink-0 font-semibold underline underline-offset-2">
                       Open patient record
                     </Link>
                   )}
+                </div>
+              )}
+
+              {duplicateNotice && (
+                <div role="alert" className="p-4 bg-[#FDF0DC] text-[#A85008] rounded-xl border border-[#D97706]/30 text-sm font-medium flex flex-wrap items-center justify-between gap-3">
+                  <p className="max-w-xl">{duplicateNotice}</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleSubmit(e, true)}
+                      className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                    >
+                      Create anyway
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDuplicateNotice(null)}
+                      className="shrink-0 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -395,7 +504,7 @@ export default function NewPatientPage() {
                       id="age"
                       type="number"
                       className="h-11 rounded-xl transition-all focus:ring-2 focus:ring-primary/20"
-                      required
+                      required={!formData.dob}
                       min="1"
                       max="120"
                       value={formData.age}
@@ -403,13 +512,27 @@ export default function NewPatientPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-semibold">Gender</Label>
+                    <Label htmlFor="dob" className="font-semibold">Date of Birth <span className="font-normal text-muted-foreground">(optional — wins over age)</span></Label>
+                    <Input
+                      id="dob"
+                      type="date"
+                      className="h-11 rounded-xl transition-all focus:ring-2 focus:ring-primary/20"
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={formData.dob}
+                      onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="gender" className="font-semibold">Gender</Label>
                     <Select
                       required
                       value={formData.gender}
                       onValueChange={(val) => setFormData({ ...formData, gender: val })}
                     >
-                      <SelectTrigger className="h-11 rounded-xl transition-all focus:ring-2 focus:ring-primary/20">
+                      <SelectTrigger id="gender" className="h-11 rounded-xl transition-all focus:ring-2 focus:ring-primary/20">
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
                       <SelectContent>
@@ -464,11 +587,12 @@ export default function NewPatientPage() {
                   <div className="space-y-2">
                     <Label htmlFor="genHlth" className="font-semibold">General Health</Label>
                     <Select
+                      required
                       value={formData.genHlth}
                       onValueChange={(val) => setFormData({ ...formData, genHlth: val })}
                     >
                       <SelectTrigger id="genHlth" className="h-11 rounded-xl">
-                        <SelectValue />
+                        <SelectValue placeholder="Select general health" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="1">1 — Excellent</SelectItem>
@@ -516,7 +640,7 @@ export default function NewPatientPage() {
                     <motion.div 
                       key={index} 
                       initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                      className="grid gap-4 sm:grid-cols-12 items-end bg-card p-3 rounded-xl border shadow-sm"
+                      className="grid gap-4 sm:grid-cols-12 items-end bg-card p-3 rounded-xl border shadow-card"
                     >
                       <div className="space-y-2 sm:col-span-4">
                         <Label htmlFor={`lab-${index}-name`} className="text-xs">Test Name</Label>
@@ -582,8 +706,9 @@ export default function NewPatientPage() {
                             labs.splice(index, 1)
                             setFormData({ ...formData, labs })
                           }}
-                          className="text-xs font-semibold text-destructive hover:bg-destructive/10 p-2 rounded-lg ml-2 mt-6 transition-colors"
+                          className="text-xs font-semibold text-destructive-text hover:bg-destructive/10 p-2 rounded-lg ml-2 mt-6 transition-colors"
                           title="Remove Lab"
+                          aria-label={`Remove lab test ${index + 1}`}
                         >
                           X
                         </button>
@@ -616,7 +741,7 @@ export default function NewPatientPage() {
                         <input
                           type="checkbox"
                           id={key}
-                          className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary/50 transition-all cursor-pointer"
+                          className="h-5 w-5 rounded border-input text-primary focus:ring-primary/50 transition-all cursor-pointer"
                           checked={formData[key as keyof typeof formData] as boolean}
                           onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
                         />

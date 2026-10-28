@@ -16,7 +16,7 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
-  const { data: prediction } = await supabase
+  const { data: prediction, error: predictionError } = await supabase
     .from('predictions')
     .select(`
       *,
@@ -33,6 +33,17 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
     .limit(200, { referencedTable: 'patients.vitals' })
     .eq('id', params.predictionId)
     .single()
+
+  // A load failure is not a 404 (QA Round 3, states F-07).
+  if (predictionError && predictionError.code !== 'PGRST116') {
+    console.error("Prediction detail failed to load:", predictionError)
+    return (
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive-text">
+        <h2 className="font-bold">This assessment could not be loaded</h2>
+        <p className="text-sm">Please reload the page to try again.</p>
+      </div>
+    )
+  }
 
   // The prediction must belong to the patient in the URL — a mismatched
   // pair is a not-found, not a view of someone else's assessment.

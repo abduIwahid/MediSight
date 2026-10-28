@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
 import { PulseLoader } from "@/components/shared/PulseLoader"
+import { OfflineBanner } from "@/components/shared/OfflineBanner"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 
 interface HeaderAlert {
@@ -46,9 +47,9 @@ function PortalErrorBanner() {
   if (!portalError || dismissed || !PORTAL_ERROR_MESSAGES.has(portalError)) return null
 
   return (
-    <div className="mx-auto mb-6 max-w-7xl rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3">
+    <div role="alert" className="mx-auto mb-6 max-w-7xl rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-text flex items-center justify-between gap-3">
       <span>{portalError}</span>
-      <button onClick={() => setDismissed(true)} className="text-destructive/70 hover:text-destructive" aria-label="Dismiss">
+      <button onClick={() => setDismissed(true)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-destructive/70 hover:text-destructive" aria-label="Dismiss">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -66,9 +67,13 @@ export default function DashboardLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [headerAlerts, setHeaderAlerts] = useState<HeaderAlert[]>([])
+  const [headerAlertsError, setHeaderAlertsError] = useState(false)
   const [unreadAlertCount, setUnreadAlertCount] = useState(0)
   const notificationsRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const notificationsButtonRef = useRef<HTMLButtonElement>(null)
+  const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -80,12 +85,37 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!mobileMenuOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileMenuOpen(false)
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false)
+        return
+      }
+      // Keep Tab inside the modal drawer (QA Round 3, accessibility
+      // A13): without a trap, focus walked into the obscured page
+      // behind the aria-modal dialog.
+      if (event.key === "Tab" && drawerRef.current) {
+        const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusables.length === 0) return
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
     }
     window.addEventListener("keydown", onKeyDown)
     // Basic focus handling: move focus into the drawer when it opens.
     drawerRef.current?.focus()
-    return () => window.removeEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      // Return focus to the control that opened the drawer (A13).
+      menuButtonRef.current?.focus()
+    }
   }, [mobileMenuOpen])
 
   // Header bell: real unread alerts (status 'New'), refreshed on
@@ -104,8 +134,13 @@ export default function DashboardLayout({
         .eq("status", "New")
         .order("created_at", { ascending: false })
         .limit(5)
-        .then(({ data, count }) => {
+        .then(({ data, count, error }) => {
           if (cancelled) return
+          // A failed fetch is not "no alerts" (QA Round 3, states
+          // F-15): track it so the dropdown can say so instead of
+          // showing a false all-clear.
+          setHeaderAlertsError(Boolean(error))
+          if (error) console.error("Header alerts failed to load:", error)
           setHeaderAlerts((data as HeaderAlert[]) || [])
           setUnreadAlertCount(count ?? data?.length ?? 0)
         })
@@ -131,6 +166,11 @@ export default function DashboardLayout({
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Return focus to the trigger before the popup unmounts
+        // (QA Round 3, accessibility A19) — otherwise focus drops to
+        // <body> when the focused element inside disappears.
+        if (notificationsOpen) notificationsButtonRef.current?.focus()
+        if (profileOpen) profileButtonRef.current?.focus()
         setNotificationsOpen(false)
         setProfileOpen(false)
       }
@@ -190,10 +230,11 @@ export default function DashboardLayout({
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 shadow-sm sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 shadow-card sm:px-6 lg:px-8">
           <div className="flex flex-1 items-center gap-4">
             <button
               type="button"
+              ref={menuButtonRef}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground lg:hidden"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open menu"
@@ -223,12 +264,13 @@ export default function DashboardLayout({
             <div className="relative" ref={notificationsRef}>
               <button
                 type="button"
+                ref={notificationsButtonRef}
                 onClick={() => {
                   setNotificationsOpen((open) => !open)
                   setProfileOpen(false)
                 }}
                 aria-expanded={notificationsOpen}
-                aria-haspopup="true"
+                aria-haspopup="menu"
                 aria-label={unreadAlertCount > 0 ? `Alerts, ${unreadAlertCount} unread` : "Alerts"}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
               >
@@ -247,13 +289,19 @@ export default function DashboardLayout({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 mt-2 w-[calc(100vw-2rem)] max-w-80 rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 z-50"
+                    role="menu"
+                    aria-label="Alerts"
+                    className="fixed left-4 right-4 top-16 z-50 rounded-xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:mt-2 sm:w-[calc(100vw-2rem)] sm:max-w-80"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-semibold">Alerts</p>
                       <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => router.push("/alerts")}>View all</button>
                     </div>
-                    {headerAlerts.length === 0 ? (
+                    {headerAlertsError && headerAlerts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+                        Alerts could not be loaded.
+                      </div>
+                    ) : headerAlerts.length === 0 ? (
                       <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">
                         No new alerts at this time.
                       </div>
@@ -283,12 +331,13 @@ export default function DashboardLayout({
             <div className="relative" ref={profileRef}>
               <button
                 type="button"
+                ref={profileButtonRef}
                 onClick={() => {
                   setProfileOpen((open) => !open)
                   setNotificationsOpen(false)
                 }}
                 aria-expanded={profileOpen}
-                aria-haspopup="true"
+                aria-haspopup="menu"
                 aria-label="Account menu"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-primary transition-all hover:border-primary/50 hover:bg-primary/20"
               >
@@ -302,7 +351,9 @@ export default function DashboardLayout({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 mt-2 w-56 rounded-2xl border border-border bg-card p-2 shadow-2xl ring-1 ring-black/5 z-50"
+                    role="menu"
+                    aria-label="Account"
+                    className="absolute right-0 top-12 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-2xl ring-1 ring-black/5 z-50"
                   >
                     <div className="px-3 py-2 mb-2 border-b">
                       <p className="text-sm font-medium">Account Info</p>
@@ -312,7 +363,7 @@ export default function DashboardLayout({
                       <Settings className="h-4 w-4" />
                       Settings
                     </Link>
-                    <button type="button" onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive">
+                    <button type="button" onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive-text">
                       <LogOut className="h-4 w-4" />
                       Sign out
                     </button>
@@ -326,6 +377,7 @@ export default function DashboardLayout({
         <main id="main-content" className="flex-1 overflow-auto custom-scrollbar p-4 sm:p-6 lg:p-8 relative">
           <Suspense fallback={<PulseLoader showWordmark={false} showLabel={false} />}>
             <PortalErrorBanner />
+            <OfflineBanner />
           </Suspense>
           {/* No AnimatePresence mode="wait" here: an exit animation made
               every navigation wait ~300ms for the old page to leave
