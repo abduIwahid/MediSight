@@ -24,6 +24,7 @@ export function AdminTabs() {
             <Link
               key={tab.href}
               href={tab.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 active

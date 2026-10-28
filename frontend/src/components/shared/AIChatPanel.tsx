@@ -38,6 +38,10 @@ const SUGGESTED_PROMPTS = [
 ]
 
 async function fetchPatientContext(patientId: string, supabase: SupabaseClient): Promise<PatientRow | null> {
+  // Embedded histories are capped + ordered newest-first (QA Round 2,
+  // cluster 30): the context only ever reads the latest few rows, and
+  // the "Recent vitals/labs" labels below are only honest if the rows
+  // arrive in recorded_at order rather than database order.
   const { data } = await supabase
     .from("patients")
     .select(`
@@ -48,8 +52,22 @@ async function fetchPatientContext(patientId: string, supabase: SupabaseClient):
       diagnoses(condition, diagnosed_at)
     `)
     .eq("id", patientId)
+    .order("created_at", { referencedTable: "predictions", ascending: false })
+    .limit(20, { referencedTable: "predictions" })
+    .order("recorded_at", { referencedTable: "vitals", ascending: false })
+    .limit(24, { referencedTable: "vitals" })
+    .order("recorded_at", { referencedTable: "lab_results", ascending: false })
+    .limit(20, { referencedTable: "lab_results" })
     .single()
   return (data as unknown as PatientRow | null) ?? null
+}
+
+/** Newest-first by recorded_at — the builders slice "recent" rows from
+ *  the top, so the sort must happen before the slice, never after. */
+function byRecordedAtDesc<T extends { recorded_at?: string | null }>(rows: T[] | null | undefined): T[] {
+  return [...(rows || [])].sort(
+    (a, b) => new Date(b.recorded_at || 0).getTime() - new Date(a.recorded_at || 0).getTime()
+  )
 }
 
 function buildPatientSummary(patient: PatientRow | null): string {
@@ -64,11 +82,11 @@ function buildPatientSummary(patient: PatientRow | null): string {
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const latest = preds[0]
-  const vitals = (patient.vitals || [])
+  const vitals = byRecordedAtDesc(patient.vitals)
     .slice(0, 6)
     .map((v) => `${v.type}: ${v.value}${v.unit ? " " + v.unit : ""}`)
     .join(", ")
-  const labs = (patient.lab_results || [])
+  const labs = byRecordedAtDesc(patient.lab_results)
     .slice(0, 5)
     .map((l) => `${l.test_name}: ${l.value}${l.unit ? " " + l.unit : ""}`)
     .join(", ")
@@ -102,8 +120,8 @@ function buildContextMessage(patient: PatientRow): string {
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const latest = preds[0]
-  const vitals = patient.vitals || []
-  const labs = patient.lab_results || []
+  const vitals = byRecordedAtDesc(patient.vitals)
+  const labs = byRecordedAtDesc(patient.lab_results)
 
   let msg = `**Patient Context Loaded: ${name}** (MRN: ${patient.mrn})\n\n`
 
@@ -162,9 +180,9 @@ function generateLocalResponse(message: string, patientContext: string, modelSta
   if (q.includes("model") || q.includes("accuracy") || q.includes("performance")) {
     const metrics = modelStatus?.metrics
     if (metrics) {
-      return `**Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (253,680 survey responses).`
+      return `**Model Performance**\n\n• **AUC-ROC:** ${(metrics.auc_roc * 100).toFixed(1)}%\n• **F1 Score:** ${(metrics.f1_score * 100).toFixed(1)}%\n• **Accuracy:** ${(metrics.accuracy * 100).toFixed(1)}%\n• **Model:** ${modelStatus.model_name || "LightGBM"}\n• **Version:** ${modelStatus.version || "1.0.0"}\n\nTrained on the CDC BRFSS 2015 Diabetes Health Indicators dataset (balanced file of 70,692 survey responses; metrics measured on its balanced held-out test split).`
     }
-    return `**Model Performance**\n\nThe WhyRisk ML engine (LightGBM) achieves AUC-ROC > 0.83 on the held-out test set.\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
+    return `**Model Performance**\n\nThe WhyRisk ML engine (LightGBM) reports AUC-ROC 0.8222 on the held-out test split of its balanced training dataset (70,692 records).\nLive metrics from the FastAPI inference service are shown here whenever the service is connected.`
   }
   if (q.includes("diabetes") || q.includes("disease") || q.includes("predict")) {
     return `**About WhyRisk Prediction**\n\nWhyRisk detects early-stage Diabetes risk using 21 clinical & lifestyle features:\n\n• **Biometric:** BMI, blood pressure, cholesterol\n• **Lifestyle:** Physical activity, smoking, diet, alcohol\n• **History:** Stroke, heart disease, difficulty walking\n• **Socioeconomic:** Income, education, healthcare access\n\n**Risk Classification:**\nLow risk: (< 20%) · Moderate risk: (20–50%) · High risk: (50–80%) · Critical risk: (> 80%)\n\nSelect a patient from the dropdown above to get patient-specific insights.`
