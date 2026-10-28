@@ -123,7 +123,7 @@ export default async function RiskQueuePage({
       </div>
 
       {assignmentsError ? (
-        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive-text">
           <h2 className="font-bold">Your queue could not be loaded</h2>
           <p className="text-sm">Please reload the page to try again.</p>
         </div>
@@ -139,7 +139,7 @@ export default async function RiskQueuePage({
         />
       ) : (
         <>
-          <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="overflow-hidden rounded-xl border bg-card shadow-card">
             {rows.map(({ patient, latest }, i) => (
               <Link
                 key={patient.id}

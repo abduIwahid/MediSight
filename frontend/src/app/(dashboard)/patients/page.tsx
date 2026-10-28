@@ -44,35 +44,64 @@ export default async function PatientListPage({
   if (search) {
     const term = search.replace(/[%_,()]/g, " ").trim()
     // Name matching must cover the fields the app actually writes: the
-    // New Patient flow stores first_name/last_name in demographics (and
-    // the in-page filter additionally matches the two combined, so a
-    // "first last" query works). full_name/name stay for seeded and
-    // legacy records that use those conventions.
-    patientsQuery = patientsQuery
-      .or(`mrn.ilike.%${term}%,demographics->>full_name.ilike.%${term}%,demographics->>name.ilike.%${term}%,demographics->>first_name.ilike.%${term}%,demographics->>last_name.ilike.%${term}%`)
-      .limit(200)
+    // New Patient flow stores first_name/last_name in demographics.
+    // A multi-word query ("Ayesha Khan") is split (QA Round 3,
+    // patients-crud H3): each word gets its own .or() group, and
+    // separate groups AND together — so one word can match first_name
+    // while the other matches last_name. The old single-term filter
+    // compared the whole string against each single field and could
+    // never match an intake-created patient by full name.
+    const words = term.split(/\s+/).filter(Boolean)
+    if (words.length <= 1) {
+      const w = words[0] || term
+      patientsQuery = patientsQuery
+        .or(`mrn.ilike.%${w}%,demographics->>full_name.ilike.%${w}%,demographics->>name.ilike.%${w}%,demographics->>first_name.ilike.%${w}%,demographics->>last_name.ilike.%${w}%`)
+    } else {
+      for (const w of words) {
+        patientsQuery = patientsQuery
+          .or(`demographics->>full_name.ilike.%${w}%,demographics->>name.ilike.%${w}%,demographics->>first_name.ilike.%${w}%,demographics->>last_name.ilike.%${w}%`)
+      }
+    }
+    patientsQuery = patientsQuery.limit(200)
   } else {
     patientsQuery = patientsQuery.limit(25)
   }
 
-  // The viewer's profile (for the isAdmin flag) loads in parallel with
-  // the patient list, through the shared per-request helper.
-  const [{ data: patients, error }, profile] = await Promise.all([
+  // The viewer's profile (for the capability flags) loads in parallel
+  // with the patient list and the exact total, through the shared
+  // per-request helper.
+  const [{ data: patients, error }, profile, countRes] = await Promise.all([
     patientsQuery,
-    getCurrentProfile()
+    getCurrentProfile(),
+    supabase.from('patients').select('id', { count: 'exact', head: true }),
   ])
 
   const isAdmin = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'data_scientist'].includes(profile.role))
+  // Affordances follow what the database will actually accept
+  // (QA Round 3, patients-crud M7): creating patients is a
+  // doctor/admin capability — offering the flow to a nurse ended in a
+  // raw RLS refusal at the final step; deleting is admin-only.
+  const canCreate = Boolean(profile?.role && ['doctor', 'super_admin', 'hospital_admin'].includes(profile.role))
+  const canDelete = Boolean(profile?.role && ['super_admin', 'hospital_admin'].includes(profile.role))
 
   if (error) {
     console.error("Supabase Error fetching patients:", error)
     return (
-      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive">
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-destructive-text">
         <h2 className="font-bold">The patient registry could not be loaded</h2>
         <p className="text-sm">Please reload the page to try again.</p>
       </div>
     )
   }
 
-  return <PatientListView patients={(patients || []) as unknown as PatientRow[]} initialSearch={search} isAdmin={isAdmin} />
+  return (
+    <PatientListView
+      patients={(patients || []) as unknown as PatientRow[]}
+      initialSearch={search}
+      isAdmin={isAdmin}
+      totalCount={countRes.count ?? (patients || []).length}
+      canCreate={canCreate}
+      canDelete={canDelete}
+    />
+  )
 }

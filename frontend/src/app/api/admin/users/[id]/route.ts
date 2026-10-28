@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server"
-import { requireSuperAdmin, createAdminClient, logAdminAction } from "@/lib/supabase/admin"
+import { requireSuperAdmin, requireAdmin, createAdminClient, logAdminAction } from "@/lib/supabase/admin"
 
 // The user_role enum (initial schema + the 'patient' addition). A role
 // outside this list is rejected here with a readable message instead of
 // surfacing as a raw database error from the enum cast (QA Round 2,
-// security M4).
-const VALID_ROLES = ["super_admin", "hospital_admin", "doctor", "nurse", "data_scientist", "patient"]
+// security M4). 'doctor' is deliberately NOT assignable here (QA Round
+// 3, onboarding O-7): stamping profiles.role='doctor' creates a
+// clinician identity with no doctors row — no specialty, license or
+// approval state — and the account sails past every "is this profile a
+// doctor" check while the file-based routes 403 it. The doctor role is
+// granted only by approving an application in Doctor Verification.
+const VALID_ROLES = ["super_admin", "hospital_admin", "nurse", "data_scientist", "patient"]
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const auth = await requireSuperAdmin()
+  // Super admins and hospital admins (QA Round 3, admin A1): this route
+  // is now the ONLY write path for role/hospital changes — the user
+  // management UI calls it instead of writing profiles directly, so
+  // the guards and the audit row below apply to every change. Hospital
+  // admins are scope-constrained further down.
+  const auth = await requireAdmin()
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.message }, { status: auth.status })
   }
@@ -16,10 +29,38 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const body = await request.json().catch(() => ({}))
   const { email, full_name, phone, contact_number, hospital_id, department, role } = body
 
+  // --- Field validation (QA Round 3, api-security L4) -------------------
+  // Every supplied field is validated BEFORE anything is written: the
+  // route runs with the service role, so a malformed email or an
+  // invented hospital id would otherwise land straight in the data.
+  if (email !== undefined && (typeof email !== "string" || !EMAIL_PATTERN.test(email) || email.length > 254)) {
+    return NextResponse.json({ error: "That email address is not valid." }, { status: 400 })
+  }
+  if (full_name !== undefined && (typeof full_name !== "string" || full_name.trim().length < 2 || full_name.length > 120)) {
+    return NextResponse.json({ error: "The name must be between 2 and 120 characters." }, { status: 400 })
+  }
+  if (department !== undefined && department !== null && (typeof department !== "string" || department.length > 120)) {
+    return NextResponse.json({ error: "The department must be 120 characters or fewer." }, { status: 400 })
+  }
+  if (contact_number !== undefined && contact_number !== null && (typeof contact_number !== "string" || contact_number.length > 30)) {
+    return NextResponse.json({ error: "That phone number is too long." }, { status: 400 })
+  } else if (phone !== undefined && (typeof phone !== "string" || phone.length > 30)) {
+    return NextResponse.json({ error: "That phone number is too long." }, { status: 400 })
+  }
+  if (hospital_id !== undefined && hospital_id !== null && (typeof hospital_id !== "string" || !UUID_PATTERN.test(hospital_id))) {
+    return NextResponse.json({ error: "That hospital reference is not valid." }, { status: 400 })
+  }
+
   // --- Role guards (QA Round 2, SA-5) -------------------------------------
   // Demoting the last super admin — or yourself — can lock the whole
   // organisation out of admin access with no in-product recovery.
   if (role !== undefined) {
+    if (role === "doctor") {
+      return NextResponse.json(
+        { error: "The doctor role is granted by approving a doctor application in Doctor Verification — it can't be assigned here." },
+        { status: 400 }
+      )
+    }
     if (!VALID_ROLES.includes(role)) {
       return NextResponse.json({ error: "That role is not valid." }, { status: 400 })
     }
@@ -32,6 +73,37 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const admin = createAdminClient()
+
+  // Hospital-admin scope (QA Round 3, admin A1): the service-role
+  // client bypasses RLS, so the scope a hospital admin's RLS policies
+  // used to enforce is applied here instead — they may only modify
+  // users currently in their own hospital, never a super_admin's row,
+  // never grant super_admin, and only assign their own hospital.
+  if (auth.role === "hospital_admin") {
+    if (role === "super_admin") {
+      return NextResponse.json(
+        { error: "Only a super admin can grant the super admin role." },
+        { status: 403 }
+      )
+    }
+    if (hospital_id !== undefined && hospital_id !== null && hospital_id !== auth.hospitalId) {
+      return NextResponse.json(
+        { error: "You can only assign users to your own hospital." },
+        { status: 403 }
+      )
+    }
+    const { data: target } = await admin
+      .from("profiles")
+      .select("role, hospital_id")
+      .eq("id", params.id)
+      .single()
+    if (!target || target.role === "super_admin" || target.hospital_id !== auth.hospitalId) {
+      return NextResponse.json(
+        { error: "That user is outside your hospital's scope." },
+        { status: 403 }
+      )
+    }
+  }
 
   if (role !== undefined && role !== "super_admin") {
     const { data: target } = await admin
@@ -71,6 +143,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   // explicitly since migration 20261025230000, so a genuine admin
   // action is not blocked by a guard designed for self-service edits.
   if (role !== undefined) profileUpdates.role = role
+
+  // A named hospital must actually exist (QA Round 3, api-security L4).
+  if (hospital_id) {
+    const { data: hospital } = await admin
+      .from("hospitals")
+      .select("id")
+      .eq("id", hospital_id)
+      .single()
+    if (!hospital) {
+      return NextResponse.json({ error: "That hospital could not be found." }, { status: 400 })
+    }
+  }
 
   // Profile first, auth email second: if the profile write fails,
   // nothing has changed anywhere. (The reverse order could move the
