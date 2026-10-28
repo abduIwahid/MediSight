@@ -8,18 +8,17 @@ import { InputsUsedDisclosure } from "@/components/shared/InputsUsedDisclosure"
 import BrandMark from "@/components/shared/BrandMark"
 import { PrintButton } from "@/components/shared/PrintButton"
 import { getCurrentProfile } from "@/lib/current-profile"
+import { SEVERITY_TEXT_HEX } from "@/lib/status"
 import { buildMLPayload, FEATURE_NAMES } from "@/lib/prediction-features"
 import { featureLabel, formatFeatureValue } from "@/lib/feature-labels"
 import type { PatientRow } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
-const SEVERITY_TEXT_COLOR: Record<string, string> = {
-  Low: "#1E7A46",
-  Moderate: "#D97706",
-  High: "#C0392B",
-  Critical: "#C0392B",
-}
+// Severity TEXT colours from lib/status.ts — Moderate text is the
+// deepened #A85008 (the Moderate rule), not the #D97706 fill this page
+// previously used for text (QA Round 2, cluster 27).
+const SEVERITY_TEXT_COLOR: Record<string, string> = SEVERITY_TEXT_HEX
 
 function fmtDate(iso?: string | null): string {
   if (!iso) return "—"
@@ -56,6 +55,10 @@ export default async function PredictionReportPage({ params }: { params: { id: s
       ),
       explanations (*)
     `)
+    // Cap the nested vitals embed (QA Round 2, cluster 30) — the
+    // fallback payload derivation reads the latest values only.
+    .order("recorded_at", { referencedTable: "patients.vitals", ascending: false })
+    .limit(200, { referencedTable: "patients.vitals" })
     .eq("id", params.predictionId)
     .single()
 
@@ -148,6 +151,13 @@ export default async function PredictionReportPage({ params }: { params: { id: s
       </div>
 
       <article className="print-report rounded-2xl border bg-card p-8 shadow-sm">
+        {/* Print-only repeating header (globals.css .print-repeat-header):
+            the browser re-renders it on every printed page, so page 2+
+            still identifies the patient this report belongs to. */}
+        <div className="print-repeat-header" aria-hidden="true">
+          <span className="font-semibold text-foreground">WhyRisk — Patient risk report</span>
+          <span>{patientName} · MRN: {patient?.mrn || "—"}</span>
+        </div>
         <header className="flex items-start justify-between gap-6 border-b border-border pb-5">
           <div>
             <div className="flex items-center gap-2.5">

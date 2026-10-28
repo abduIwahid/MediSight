@@ -27,6 +27,10 @@ export default async function PredictionDetailPage({ params }: { params: { id: s
       ),
       explanations (*)
     `)
+    // Cap the nested vitals embed (QA Round 2, cluster 30) — the
+    // payload builder reads the latest values, not the full history.
+    .order('recorded_at', { referencedTable: 'patients.vitals', ascending: false })
+    .limit(200, { referencedTable: 'patients.vitals' })
     .eq('id', params.predictionId)
     .single()
 

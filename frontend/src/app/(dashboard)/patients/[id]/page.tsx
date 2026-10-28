@@ -17,6 +17,11 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
     { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
   )
 
+  // Embedded histories are ordered newest-first and capped (QA Round
+  // 2, cluster 30): they were unbounded — every vital, lab and
+  // prediction the patient ever had shipped with the page. The view
+  // displays the latest 8 vitals/labs and the recent prediction
+  // history; the caps sit far above those display windows.
   const { data: patient } = await supabase
     .from('patients')
     .select(`
@@ -27,6 +32,12 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
       predictions(*)
     `)
     .eq('id', params.id)
+    .order('recorded_at', { referencedTable: 'vitals', ascending: false })
+    .limit(200, { referencedTable: 'vitals' })
+    .order('recorded_at', { referencedTable: 'lab_results', ascending: false })
+    .limit(200, { referencedTable: 'lab_results' })
+    .order('created_at', { referencedTable: 'predictions', ascending: false })
+    .limit(100, { referencedTable: 'predictions' })
     .single()
 
   if (!patient) return notFound()

@@ -247,7 +247,7 @@ export default function DashboardLayout({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 mt-2 w-80 rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 z-50"
+                    className="absolute right-0 top-12 mt-2 w-[calc(100vw-2rem)] max-w-80 rounded-2xl border border-border bg-card p-4 shadow-2xl ring-1 ring-black/5 z-50"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-semibold">Alerts</p>
