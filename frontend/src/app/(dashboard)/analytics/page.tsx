@@ -33,23 +33,31 @@ export default async function AnalyticsPage() {
       .select('disease, severity, probability, created_at')
       .order('created_at', { ascending: false })
       .limit(2000),
-    // Patient count per hospital — join hospitals table
+    // Patient count per hospital — join hospitals table. Capped at
+    // the most recent 2,000 patient records (was an unlabelled 10,000);
+    // the view labels the cap when it is hit (QA Round 2, cluster 30).
     supabase
       .from('patients')
       .select('hospital_id, hospitals!patients_hospital_id_fkey(name)')
-      .limit(10000),
+      .order('created_at', { ascending: false })
+      .limit(2000),
     // Alert stats — explicitly capped at the most recent 2,000 alerts.
     supabase
       .from('alerts')
       .select('severity, status, created_at')
       .order('created_at', { ascending: false })
       .limit(2000),
-    // Risk score distribution (30-day window)
+    // Risk score distribution (30-day window) — explicitly capped at
+    // the most recent 2,000 predictions in the window; without a limit
+    // PostgREST silently truncated this at 1,000 rows (QA Round 2,
+    // cluster 30). The view buckets by day itself, so newest-first
+    // ordering here only decides WHICH rows the cap keeps.
     supabase
       .from('predictions')
       .select('probability, severity, disease, created_at')
       .gte('created_at', thirtyDaysAgo)
-      .order('created_at', { ascending: true }),
+      .order('created_at', { ascending: false })
+      .limit(2000),
   ])
 
   const { data: predictions, error: predErr } = predictionsRes

@@ -30,10 +30,14 @@ export default function AppointmentsPage() {
   const load = async () => {
     setLoading(true)
     setLoadError(false)
+    // Newest first, explicitly capped (QA Round 2, cluster 30): this
+    // list was limit-less and oldest-first, so PostgREST silently
+    // truncated it at 1,000 rows with the newest appointments cut.
     const { data, error } = await supabase
       .from("appointments")
       .select("id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, contact_number)")
-      .order("scheduled_at", { ascending: true })
+      .order("scheduled_at", { ascending: false })
+      .limit(200)
     if (error) {
       setLoadError(true)
     } else {
@@ -67,12 +71,16 @@ export default function AppointmentsPage() {
       <div>
         <h1 className="font-heading text-2xl font-bold">Appointments</h1>
         <p className="mt-1 text-sm text-muted-foreground">Review requests and manage your patient schedule.</p>
+        {appointments.length >= 200 && (
+          <p className="mt-1 text-xs text-muted-foreground">Showing the 200 most recent appointments.</p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
         {["All", "Requested", "Confirmed", "Completed", "Cancelled"].map((f) => (
           <button
             key={f}
+            aria-pressed={filter === f}
             onClick={() => setFilter(f)}
             className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
               filter === f ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"

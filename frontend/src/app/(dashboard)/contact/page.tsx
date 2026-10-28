@@ -127,7 +127,7 @@ export default function ContactPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Ayesha Khan"
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -141,7 +141,7 @@ export default function ContactPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="doctor@hospital.org"
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
@@ -157,7 +157,7 @@ export default function ContactPage() {
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   placeholder="Cardiology / Central Hospital"
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -167,7 +167,7 @@ export default function ContactPage() {
                   name="subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   {SUBJECT_OPTIONS.map((option) => (
                     <option key={option}>{option}</option>
@@ -187,7 +187,7 @@ export default function ContactPage() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe your request or technical issue..."
-                className="w-full p-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full p-3 rounded-lg border border-input bg-background text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
 

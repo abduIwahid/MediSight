@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { PulseLoader } from "@/components/shared/PulseLoader"
 import type { PatientDemographics } from "@/lib/types"
 import { fmtDateTime } from "@/lib/dates"
+import { severityRowClass } from "@/lib/status"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Bell, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from "lucide-react"
@@ -45,20 +46,8 @@ function timeAgo(iso: string): string {
   return `${days}d ago`
 }
 
-// Row tint per severity, from the canonical RiskBadge palette.
-function severityRowClass(severity: string): string {
-  switch (severity) {
-    case "Critical":
-    case "High":
-      return "border-[#C0392B]/25 bg-[#FAE9E7]/50 hover:bg-[#FAE9E7]"
-    case "Moderate":
-      return "border-[#D97706]/25 bg-[#FDF0DC]/50 hover:bg-[#FDF0DC]"
-    case "Low":
-      return "border-[#1E7A46]/25 bg-[#E2F0E6]/50 hover:bg-[#E2F0E6]"
-    default:
-      return "border-border bg-card hover:bg-muted/40"
-  }
-}
+// Row tint per severity: severityRowClass from lib/status.ts (the one
+// palette) — imported at the top of this file.
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
