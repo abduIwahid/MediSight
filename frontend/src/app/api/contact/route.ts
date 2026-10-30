@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { isEmailConfigured, sendContactInquiryEmail } from "@/lib/email"
+import { checkRateLimit, rateLimitBody, clientIp } from "@/lib/rate-limit"
 
 const LIMITS = {
   name: 100,
@@ -38,11 +39,24 @@ function cleanSingleLine(value: unknown, max: number): string | null {
  *
  * The handler checks the caller's session itself (below) — middleware
  * deliberately lets API requests reach their own handlers, so "the
- * page is gated" does NOT make this route authenticated. Without the
- * check, anyone on the internet could submit inquiries through the
- * project's Resend account and write rows into contact_inquiries
- * (QA Round 2, security M1). The archive insert goes through the
- * caller's session client; reads on the table stay admin-only.
+ * page is gated" does NOT make an API route authenticated.
+ *
+ * Two caller classes, two rule sets (the public path was added with
+ * the public contact page, features round 2026-10-30):
+ *  - Signed-in users (the dashboard contact page): the reply-to is the
+ *    SESSION's email, never the body's (QA Round 3, api-security L6),
+ *    and the inquiry is archived to contact_inquiries through the
+ *    caller's session client; reads on the table stay admin-only.
+ *  - Anonymous visitors (the public /contact-us page): there is no
+ *    session to borrow, so the reply-to is the body's email — fully
+ *    validated like every other field. The QA Round 2 (security M1)
+ *    concern was unbounded anonymous use of the project's Resend
+ *    account; that is answered with a hard per-IP rate limit
+ *    (5/hour) on top of the existing field caps and header-injection
+ *    cleaning, and the mail still goes to exactly one fixed address
+ *    (the maintainer's), never to a caller-chosen recipient.
+ *    Anonymous inquiries are NOT archived — there is no session client
+ *    to write them with, and the emailed copy is the record.
  *
  * The email is the delivery of record — if it cannot be sent, the
  * request fails honestly. The database copy is best-effort: if the
@@ -53,14 +67,20 @@ function cleanSingleLine(value: unknown, max: number): string | null {
  * deployment), the route answers 503 and nothing is stored.
  */
 export async function POST(request: Request) {
-  // Signed-in users only — the contact page lives inside the staff
-  // dashboard, so there is no anonymous use case for this endpoint.
   const supabase = createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
   if (!user) {
-    return NextResponse.json({ error: "Not signed in." }, { status: 401 })
+    // Anonymous path: capped hard per IP before any work happens.
+    const limit = checkRateLimit(`contact:${clientIp(request)}`, 5, 60 * 60_000)
+    if (!limit.allowed) {
+      return NextResponse.json(rateLimitBody(), {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      })
+    }
   }
 
   let payload: {
@@ -81,14 +101,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter your name." }, { status: 400 })
   }
 
-  // The reply-to address is the SESSION's email, never the body's
-  // (QA Round 3, api-security L6): the route is signed-in-only, so a
-  // body-supplied address could only make maintainer replies land in
-  // someone else's inbox. The body value is still validated for the
-  // archive row's shape, but the mailed reply-to uses the account.
-  const email = user.email ?? cleanField(payload.email, LIMITS.email)
+  // The reply-to address follows the caller class: for signed-in users
+  // it is the SESSION's email, never the body's (QA Round 3,
+  // api-security L6) — a body-supplied address could only make
+  // maintainer replies land in someone else's inbox. For anonymous
+  // visitors there is no session, so the body's address is the only
+  // possible reply-to; it is validated to the same standard.
+  const email = user ? user.email ?? cleanField(payload.email, LIMITS.email) : cleanField(payload.email, LIMITS.email)
   if (!email || !EMAIL_PATTERN.test(email)) {
-    return NextResponse.json({ error: "Your account has no valid email address on record." }, { status: 400 })
+    return NextResponse.json(
+      { error: user ? "Your account has no valid email address on record." : "Please enter a valid email address." },
+      { status: 400 }
+    )
   }
 
   // Department is optional; an over-long one is rejected, an empty or
@@ -134,9 +158,10 @@ export async function POST(request: Request) {
   }
 
   // Best-effort archive copy — the email above is the delivery of
-  // record, so a failed insert is logged, never surfaced. (Same session
-  // client as the auth check above.)
-  try {
+  // record, so a failed insert is logged, never surfaced. Signed-in
+  // callers only: the write goes through the caller's session client,
+  // which an anonymous request does not have.
+  if (user) try {
     const { error: insertError } = await supabase.from("contact_inquiries").insert({
       full_name: name,
       email,

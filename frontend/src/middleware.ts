@@ -70,6 +70,7 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = request.nextUrl.pathname.startsWith('/welcome') ||
                         request.nextUrl.pathname === '/' ||
                         request.nextUrl.pathname === '/model-card' ||
+                        request.nextUrl.pathname === '/contact-us' ||
                         request.nextUrl.pathname === '/api/ml/model-card'
 
   const isOnboardingRoute = request.nextUrl.pathname.startsWith('/onboarding')
@@ -86,7 +87,10 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/predict') ||
     request.nextUrl.pathname.startsWith('/settings') ||
     request.nextUrl.pathname.startsWith('/about') ||
-    request.nextUrl.pathname.startsWith('/contact') ||
+    // Exact /contact only: the public /contact-us page also starts
+    // with "/contact" and must not be treated as the staff area.
+    request.nextUrl.pathname === '/contact' ||
+    request.nextUrl.pathname.startsWith('/contact/') ||
     request.nextUrl.pathname.startsWith('/admin')
 
   // Only these known protected areas bounce a signed-out visitor to
