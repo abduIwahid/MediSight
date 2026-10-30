@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { mlServiceFetch } from "@/lib/ml-service"
 import { createClient } from "@/lib/supabase/server"
 import { validateMLPayload } from "@/lib/validate-ml-payload"
+import { checkRateLimit, rateLimitBody } from "@/lib/rate-limit"
 
 const UNAVAILABLE = {
   error: "Prediction service unavailable. No score was generated.",
@@ -28,6 +29,16 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 })
+  }
+
+  // Per-user brake on scripted looping (see lib/rate-limit.ts): 60/min
+  // sits far above the UI's debounced prediction + what-if traffic.
+  const limit = checkRateLimit(`predict:${user.id}`, 60, 60_000)
+  if (!limit.allowed) {
+    return NextResponse.json(rateLimitBody(), {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    })
   }
 
   const { data: profile } = await supabase

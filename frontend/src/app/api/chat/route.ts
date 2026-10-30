@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { checkRateLimit, rateLimitBody } from "@/lib/rate-limit"
 
 const GEMINI_MODEL = "gemini-flash-latest"
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -52,6 +53,17 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: "Not signed in.", fallback: true }, { status: 401 })
+    }
+
+    // Per-user brake on scripted looping (see lib/rate-limit.ts): the
+    // panels send one message per user action, so 20/min is generous
+    // for a human and useless for a script burning Gemini quota.
+    const limit = checkRateLimit(`chat:${user.id}`, 20, 60_000)
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { ...rateLimitBody(), fallback: true },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+      )
     }
 
     // The instruction set follows the CALLER's actual role, never a
