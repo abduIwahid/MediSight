@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, CalendarPlus, CalendarClock, Bot, User, LogOut, X } from "lucide-react"
+import { LayoutDashboard, CalendarPlus, CalendarClock, Bot, User, LogOut, X, Gauge } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { motion } from "framer-motion"
 import BrandMark from "@/components/shared/BrandMark"
@@ -27,6 +27,7 @@ export function PatientSidebar({ onClose, className }: PatientSidebarProps) {
 
   const navItems = [
     { name: "Overview", href: "/patient/dashboard", icon: LayoutDashboard },
+    { name: "My Risk", href: "/patient/risk", icon: Gauge },
     { name: "Book an Appointment", href: "/patient/appointments/book", icon: CalendarPlus },
     { name: "My Appointments", href: "/patient/appointments", icon: CalendarClock },
     { name: "AI Assistant", href: "/patient/assistant", icon: Bot },

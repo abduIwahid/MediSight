@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { CalendarPlus, CalendarClock, Bot, ArrowRight } from "lucide-react"
+import { CalendarPlus, CalendarClock, Bot, ArrowRight, Gauge } from "lucide-react"
 import { PulseLoader } from "@/components/shared/PulseLoader"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { appointmentStatusClass } from "@/lib/status"
@@ -73,7 +73,23 @@ export default function PatientDashboardPage() {
         <p className="text-muted-foreground">Manage your appointments and get quick health guidance.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link
+          href="/patient/risk"
+          className="group flex items-center justify-between rounded-xl border bg-card p-6 shadow-card transition hover:shadow-md hover:border-primary/40"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Gauge className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold">My Risk</p>
+              <p className="text-sm text-muted-foreground">Your latest assessment and what drives it</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-primary" />
+        </Link>
+
         <Link
           href="/patient/appointments/book"
           className="group flex items-center justify-between rounded-xl border bg-card p-6 shadow-card transition hover:shadow-md hover:border-primary/40"
