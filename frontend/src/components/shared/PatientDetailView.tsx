@@ -9,7 +9,7 @@ import { RunPredictionButton } from "@/components/shared/RunPredictionButton"
 import { RiskTrendChart } from "@/components/shared/RiskTrendChart"
 import { EmptyState } from "@/components/shared/EmptyState"
 import Link from "next/link"
-import { ArrowLeft, User, Calendar, Activity, FlaskConical, Stethoscope, Heart, Pencil, Trash2, TrendingUp, ClipboardList } from "lucide-react"
+import { ArrowLeft, User, Calendar, Activity, FlaskConical, Stethoscope, Heart, Pencil, Trash2, TrendingUp, ClipboardList, Plus } from "lucide-react"
 import { fmtDate as fmtAppDate } from "@/lib/dates"
 import { RiskBadge } from "@/components/shared/RiskBadge"
 import { Button } from "@/components/ui/button"
@@ -51,9 +51,31 @@ interface PatientDetailViewProps {
   /** Doctors (and admins) may edit demographics; delete stays
    *  admin-only (QA Round 3, patients-crud M7). */
   canEdit?: boolean
+  /** Roles whose RLS policies allow writing vitals (doctor,
+   *  hospital_admin, super_admin) — gates the add/edit vital form so
+   *  nobody is offered a control that can only fail. */
+  canAddVitals?: boolean
 }
 
-export function PatientDetailView({ patient, latestPrediction, isAdmin = false, canEdit }: PatientDetailViewProps) {
+/** The vital types this chart records, with their fixed unit and the
+ *  plausible range a value is validated against before it is written.
+ *  The unit is never typed by hand — it follows the type, so a heart
+ *  rate can never land in the record labelled mmHg. Ranges are wide
+ *  clinical plausibility bounds, not normal ranges: they exist to
+ *  catch typos (a heart rate of 900), not to judge the patient. */
+const VITAL_TYPES: { type: string; unit: string; min: number; max: number }[] = [
+  { type: "Blood Pressure Systolic", unit: "mmHg", min: 40, max: 300 },
+  { type: "Blood Pressure Diastolic", unit: "mmHg", min: 20, max: 200 },
+  { type: "Heart Rate", unit: "bpm", min: 20, max: 250 },
+  { type: "Respiratory Rate", unit: "/min", min: 4, max: 60 },
+  { type: "Temperature", unit: "°F", min: 85, max: 110 },
+  { type: "SpO2", unit: "%", min: 50, max: 100 },
+  { type: "Blood Glucose", unit: "mg/dL", min: 20, max: 600 },
+  { type: "Weight", unit: "kg", min: 1, max: 500 },
+  { type: "BMI", unit: "kg/m²", min: 8, max: 80 },
+]
+
+export function PatientDetailView({ patient, latestPrediction, isAdmin = false, canEdit, canAddVitals = false }: PatientDetailViewProps) {
   const showEdit = canEdit ?? isAdmin
   const router = useRouter()
   const supabase = createClient()
@@ -77,6 +99,188 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
     unit: "",
     recorded_at: new Date().toISOString().slice(0, 10),
   })
+
+  // Add/edit vitals (features round, 2026-10-30). Rows written here
+  // join the displayed list immediately via localVitals overrides, so
+  // the clinician sees the value they just saved without waiting on a
+  // server re-render; router.refresh() still runs to reconcile.
+  const [vitalFormOpen, setVitalFormOpen] = useState(false)
+  const [editingVitalId, setEditingVitalId] = useState<string | null>(null)
+  const [newVital, setNewVital] = useState({
+    type: VITAL_TYPES[0].type,
+    value: "",
+    recorded_at: new Date().toISOString().slice(0, 10),
+  })
+  const [vitalSaving, setVitalSaving] = useState(false)
+  const [vitalMessage, setVitalMessage] = useState<string | null>(null)
+  const [vitalError, setVitalError] = useState<string | null>(null)
+  const [localVitals, setLocalVitals] = useState<Record<string, VitalRow>>({})
+
+  const handleSaveVital = async () => {
+    const spec = VITAL_TYPES.find((v) => v.type === newVital.type)
+    const value = Number(newVital.value)
+    // A legacy vital whose type predates VITAL_TYPES can still be
+    // edited (value/date only) — it just has no range to check against.
+    if (!spec && !editingVitalId) {
+      setVitalError("Please choose the vital type from the list.")
+      return
+    }
+    if (newVital.value.trim() === "" || !Number.isFinite(value)) {
+      setVitalError(`Please enter a numeric value for ${fmtLabel(newVital.type)}.`)
+      return
+    }
+    if (spec && (value < spec.min || value > spec.max)) {
+      setVitalError(`${spec.type} must be between ${spec.min} and ${spec.max} ${spec.unit} — please check the value.`)
+      return
+    }
+    if (!newVital.recorded_at || newVital.recorded_at > new Date().toISOString().slice(0, 10)) {
+      setVitalError("Please choose the date the vital was recorded (today or earlier).")
+      return
+    }
+
+    setVitalSaving(true)
+    setVitalError(null)
+    setVitalMessage(null)
+
+    const recordedAt = new Date(`${newVital.recorded_at}T12:00:00.000Z`).toISOString()
+    if (editingVitalId) {
+      // .select() verification, same as the delete flow: an RLS-refused
+      // update returns no error and zero rows, which must not read as
+      // success.
+      const { data: updated, error } = await supabase
+        .from("vitals")
+        .update({ value, recorded_at: recordedAt })
+        .eq("id", editingVitalId)
+        .select("id, patient_id, type, value, unit, recorded_at")
+      if (error || !updated || updated.length === 0) {
+        if (error) console.error("Vital update failed:", error)
+        setVitalError("That vital could not be updated. You may not have permission to change it.")
+        setVitalSaving(false)
+        return
+      }
+      const row = updated[0] as VitalRow
+      setLocalVitals((prev) => ({ ...prev, [row.id as string]: row }))
+      setVitalMessage("Vital updated.")
+    } else {
+      // Inserts always carry a listed type (the early return above
+      // guarantees it); the check just makes that explicit.
+      if (!spec) {
+        setVitalError("Please choose the vital type from the list.")
+        setVitalSaving(false)
+        return
+      }
+      const { data: inserted, error } = await supabase
+        .from("vitals")
+        .insert({
+          patient_id: patient.id,
+          type: spec.type,
+          value,
+          unit: spec.unit,
+          recorded_at: recordedAt,
+        })
+        .select("id, patient_id, type, value, unit, recorded_at")
+      if (error || !inserted || inserted.length === 0) {
+        if (error) console.error("Vital insert failed:", error)
+        setVitalError("That vital could not be saved. You may not have permission to add vitals for this patient.")
+        setVitalSaving(false)
+        return
+      }
+      const row = inserted[0] as VitalRow
+      setLocalVitals((prev) => ({ ...prev, [row.id as string]: row }))
+      setVitalMessage("Vital recorded.")
+    }
+
+    setEditingVitalId(null)
+    setNewVital({ type: VITAL_TYPES[0].type, value: "", recorded_at: new Date().toISOString().slice(0, 10) })
+    setVitalSaving(false)
+    router.refresh()
+  }
+
+  // Book follow-up (features round, 2026-10-30): creates a Confirmed
+  // appointment the patient sees in their portal. Only possible when
+  // the record is linked to a portal account (migration 22); doctors
+  // book for their assigned patients (migration 23), admins fall back
+  // to the patient's first assigned doctor.
+  const linkedUserId = typeof patient.user_id === "string" ? patient.user_id : null
+  const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [followUp, setFollowUp] = useState(() => {
+    const t = new Date(Date.now() + 7 * 24 * 3600 * 1000)
+    t.setMinutes(0, 0, 0)
+    const local = new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    return { when: local, reason: "Follow-up visit" }
+  })
+  const [followUpSaving, setFollowUpSaving] = useState(false)
+  const [followUpError, setFollowUpError] = useState<string | null>(null)
+  const [followUpDone, setFollowUpDone] = useState(false)
+
+  const handleBookFollowUp = async () => {
+    if (!linkedUserId) return
+    const when = new Date(followUp.when)
+    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      setFollowUpError("Please choose a date and time in the future.")
+      return
+    }
+    setFollowUpSaving(true)
+    setFollowUpError(null)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setFollowUpError("Your session has ended. Please sign in again.")
+      setFollowUpSaving(false)
+      return
+    }
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+    let doctorId: string | null = null
+    if (profile?.role === "doctor") {
+      doctorId = user.id
+    } else {
+      const { data: assignment } = await supabase
+        .from("doctor_patient_assignments")
+        .select("doctor_id")
+        .eq("patient_id", patient.id)
+        .limit(1)
+        .maybeSingle()
+      doctorId = assignment?.doctor_id ?? null
+    }
+    if (!doctorId) {
+      setFollowUpError("No doctor is assigned to this patient yet — assign a doctor before booking a follow-up.")
+      setFollowUpSaving(false)
+      return
+    }
+
+    const { data: inserted, error } = await supabase
+      .from("appointments")
+      .insert({
+        patient_id: linkedUserId,
+        doctor_id: doctorId,
+        scheduled_at: when.toISOString(),
+        status: "Confirmed",
+        reason: followUp.reason.trim() || "Follow-up visit",
+      })
+      .select("id")
+    if (error || !inserted || inserted.length === 0) {
+      if (error) console.error("Follow-up booking failed:", error)
+      setFollowUpError("That follow-up could not be booked. Doctors can book follow-ups for patients assigned to them.")
+      setFollowUpSaving(false)
+      return
+    }
+    setFollowUpDone(true)
+    setFollowUpSaving(false)
+  }
+
+  const startEditVital = (v: VitalRow) => {
+    if (!v.id) return
+    setEditingVitalId(v.id)
+    setNewVital({
+      type: v.type,
+      value: String(v.value ?? ""),
+      recorded_at: (v.recorded_at || new Date().toISOString()).slice(0, 10),
+    })
+    setVitalError(null)
+    setVitalMessage(null)
+    setVitalFormOpen(true)
+  }
 
   // Prefill goes through the same name resolution the header uses
   // (QA Round 3, patients-crud M3): a record that stores only
@@ -240,7 +444,22 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
   const vitalsColumns = [
     { header: "Type", cell: (v: VitalRow) => <span className="font-medium">{fmtLabel(v.type)}</span> },
     { header: "Value", cell: (v: VitalRow) => `${v.value} ${v.unit || ""}`.trim() },
-    { header: "Date", cell: (v: VitalRow) => fmtDate(v.recorded_at) }
+    { header: "Date", cell: (v: VitalRow) => fmtDate(v.recorded_at) },
+    ...(canAddVitals
+      ? [{
+          header: "",
+          cell: (v: VitalRow) => (
+            <button
+              type="button"
+              onClick={() => startEditVital(v)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              aria-label={`Edit ${v.type} recorded ${fmtDate(v.recorded_at)}`}
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+          ),
+        }]
+      : []),
   ]
 
   const labsColumns = [
@@ -259,7 +478,20 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
   // Vitals and labs read newest-first (the record must not depend on
   // the order the query happened to return), capped at the latest 8 —
   // and the cap is labelled where it applies.
-  const sortedVitals = [...(patient.vitals || [])].sort((a, b) =>
+  // Locally saved vitals override/extend the server rows by id, so a
+  // just-recorded vital is visible in place even before the refresh
+  // lands (and an edited row shows its new value, not the stale one).
+  const mergedVitals = (() => {
+    const byId = new Map<string, VitalRow>()
+    const idless: VitalRow[] = []
+    for (const v of patient.vitals || []) {
+      if (v.id) byId.set(v.id, v)
+      else idless.push(v)
+    }
+    for (const [id, v] of Object.entries(localVitals)) byId.set(id, v)
+    return [...idless, ...byId.values()]
+  })()
+  const sortedVitals = [...mergedVitals].sort((a, b) =>
     new Date(b.recorded_at || 0).getTime() - new Date(a.recorded_at || 0).getTime()
   )
   const sortedLabs = [...(patient.lab_results || [])].sort((a, b) =>
@@ -507,7 +739,7 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
         {[
           { label: "Gender", icon: User, value: gender },
           { label: "Age", icon: Calendar, value: age != null ? `${age} yrs` : "—" },
-          { label: "Vitals Tracked", icon: Activity, value: `${patient.vitals?.length || 0} records` },
+          { label: "Vitals Tracked", icon: Activity, value: `${sortedVitals.length} records` },
           { label: "Lab Results", icon: FlaskConical, value: `${patient.lab_results?.length || 0} results` },
         ].map((stat, i) => (
           <div key={i} className="group bg-card border rounded-xl p-5 shadow-card hover:shadow-md transition-all duration-300 flex flex-col items-start gap-2 relative overflow-hidden">
@@ -558,6 +790,70 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
             </div>
           )}
 
+          <div className="bg-card border rounded-xl p-5 shadow-card">
+            <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> Follow-up
+            </h3>
+            {!linkedUserId ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                This record is not linked to a patient portal account yet, so a follow-up cannot be booked
+                from here. Once the record is linked, booking opens and the patient sees the appointment
+                in their portal.
+              </p>
+            ) : followUpDone ? (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-[#1E7A46]">Follow-up booked. The patient can see it in their portal.</p>
+                <Link href="/appointments" className="text-sm font-medium text-primary hover:underline">
+                  View in Appointments
+                </Link>
+              </div>
+            ) : !followUpOpen ? (
+              <Button onClick={() => setFollowUpOpen(true)} className="rounded-xl h-11 px-5 w-full">
+                Book follow-up
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="followUpWhen">Date and time</Label>
+                  <Input
+                    id="followUpWhen"
+                    type="datetime-local"
+                    className="h-11 rounded-xl"
+                    value={followUp.when}
+                    onChange={(e) => setFollowUp({ ...followUp, when: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="followUpReason">Reason</Label>
+                  <Input
+                    id="followUpReason"
+                    className="h-11 rounded-xl"
+                    value={followUp.reason}
+                    onChange={(e) => setFollowUp({ ...followUp, reason: e.target.value })}
+                    placeholder="Follow-up visit"
+                  />
+                </div>
+                {followUpError && (
+                  <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive-text">
+                    {followUpError}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button onClick={handleBookFollowUp} disabled={followUpSaving} className="rounded-xl h-11 px-5 flex-1">
+                    {followUpSaving ? "Booking…" : "Confirm booking"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setFollowUpOpen(false); setFollowUpError(null) }}
+                    className="rounded-xl h-11 px-4"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {sortedPreds.length >= 1 && (
             <div className="bg-card border rounded-xl p-5 shadow-card">
               <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
@@ -602,12 +898,28 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
 
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-card border rounded-xl p-6 shadow-card overflow-hidden flex flex-col">
-            <h2 className="text-lg font-bold mb-5 flex items-center gap-3 tracking-tight">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Activity className="h-5 w-5 text-primary" />
-              </div>
-              Recent Vitals
-            </h2>
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold flex items-center gap-3 tracking-tight">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Activity className="h-5 w-5 text-primary" />
+                </div>
+                Recent Vitals
+              </h2>
+              {canAddVitals && !vitalFormOpen && (
+                <Button
+                  onClick={() => {
+                    setEditingVitalId(null)
+                    setNewVital({ type: VITAL_TYPES[0].type, value: "", recorded_at: new Date().toISOString().slice(0, 10) })
+                    setVitalError(null)
+                    setVitalMessage(null)
+                    setVitalFormOpen(true)
+                  }}
+                  className="rounded-xl h-10 px-4 shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" /> Add Vital
+                </Button>
+              )}
+            </div>
             <div className="flex-1 overflow-x-auto custom-scrollbar -mx-2 px-2 pb-2">
               <div className="min-w-0 sm:min-w-[400px]">
                 {sortedVitals.length > 0 ? (
@@ -627,6 +939,91 @@ export function PatientDetailView({ patient, latestPrediction, isAdmin = false, 
                 )}
               </div>
             </div>
+
+            {canAddVitals && vitalFormOpen && (
+              <div className="mt-2 space-y-4 border-t border-border/50 pt-5">
+                <h3 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                  <Activity className="h-4 w-4" /> {editingVitalId ? "Edit Vital" : "Add Vital"}
+                </h3>
+                <div className="grid gap-5 sm:grid-cols-4 items-end">
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="vitalType">Type</Label>
+                    <Select
+                      value={newVital.type}
+                      onValueChange={(value) => setNewVital({ ...newVital, type: value })}
+                      disabled={Boolean(editingVitalId)}
+                    >
+                      <SelectTrigger id="vitalType" className="h-11 rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VITAL_TYPES.map((v) => (
+                          <SelectItem key={v.type} value={v.type}>{v.type}</SelectItem>
+                        ))}
+                        {editingVitalId && !VITAL_TYPES.some((v) => v.type === newVital.type) && (
+                          <SelectItem value={newVital.type}>{fmtLabel(newVital.type)}</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="vitalValue">
+                      Value ({VITAL_TYPES.find((v) => v.type === newVital.type)?.unit || ""})
+                    </Label>
+                    <Input
+                      id="vitalValue"
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      className="h-11 rounded-xl"
+                      value={newVital.value}
+                      onChange={(e) => setNewVital({ ...newVital, value: e.target.value })}
+                      placeholder="e.g. 72"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="vitalDate">Date Recorded</Label>
+                    <Input
+                      id="vitalDate"
+                      type="date"
+                      className="h-11 rounded-xl"
+                      value={newVital.recorded_at}
+                      onChange={(e) => setNewVital({ ...newVital, recorded_at: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2 sm:col-span-1">
+                    <Button onClick={handleSaveVital} disabled={vitalSaving} className="rounded-xl h-11 px-5 flex-1">
+                      {vitalSaving ? "Saving…" : editingVitalId ? "Update Vital" : "Save Vital"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setVitalFormOpen(false)
+                        setEditingVitalId(null)
+                        setVitalError(null)
+                      }}
+                      className="rounded-xl h-11 px-4"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+                {editingVitalId && (
+                  <p className="text-xs text-muted-foreground">
+                    The type and unit of an existing vital stay fixed — record a new vital to correct those.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(vitalMessage || vitalError) && (
+              <div
+                role={vitalError ? "alert" : "status"}
+                className={`mt-4 rounded-xl p-4 text-sm font-medium ${vitalError ? "bg-destructive/10 text-destructive-text border border-destructive/20" : "bg-[#E2F0E6] text-[#1E7A46] border border-[#1E7A46]/25"}`}
+              >
+                {vitalError || vitalMessage}
+              </div>
+            )}
           </div>
 
           <div className="bg-card border rounded-xl p-6 shadow-card overflow-hidden flex flex-col">

@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, Clock, CheckCircle2, XCircle, CheckCheck, Loader2, CalendarX2 } from "lucide-react"
+import Link from "next/link"
+import { Calendar, Clock, CheckCircle2, XCircle, CheckCheck, Loader2, CalendarX2, ClipboardList } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
@@ -11,6 +12,7 @@ import { appointmentStatusClass } from "@/lib/status"
 
 type Appointment = {
   id: string
+  patient_id: string
   scheduled_at: string
   status: "Requested" | "Confirmed" | "Completed" | "Cancelled"
   reason: string | null
@@ -20,6 +22,11 @@ type Appointment = {
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  // Portal user id -> clinical record id, for the "View chart" link.
+  // Resolved through the migration-22 link column and the caller's own
+  // patients RLS: if a linked record is not visible to this staff
+  // member, no link is offered for it.
+  const [chartByUser, setChartByUser] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -35,13 +42,26 @@ export default function AppointmentsPage() {
     // truncated it at 1,000 rows with the newest appointments cut.
     const { data, error } = await supabase
       .from("appointments")
-      .select("id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, contact_number)")
+      .select("id, patient_id, scheduled_at, status, reason, notes, patient:patient_id(full_name, email, contact_number)")
       .order("scheduled_at", { ascending: false })
       .limit(200)
     if (error) {
       setLoadError(true)
     } else {
-      setAppointments((data as unknown as Appointment[]) || [])
+      const rows = (data as unknown as Appointment[]) || []
+      setAppointments(rows)
+      const userIds = [...new Set(rows.map((r) => r.patient_id).filter(Boolean))]
+      if (userIds.length > 0) {
+        const { data: linked } = await supabase
+          .from("patients")
+          .select("id, user_id")
+          .in("user_id", userIds)
+        if (linked) {
+          const map: Record<string, string> = {}
+          for (const p of linked as { id: string; user_id: string }[]) map[p.user_id] = p.id
+          setChartByUser(map)
+        }
+      }
     }
     setLoading(false)
   }
@@ -133,6 +153,14 @@ export default function AppointmentsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {chartByUser[a.patient_id] && (
+                    <Link
+                      href={`/patients/${chartByUser[a.patient_id]}`}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/10"
+                    >
+                      <ClipboardList className="h-3.5 w-3.5" /> View chart
+                    </Link>
+                  )}
                   {updatingId === a.id ? (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : (

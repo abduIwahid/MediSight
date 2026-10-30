@@ -62,6 +62,10 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
   // they were the one role doing daily corrections with no UI at all
   // (QA Round 3, patients-crud M7). Deleting stays admin-only.
   const canEdit = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'data_scientist', 'doctor'].includes(profile.role))
+  // Vitals writes follow the vitals RLS policies exactly (doctor,
+  // hospital_admin, super_admin) — data scientists and nurses can read
+  // vitals but have no write policy, so they never see the form.
+  const canAddVitals = Boolean(profile?.role && ['super_admin', 'hospital_admin', 'doctor'].includes(profile.role))
 
   // Get the latest prediction
   const latestPrediction = (patient.predictions?.sort((a: PredictionRow, b: PredictionRow) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]) ?? null
@@ -72,6 +76,7 @@ export default async function PatientDetailPage({ params }: { params: { id: stri
       latestPrediction={latestPrediction}
       isAdmin={isAdmin}
       canEdit={canEdit}
+      canAddVitals={canAddVitals}
     />
   )
 }
