@@ -3,6 +3,7 @@ import type { CSSProperties } from "react"
 import type { Metadata } from "next"
 import { Activity, ArrowRight, CalendarCheck, ListChecks } from "lucide-react"
 import BrandMark from "@/components/shared/BrandMark"
+import { GuestRiskCheck } from "@/components/shared/GuestRiskCheck"
 import { SEVERITY_HEX } from "@/lib/status"
 
 export const metadata: Metadata = {
@@ -130,6 +131,7 @@ export default function WelcomePage() {
             </span>
           </Link>
           <nav className="ml-auto hidden items-center gap-6 text-sm font-semibold md:flex">
+            <a href="#check" className="text-foreground/75 transition hover:text-foreground">Risk check</a>
             <Link href="/model-card" className="text-foreground/75 transition hover:text-foreground">The model</Link>
             <a href="#how" className="text-foreground/75 transition hover:text-foreground">How it works</a>
             <a href="#scope" className="text-foreground/75 transition hover:text-foreground">Scope</a>
@@ -256,6 +258,18 @@ export default function WelcomePage() {
           ))}
         </section>
 
+        {/* Quick risk check — the real model, no account needed */}
+        <section id="check" className="scroll-mt-24 pb-2 pt-12">
+          <h2 className="font-heading text-[30px] font-bold uppercase tracking-wide">Try the model yourself</h2>
+          <p className="mt-1.5 max-w-[640px] text-[15.5px] text-muted-foreground">
+            No account, nothing saved. Answer the same questions a care team would ask, and the trained
+            diabetes model scores them — the same model, not a demo imitation.
+          </p>
+          <div className="mt-[22px]">
+            <GuestRiskCheck />
+          </div>
+        </section>
+
         {/* What it does */}
         <section id="how" className="scroll-mt-24 pb-2 pt-12">
           <h2 className="font-heading text-[30px] font-bold uppercase tracking-wide">What it does</h2>
@@ -366,6 +380,9 @@ export default function WelcomePage() {
             <a href="/model-card" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
               Model card
             </a>
+            <Link href="/contact-us" className="text-xs font-semibold text-white underline decoration-[#2E7FA8] decoration-2 underline-offset-4 hover:opacity-80">
+              Contact
+            </Link>
           </span>
           <p className="max-w-[640px] text-xs leading-relaxed opacity-75">
             WhyRisk is an experimental clinical decision-support and research tool. It is not a certified medical
